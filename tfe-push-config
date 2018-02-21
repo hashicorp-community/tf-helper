@@ -1,0 +1,333 @@
+#!/bin/sh
+
+## -------------------------------------------------------------------
+##
+## tfe-push-config: Use the Terraform Enteprise API to push a
+##                  configuration into a TFE environment and start a
+##                  run / plan.
+##
+## -------------------------------------------------------------------
+##
+## Copyright (c) 2018 Brent W. Woodruff.  All Rights Reserved.
+##
+## This file is provided to you under the Mozilla Public License
+## Version 2.0 (the "License"); you may not use this file
+## except in compliance with the License.  You may obtain
+## a copy of the License at
+##
+##   https://www.mozilla.org/en-US/MPL/2.0/
+##
+## Unless required by applicable law or agreed to in writing,
+## software distributed under the License is distributed on an
+## "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+## KIND, either express or implied.  See the License for the
+## specific language governing permissions and limitations
+## under the License.
+##
+## -------------------------------------------------------------------
+
+###
+### Function declarations
+###
+
+echoerr () { echo "$@" 1>&2; }
+
+echodebug () {
+    if [ -n "$TF_LOG" ]; then
+        echoerr
+        echoerr $@
+        echoerr
+    fi
+}
+
+cleanup () {
+    if [ -f "$config_payload" ]; then
+        echodebug "[DEBUG] Deleting temporary content file"
+        rm "$config_payload" 
+        if [ 0 -ne $? ]; then
+            echoerr "Error deleting temporary configuration payload file:"
+            echoerr "$config_payload"
+        fi
+    else
+        echodebug "[DEBUG] No temporary content file to delete"
+    fi
+
+    if [ -f "$json_payload_file" ]; then
+        echodebug "[DEBUG] Deleting temporary JSON file"
+        rm "$json_payload_file" 
+        if [ 0 -ne $? ]; then
+            echoerr "Error deleting temporary configuration payload file:"
+            echoerr "$json_payload_file"
+        fi
+    else
+        echodebug "[DEBUG] No temporary content file to delete"
+    fi
+}
+
+assign_arg () {
+    if [ "${2#-}" != "$2" ]; then
+        echoerr "Parameter $1 is missing a value"
+        exit 1
+    else
+        echo $2
+    fi
+}
+
+tfe_api_call () {
+    curl $curl_silent \
+         --header "Authorization: Bearer $token" \
+         --header "Content-Type: application/vnd.api+json" \
+         $@
+}
+
+make_run_payload () {
+cat > "$json_payload_file" << EOF
+{
+  "data": {
+    "attributes": {
+      "is-destroy":false
+    },
+    "type":"runs",
+    "relationships": {
+      "workspace": {
+        "data": {
+          "type": "workspaces",
+          "id": "$workspace_id"
+        }
+      }
+    }
+  }
+}
+EOF
+}
+
+usage () {
+cat << 'EOF'
+Usage:
+
+  tfe-push-config -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS] [CONFIG_DIR]
+
+  Upload a Terraform configuration to a Terraform Enterprise workspace
+  and begin a run.
+
+Options:
+
+  -tfe-address=<url>   An alternate address to an Atlas instance. Defaults
+                       to https://atlas.hashicorp.com
+
+  -upload-modules=true If true (default), then the modules are locked at
+                       their current checkout and uploaded completely. This
+                       prevents Atlas from running "terraform get".
+
+  -name=<name>         Name of the configuration in Atlas. This can also
+                       be set in the configuration itself. Format is
+                       typically: "username/name".
+
+  -token=<token>       Access token to use to upload. If blank or unspecified,
+                       the ATLAS_TOKEN environmental variable will be used.
+
+Notes:
+
+  The curl and jq commands are required.
+
+EOF
+exit
+}
+
+if [ -z "$(command -v jq)" ]; then
+    echoerr "The jq command must be installed"
+    exit 1
+fi
+
+if [ -z "$(command -v curl)" ]; then
+    echoerr "The curl command must be installed"
+    exit 1
+fi
+
+if [ -z "$TMPDIR" ]; then
+    TMPDIR=/tmp
+fi
+
+tfe_address=https://atlas.hashicorp.com
+name=
+token=
+config_dir=.
+tar_verbose=
+tar_exclude="--exclude .git"
+curl_silent="-s"
+json_payload_file="$TMPDIR/tfe.json"
+
+###
+### Parse options
+###
+
+while [ -n "$1" ]; do
+    case "$1" in
+        help|-h|-help|--help)
+            usage
+            ;;
+        -tfe-address)
+            tfe_address=$(assign_arg "$1" "$2")
+            ;;
+        -upload-modules)
+            case "$2" in
+                true)
+                    tar_exclude="--exclude .git"
+                    ;;
+                false)
+                    tar_exclude="--exclude .git --exclude .terraform" 
+                    ;;
+                *)
+                    echoerr "-upload-modules should be true or false"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        -name)
+            name=$(assign_arg "$1" "$2")
+            ;;
+        -token)
+            token=$(assign_arg "$1" "$2")
+            ;;
+        *)
+            # Shouldn't get here until the last option, the optional
+            # config directory
+            if [ $# -gt 1 ]; then
+                echoerr "Trailing options following config directory $1"
+                exit 1
+            fi
+
+            config_dir=$1
+            ;;
+    esac
+    shift
+    shift
+done
+
+if [ -z "$name" ]; then
+    echoerr "-name is a required parameter"
+    exit 1
+else
+    org="${name%/*}"
+    workspace="${name#*/}"
+fi
+
+if [ -z "$token" ]; then
+    token="$ATLAS_TOKEN"
+    if [ -z "$token" ]; then
+        echoerr 'Set the API token with -token or $ATLAS_TOKEN'
+    fi
+fi
+
+if [ -n "$TF_LOG" ]; then
+    tar_verbose=v
+    curl_silent=
+fi
+
+echo "Uploading Terraform configuration..."
+
+echodebug "[DEBUG] Creating file for upload"
+
+# Creates a tar.gz of the director with the configuration
+config_payload="$TMPDIR/content-$(date +%s).tar.gz"
+
+tar $tar_exclude -C "$config_dir" -zcf$verbose_tar "$config_payload" .
+if [ 0 -ne $? ]; then
+    echoerr "Error creating archive for configuration payload"
+    exit 1
+fi
+
+echodebug "[DEBUG] Requesting workspace information for $org/$workspace"
+
+# Gets the workspace ID given the organization name and workspace name
+# This step can be skipped if you know the workspace ID
+url="$tfe_address/api/v2/organizations/$org/workspaces/$workspace"
+workspace_id_resp="$(tfe_api_call "$url")"
+if [ 0 -ne $? ]; then
+    echoerr "Error requesting workspace ID"
+    cleanup
+    exit 1
+fi
+
+echodebug "[DEBUG] $workspace_id_resp"
+
+workspace_id="$(echo "$workspace_id_resp" | jq -r '.data.id')"
+if [ 0 -ne $? ]; then
+    echoerr "Error parsing API response for workspace ID"
+    cleanup
+    exit 1
+fi
+
+if [ -z "$workspace_id" ]; then
+    echoerr "Error retrieving workspace ID. Parsing result was empty."
+    cleanup
+    exit 1
+fi
+
+echodebug "[DEBUG] Workspace ID: $workspace_id"
+
+echodebug "[DEBUG] Creating a new configuration version for $workspace"
+
+# Creates the JSON Payload used to create the new cnofiguration version
+config_ver_payload='{"data":{"type":"configuration-version"}}'
+
+echodebug "[DEBUG] Requesting config versions information for $workspace_id"
+
+# Creates the configuration version and extractes the upload-url
+url=$tfe_address/api/v2/workspaces/$workspace_id/configuration-versions
+upload_url_resp="$(tfe_api_call -d "$config_ver_payload" $url)"
+if [ 0 -ne $? ]; then
+    echoerr "Error creating configuration version"
+    cleanup
+    exit 1
+fi
+
+echodebug "[DEBUG] $upload_url_resp"
+
+config_id="$(echo "$upload_url_resp" | jq -r '.data.id')"
+url="$(echo "$upload_url_resp" | jq -r '.data.links.self')"
+if [ 0 -ne $? ]; then
+    echoerr "Error parsing API response for configuration upload"
+    cleanup
+    exit 1
+fi
+
+echodebug "[DEBUG] Upload URL: $url"
+
+echodebug "[DEBUG] Uploading content to upload URL"
+
+tfe_api_call -X PUT -F "data=@$config_payload" ${tfe_address}${url}
+if [ 0 -ne $? ]; then
+    echoerr "Error uploading configuration archive"
+    cleanup
+    exit 1
+fi
+
+url=$tfe_address/api/v2/runs
+make_run_payload
+
+echodebug "[DEBUG] JSON payload file: $json_payload_file"
+
+echodebug "[DEBUG] JSON payload contents:"
+cat $json_payload_file 1>&2
+
+make_run_resp=$(tfe_api_call -d @"$json_payload_file" $url)
+if [ 0 -ne $? ]; then
+    echoerr "Error starting run"
+    cleanup
+    exit 1
+fi
+
+echodebug "[DEBUG] $make_run_resp"
+
+run_id="$(echo "$make_run_resp" | jq -r '.data.id')"
+if [ 0 -ne $? ]; then
+    echoerr "Error parsing run ID"
+    cleanup
+    exit 1
+fi
+
+echo "Run $run_id started with configuration $config_id on $org/$workspace"
+
+cleanup
+
