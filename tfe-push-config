@@ -239,7 +239,7 @@ echodebug "[DEBUG] Creating file for upload"
 # Creates a tar.gz of the director with the configuration
 config_payload="$TMPDIR/content-$(date +%s).tar.gz"
 
-tar $tar_exclude -C "$config_dir" -zcf$verbose_tar "$config_payload" .
+tar $tar_exclude -C "$config_dir" -${tar_verbose}zcf "$config_payload" .
 if [ 0 -ne $? ]; then
     echoerr "Error creating archive for configuration payload"
     exit 1
