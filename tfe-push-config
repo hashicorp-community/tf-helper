@@ -35,7 +35,7 @@ echoerr () { echo "$@" 1>&2; }
 echodebug () {
     if [ -n "$TF_LOG" ]; then
         echoerr
-        echoerr $@
+        echoerr "$@"
         echoerr
     fi
 }
@@ -47,17 +47,6 @@ cleanup () {
         if [ 0 -ne $? ]; then
             echoerr "Error deleting temporary configuration payload file:"
             echoerr "$config_payload"
-        fi
-    else
-        echodebug "[DEBUG] No temporary content file to delete"
-    fi
-
-    if [ -f "$json_payload_file" ]; then
-        echodebug "[DEBUG] Deleting temporary JSON file"
-        rm "$json_payload_file" 
-        if [ 0 -ne $? ]; then
-            echoerr "Error deleting temporary configuration payload file:"
-            echoerr "$json_payload_file"
         fi
     else
         echodebug "[DEBUG] No temporary content file to delete"
@@ -80,27 +69,6 @@ tfe_api_call () {
          $@
 }
 
-make_run_payload () {
-cat > "$json_payload_file" << EOF
-{
-  "data": {
-    "attributes": {
-      "is-destroy":false
-    },
-    "type":"runs",
-    "relationships": {
-      "workspace": {
-        "data": {
-          "type": "workspaces",
-          "id": "$workspace_id"
-        }
-      }
-    }
-  }
-}
-EOF
-}
-
 usage () {
 cat << 'EOF'
 Usage:
@@ -112,19 +80,22 @@ Usage:
 
 Options:
 
-  -tfe-address=<url>   An alternate address to an Atlas instance. Defaults
+  -tfe-address <url>   An alternate address to an Atlas instance. Defaults
                        to https://atlas.hashicorp.com
 
-  -upload-modules=true If true (default), then the modules are locked at
+  -upload-modules true If true (default), then the modules are locked at
                        their current checkout and uploaded completely. This
                        prevents Atlas from running "terraform get".
 
-  -name=<name>         Name of the configuration in Atlas. This can also
+  -name <name>         Name of the configuration in Atlas. This can also
                        be set in the configuration itself. Format is
-                       typically: "username/name".
+                       typically: "username_or_org/workspace".
 
-  -token=<token>       Access token to use to upload. If blank or unspecified,
+  -token <token>       Access token to use to upload. If blank or unspecified,
                        the ATLAS_TOKEN environmental variable will be used.
+
+  -poll <seconds>      Number of seconds to wait between polling the submitted
+                       run for a non-active status. Defaults to 0 (no polling).
 
 Notes:
 
@@ -155,7 +126,7 @@ config_dir=.
 tar_verbose=
 tar_exclude="--exclude .git"
 curl_silent="-s"
-json_payload_file="$TMPDIR/tfe.json"
+poll_run=0
 
 ###
 ### Parse options
@@ -182,6 +153,14 @@ while [ -n "$1" ]; do
                     exit 1
                     ;;
             esac
+            ;;
+        -poll)
+            if [ "$2" -eq "$2" ] >/dev/null 2>&1; then
+                poll_run=$(assign_arg "$1" "$2")
+            else
+                echoerr "-poll must be an integer"
+                exit 1
+            fi
             ;;
         -name)
             name=$(assign_arg "$1" "$2")
@@ -224,23 +203,9 @@ if [ -n "$TF_LOG" ]; then
     curl_silent=
 fi
 
-echo "Uploading Terraform configuration..."
-
-echodebug "[DEBUG] Creating file for upload"
-
-# Creates a tar.gz of the director with the configuration
-config_payload="$TMPDIR/content-$(date +%s).tar.gz"
-
-tar $tar_exclude -C "$config_dir" -zcf$verbose_tar "$config_payload" .
-if [ 0 -ne $? ]; then
-    echoerr "Error creating archive for configuration payload"
-    exit 1
-fi
-
 echodebug "[DEBUG] Requesting workspace information for $org/$workspace"
 
 # Gets the workspace ID given the organization name and workspace name
-# This step can be skipped if you know the workspace ID
 url="$tfe_address/api/v2/organizations/$org/workspaces/$workspace"
 workspace_id_resp="$(tfe_api_call "$url")"
 if [ 0 -ne $? ]; then
@@ -249,7 +214,8 @@ if [ 0 -ne $? ]; then
     exit 1
 fi
 
-echodebug "[DEBUG] $workspace_id_resp"
+echodebug "[DEBUG] Workspace ID response:"
+echodebug "$(echo "$workspace_id_resp" | jq '')"
 
 workspace_id="$(echo "$workspace_id_resp" | jq -r '.data.id')"
 if [ 0 -ne $? ]; then
@@ -266,9 +232,22 @@ fi
 
 echodebug "[DEBUG] Workspace ID: $workspace_id"
 
+echo "Uploading Terraform configuration..."
+
+echodebug "[DEBUG] Creating file for upload"
+
+# Creates a tar.gz of the director with the configuration
+config_payload="$TMPDIR/content-$(date +%s).tar.gz"
+
+tar $tar_exclude -C "$config_dir" -zcf$verbose_tar "$config_payload" .
+if [ 0 -ne $? ]; then
+    echoerr "Error creating archive for configuration payload"
+    exit 1
+fi
+
 echodebug "[DEBUG] Creating a new configuration version for $workspace"
 
-# Creates the JSON Payload used to create the new cnofiguration version
+# The JSON Payload used to create the new cnofiguration version
 config_ver_payload='{"data":{"type":"configuration-version"}}'
 
 echodebug "[DEBUG] Requesting config versions information for $workspace_id"
@@ -282,10 +261,11 @@ if [ 0 -ne $? ]; then
     exit 1
 fi
 
-echodebug "[DEBUG] $upload_url_resp"
+echodebug "[DEBUG] Upload URL response:" 
+echodebug "$(echo "$upload_url_resp" | jq '')"
 
 config_id="$(echo "$upload_url_resp" | jq -r '.data.id')"
-url="$(echo "$upload_url_resp" | jq -r '.data.links.self')"
+url="$(echo "$upload_url_resp" | jq -r '.data.attributes."upload-url"')"
 if [ 0 -ne $? ]; then
     echoerr "Error parsing API response for configuration upload"
     cleanup
@@ -296,38 +276,97 @@ echodebug "[DEBUG] Upload URL: $url"
 
 echodebug "[DEBUG] Uploading content to upload URL"
 
-tfe_api_call -X PUT -F "data=@$config_payload" ${tfe_address}${url}
+upload_config_resp="$(curl $curl_silent -X PUT --data-binary "@$config_payload" ${url})"
 if [ 0 -ne $? ]; then
     echoerr "Error uploading configuration archive"
     cleanup
     exit 1
 fi
 
-url=$tfe_address/api/v2/runs
-make_run_payload
-
-echodebug "[DEBUG] JSON payload file: $json_payload_file"
-
-echodebug "[DEBUG] JSON payload contents:"
-cat $json_payload_file 1>&2
-
-make_run_resp=$(tfe_api_call -d @"$json_payload_file" $url)
-if [ 0 -ne $? ]; then
-    echoerr "Error starting run"
-    cleanup
-    exit 1
-fi
-
-echodebug "[DEBUG] $make_run_resp"
-
-run_id="$(echo "$make_run_resp" | jq -r '.data.id')"
-if [ 0 -ne $? ]; then
-    echoerr "Error parsing run ID"
-    cleanup
-    exit 1
-fi
-
-echo "Run $run_id started with configuration $config_id on $org/$workspace"
-
 cleanup
+
+echodebug "[DEBUG] Upload config response:"
+echodebug "$(echo "$upload_config_resp" | jq '')"
+
+url=$tfe_address/api/v2/workspaces/$workspace_id/runs
+run_check_resp="$(tfe_api_call $url)"
+if [ 0 -ne $? ]; then
+    echoerr "Error getting runs to obtain status"
+    exit 1
+fi
+
+echodebug "[DEBUG] Run check response:"
+echodebug "$(echo "$run_check_resp" | jq '')"
+
+run_id="$(echo "$run_check_resp" | jq -r '.data[] | select(.relationships."configuration-version".data.id == "'$config_id'") | .id')"
+if [ 0 -ne $? ]; then
+    echoerr "Error parsing API response for run ID"
+    exit 1
+fi
+
+echo "Run $run_id submitted with configuration $config_id on $org/$workspace"
+
+run_status=pending
+lock_id=
+
+while [ 0 != "$poll_run" ] &&
+        ( [ pending = "$run_status"   ] ||
+          [ planning = "$run_status"  ] ||
+          [ applying = "$run_status"  ] ||
+          [ confirmed = "$run_status" ] ); do
+    # if the workspace was determined to be locked in the previous
+    # poll, don't delay getting the final status and exiting.
+    if [ true != "$workspace_locked" ]; then
+        sleep $poll_run
+    fi
+
+    url=$tfe_address/api/v2/workspaces/$workspace_id/runs
+    poll_run_resp=$(tfe_api_call $url)
+    if [ 0 -ne $? ]; then
+        echoerr "Error getting runs to obtain status"
+        exit 1
+    fi
+
+    echodebug "[DEBUG] $poll_run_resp"
+
+    run_status="$(echo "$poll_run_resp" | jq -r '.data[] | select(.id == "'$run_id'") | .attributes.status')"
+
+    echo "$run_status"
+
+    echodebug "[DEBUG] Requesting workspace info for $org/$workspace"
+
+    url="$tfe_address/api/v2/organizations/$org/workspaces/$workspace"
+    workspace_info_resp="$(tfe_api_call "$url")"
+    if [ 0 -ne $? ]; then
+        echoerr "Error requesting workspace info"
+        exit 1
+    fi
+
+    echodebug "[DEBUG] Workspace info response:"
+    echodebug "$(echo "$workspace_info_resp" | jq '')"
+
+    workspace_locked="$(echo "$workspace_info_resp" | jq -r '.data.attributes.locked')"
+    if [ 0 -ne $? ]; then
+        echoerr "Error parsing API response for workspace lock status"
+        exit 1
+    fi
+
+    if [ true = "$workspace_locked" ]; then
+        lock_id="$(echo "$workspace_info_resp" | jq -r '.data.relationships."locked-by".data.id')"
+        if [ 0 -ne $? ]; then
+            echoerr "Error parsing API response for run locking workspace"
+            cleanup
+            exit 1
+        fi
+
+        if [ "$lock_id" != "$run_id" ]; then
+            echoerr "Workspace is locked by $lock_id. Polling has been halted."
+            exit 1
+        fi
+
+        # When the workspace is locked skip sleeping to quickly loop
+        # around for the final run status.
+        continue
+    fi
+done
 
