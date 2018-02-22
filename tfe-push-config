@@ -87,7 +87,7 @@ Options:
                        in Atlas. Format is: "username_or_org/workspace".
 
   -tfe-address <url>   An alternate address to an Atlas instance. Defaults
-                       to https://atlas.hashicorp.com
+                       to https://app.terraform.io
 
   -upload-modules true If true (default), then the modules are locked at
                        their current checkout and uploaded completely. This
@@ -121,7 +121,7 @@ if [ -z "$TMPDIR" ]; then
     TMPDIR=/tmp
 fi
 
-tfe_address=https://atlas.hashicorp.com
+tfe_address=https://app.terraform.io
 name=
 token=
 config_dir=.
