@@ -267,9 +267,15 @@ echodebug "[DEBUG] Upload URL response:"
 echodebug "$(echo "$upload_url_resp" | jq '')"
 
 config_id="$(echo "$upload_url_resp" | jq -r '.data.id')"
+if [ 0 -ne $? ]; then
+    echoerr "Error parsing API response for configuration ID"
+    cleanup
+    exit 1
+fi
+
 url="$(echo "$upload_url_resp" | jq -r '.data.attributes."upload-url"')"
 if [ 0 -ne $? ]; then
-    echoerr "Error parsing API response for configuration upload"
+    echoerr "Error parsing API response for upload URL"
     cleanup
     exit 1
 fi
@@ -329,9 +335,15 @@ while [ 0 != "$poll_run" ] &&
         exit 1
     fi
 
-    echodebug "[DEBUG] $poll_run_resp"
+    echodebug "[DEBUG] Poll run response:"
+    echodebug "$(echo "$poll_run_resp" | jq '')"
 
     run_status="$(echo "$poll_run_resp" | jq -r '.data[] | select(.id == "'$run_id'") | .attributes.status')"
+    if [ 0 -ne $? ]; then
+        echoerr "Error parsing API response for run status"
+        # Loop and try again
+        continue
+    fi
 
     echo "$run_status"
 
