@@ -54,9 +54,12 @@ cleanup () {
 }
 
 assign_arg () {
-    if [ "${2#-}" != "$2" ]; then
+    if [ -z "$2" ] || [ "${2#-}" != "$2" ]; then
         echoerr "Parameter $1 is missing a value"
-        exit 1
+        # exit here will not terminate the script. Using PIPE
+        # to kill the current process will not produce a kill
+        # message
+        kill -PIPE $$
     else
         echo $2
     fi
