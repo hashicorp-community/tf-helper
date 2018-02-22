@@ -252,10 +252,13 @@ echodebug "[DEBUG] Creating a new configuration version for $workspace"
 # The JSON Payload used to create the new cnofiguration version
 config_ver_payload='{"data":{"type":"configuration-version"}}'
 
-echodebug "[DEBUG] Requesting config versions information for $workspace_id"
+echodebug "[DEBUG] Creating config version in workspace $workspace_id"
 
 # Creates the configuration version and extractes the upload-url
 url=$tfe_address/api/v2/workspaces/$workspace_id/configuration-versions
+
+echodebug "[DEBUG] URL: $url"
+
 upload_url_resp="$(tfe_api_call -d "$config_ver_payload" $url)"
 if [ 0 -ne $? ]; then
     echoerr "Error creating configuration version"
