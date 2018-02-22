@@ -377,10 +377,6 @@ while [ 0 != "$poll_run" ] &&
             echoerr "Workspace is locked by $lock_id. Polling has been halted."
             exit 1
         fi
-
-        # When the workspace is locked skip sleeping to quickly loop
-        # around for the final run status.
-        continue
     fi
 done
 
