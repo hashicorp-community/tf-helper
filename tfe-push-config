@@ -80,6 +80,9 @@ Usage:
 
 Options:
 
+  -name <name>         This parameter is required. Name of the configuration
+                       in Atlas. Format is: "username_or_org/workspace".
+
   -tfe-address <url>   An alternate address to an Atlas instance. Defaults
                        to https://atlas.hashicorp.com
 
@@ -87,12 +90,8 @@ Options:
                        their current checkout and uploaded completely. This
                        prevents Atlas from running "terraform get".
 
-  -name <name>         Name of the configuration in Atlas. This can also
-                       be set in the configuration itself. Format is
-                       typically: "username_or_org/workspace".
-
   -token <token>       Access token to use to upload. If blank or unspecified,
-                       the ATLAS_TOKEN environmental variable will be used.
+                       the ATLAS_TOKEN environment variable will be used.
 
   -poll <seconds>      Number of seconds to wait between polling the submitted
                        run for a non-active status. Defaults to 0 (no polling).
