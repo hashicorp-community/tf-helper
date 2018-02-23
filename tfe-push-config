@@ -197,6 +197,7 @@ if [ -z "$token" ]; then
     token="$ATLAS_TOKEN"
     if [ -z "$token" ]; then
         echoerr 'Set the API token with -token or $ATLAS_TOKEN'
+        exit 1
     fi
 fi
 
