@@ -4,7 +4,7 @@
 ##
 ## tfe-pull-vars: Use the Terraform Enteprise API to output variables
 ##                from a Terraform Enterprise workspace in tfvars
-##                format.
+##                and shell format.
 ##
 ## -------------------------------------------------------------------
 ##
@@ -140,16 +140,16 @@ while [ -n "$1" ]; do
         -token)
             token=$(assign_arg "$1" "$2")
             ;;
-		-var)
+        -var)
             # -var can be specified multiple times
             new_var="$(assign_arg "$1" "$2")"
             vars="$( [ -n "$vars" ] && echo "$vars"; echo "$new_var")"
-			;;
-		-env-var)
+            ;;
+        -env-var)
             # -env-var can be specified multiple times
             new_var="$(assign_arg "$1" "$2")"
             env_vars="$( [ -n "$env_vars" ] && echo "$env_vars"; echo "$new_var")"
-			;;
+            ;;
         -env)
             case "$2" in
                 true)
@@ -185,7 +185,7 @@ if [ -z "$token" ]; then
     token="$ATLAS_TOKEN"
     if [ -z "$token" ]; then
         echoerr 'Set the API token with -token or $ATLAS_TOKEN'
-		exit 1
+        exit 1
     fi
 fi
 
@@ -210,7 +210,7 @@ if [ 0 -ne $? ]; then
     exit 1
 fi
 
-echodebug "[DEBUG] Variable list response:" 
+echodebug "[DEBUG] Variable list response:"
 echodebug "$(printf "%s" "$var_get_resp" | jq '.')"
 
 vars_retval=0
