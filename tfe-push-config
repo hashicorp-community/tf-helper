@@ -35,7 +35,7 @@ echoerr () { echo "$@" 1>&2; }
 echodebug () {
     if [ -n "$TF_LOG" ]; then
         echoerr
-        echoerr "$@"
+        printf "%s" "$@"
         echoerr
     fi
 }
@@ -218,9 +218,9 @@ if [ 0 -ne $? ]; then
 fi
 
 echodebug "[DEBUG] Workspace ID response:"
-echodebug "$(echo "$workspace_id_resp" | jq '')"
+echodebug "$(printf "%s" "$workspace_id_resp" | jq '')"
 
-workspace_id="$(echo "$workspace_id_resp" | jq -r '.data.id')"
+workspace_id="$(printf "%s" "$workspace_id_resp" | jq -r '.data.id')"
 if [ 0 -ne $? ]; then
     echoerr "Error parsing API response for workspace ID"
     cleanup
@@ -268,16 +268,16 @@ if [ 0 -ne $? ]; then
 fi
 
 echodebug "[DEBUG] Upload URL response:" 
-echodebug "$(echo "$upload_url_resp" | jq '')"
+echodebug "$(printf "%s" "$upload_url_resp" | jq '')"
 
-config_id="$(echo "$upload_url_resp" | jq -r '.data.id')"
+config_id="$(printf "%s" "$upload_url_resp" | jq -r '.data.id')"
 if [ 0 -ne $? ]; then
     echoerr "Error parsing API response for configuration ID"
     cleanup
     exit 1
 fi
 
-url="$(echo "$upload_url_resp" | jq -r '.data.attributes."upload-url"')"
+url="$(printf "%s" "$upload_url_resp" | jq -r '.data.attributes."upload-url"')"
 if [ 0 -ne $? ]; then
     echoerr "Error parsing API response for upload URL"
     cleanup
@@ -298,7 +298,7 @@ fi
 cleanup
 
 echodebug "[DEBUG] Upload config response:"
-echodebug "$(echo "$upload_config_resp" | jq '')"
+echodebug "$(printf "%s" "$upload_config_resp" | jq '')"
 
 url=$tfe_address/api/v2/workspaces/$workspace_id/runs
 run_check_resp="$(tfe_api_call $url)"
@@ -308,9 +308,9 @@ if [ 0 -ne $? ]; then
 fi
 
 echodebug "[DEBUG] Run check response:"
-echodebug "$(echo "$run_check_resp" | jq '')"
+echodebug "$(printf "%s" "$run_check_resp" | jq '')"
 
-run_id="$(echo "$run_check_resp" | jq -r '.data[] | select(.relationships."configuration-version".data.id == "'$config_id'") | .id')"
+run_id="$(printf "%s" "$run_check_resp" | jq -r '.data[] | select(.relationships."configuration-version".data.id == "'$config_id'") | .id')"
 if [ 0 -ne $? ]; then
     echoerr "Error parsing API response for run ID"
     exit 1
@@ -340,9 +340,9 @@ while [ 0 != "$poll_run" ] &&
     fi
 
     echodebug "[DEBUG] Poll run response:"
-    echodebug "$(echo "$poll_run_resp" | jq '')"
+    echodebug "$(printf "%s" "$poll_run_resp" | jq '')"
 
-    run_status="$(echo "$poll_run_resp" | jq -r '.data[] | select(.id == "'$run_id'") | .attributes.status')"
+    run_status="$(printf "%s" "$poll_run_resp" | jq -r '.data[] | select(.id == "'$run_id'") | .attributes.status')"
     if [ 0 -ne $? ]; then
         echoerr "Error parsing API response for run status"
         # Loop and try again
@@ -361,16 +361,16 @@ while [ 0 != "$poll_run" ] &&
     fi
 
     echodebug "[DEBUG] Workspace info response:"
-    echodebug "$(echo "$workspace_info_resp" | jq '')"
+    echodebug "$(printf "%s" "$workspace_info_resp" | jq '')"
 
-    workspace_locked="$(echo "$workspace_info_resp" | jq -r '.data.attributes.locked')"
+    workspace_locked="$(printf "%s" "$workspace_info_resp" | jq -r '.data.attributes.locked')"
     if [ 0 -ne $? ]; then
         echoerr "Error parsing API response for workspace lock status"
         exit 1
     fi
 
     if [ true = "$workspace_locked" ]; then
-        lock_id="$(echo "$workspace_info_resp" | jq -r '.data.relationships."locked-by".data.id')"
+        lock_id="$(printf "%s" "$workspace_info_resp" | jq -r '.data.relationships."locked-by".data.id')"
         if [ 0 -ne $? ]; then
             echoerr "Error parsing API response for run locking workspace"
             cleanup
