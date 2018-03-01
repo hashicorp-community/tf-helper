@@ -199,7 +199,7 @@ if [ -n "$TF_LOG" ]; then
 fi
 
 # request template
-url="$tfe_address/api/v2/vars?filter%5Borganization%5D%5Busername%5D=$org&filter%5Bworkspace%5D%5Bname%5D=$workspace"
+url="$tfe_address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$org&filter%5Bworkspace%5D%5Bname%5D=$workspace"
 
 echodebug "[DEBUG] API list variables URL:"
 echodebug "$url"
