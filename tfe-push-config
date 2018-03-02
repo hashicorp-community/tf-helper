@@ -91,7 +91,10 @@ Options:
 
   -upload-modules true If true (default), then the modules are locked at
                        their current checkout and uploaded completely. This
-                       prevents Atlas from running "terraform get".
+                       prevents modules from being retrieved with "terraform
+                       init". This does not lock provider versions. Use the
+                       "version" parameter in provider blocks in the
+                       configuration to accomplish that.
 
   -token <token>       Access token to use to upload. If blank or unspecified,
                        the ATLAS_TOKEN environment variable will be used.
@@ -145,7 +148,7 @@ while [ -n "$1" ]; do
         -upload-modules)
             case "$2" in
                 true)
-                    tar_exclude="--exclude .git"
+                    tar_exclude="--exclude .git --exclude .terraform/plugins"
                     ;;
                 false)
                     tar_exclude="--exclude .git --exclude .terraform" 
