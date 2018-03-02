@@ -163,7 +163,7 @@ tfe_api_call () {
          $@
 }
 
-escape_hcl () {
+escape_value () {
     echo "$1" | awk '
     {
         gsub(/"/,"\\\"")
@@ -392,14 +392,14 @@ while [ -n "$1" ]; do
         -hcl-var)
             new_var_arg="$(assign_arg "$1" "$2")"
             new_var_name=${new_var_arg%%=*}
-            new_var_value="$(escape_hcl "${new_var_arg#*=}")"
+            new_var_value="$(escape_value "${new_var_arg#*=}")"
             hclvars="$( [ -n "$hclvars" ] && echo "$hclvars"; echo "$new_var_name")"
             hclvars_values="$( [ -n "$hclvars_values" ] && echo "$hclvars_values"; echo "$new_var_value")"
             ;;
         -shcl-var)
             new_var_arg="$(assign_arg "$1" "$2")"
             new_var_name=${new_var_arg%%=*}
-            new_var_value="$(escape_hcl "${new_var_arg#*=}")"
+            new_var_value="$(escape_value "${new_var_arg#*=}")"
             shclvars="$( [ -n "$shclvars" ] && echo "$shclvars"; echo "$new_var_name")"
             shclvars_values="$( [ -n "$shclvars_values" ] && echo "$shclvars_values"; echo "$new_var_value")"
             ;;
@@ -560,7 +560,7 @@ if [ -n "$config_dir" ]; then
                 # Terraform variable values
                 value_char = substr($0, RLENGTH + 1, 1)
 
-                if(value_char == "\"") {
+                if(value_char == "\"" || value_char == "<") {
                     print "nonhcl", name
                 } else {
                     print "hcl", name
@@ -631,7 +631,7 @@ elif [ -n "$var_file" ]; then
                 # Terraform variable values
                 value_char = substr($0, RLENGTH + 1, 1)
 
-                if(value_char == "\"") {
+                if(value_char == "\"" || value_char == "<") {
                     print "nonhcl", name
                 } else {
                     print "hcl", name
@@ -661,18 +661,19 @@ maybe_defaulthclvars="$(echo "${all_vars}" | while read var_info; do
 if [ -n "$maybe_defaultvars" ]; then
     for var in $maybe_defaultvars; do
         if [ -z "$var_file_arg" ]; then
-            val="$(echo "var.$var" | terraform console 2>/dev/null)"
+            val_lines="$(echo "var.$var" | terraform console 2>/dev/null)"
         else
-            val="$(echo "var.$var" | terraform console $var_file_arg 2>/dev/null)"
+            val_lines="$(echo "var.$var" | terraform console $var_file_arg 2>/dev/null)"
         fi
 
         if [ 0 -ne $? ]; then
             echodebug "Unable to retrieve value for potential variable $var"
             continue
         fi
+        val="$(escape_value "$val_lines")"
 
         defaultvars="$( [ -n "$defaultvars" ] && echo "$defaultvars"; echo "$var")"
-        defaultvars_values="$( [ -n "$defaultvars_values" ] && echo "$defaultvars_values"; echo "$val")"
+        defaultvars_values="$( [ -n "$defaultvars_values" ] && printf "%s\n" "$defaultvars_values"; printf "%s\n" "$val")"
     done
 fi
 
@@ -687,7 +688,7 @@ if [ -n "$maybe_defaulthclvars" ]; then
             echodebug "Unable to retrieve value for potential variable $var"
             continue
         fi
-        val="$(escape_hcl "$val_lines")"
+        val="$(escape_value "$val_lines")"
 
         defaulthclvars="$( [ -n "$defaulthclvars" ] && echo "$defaulthclvars"; echo "$var")"
         defaulthclvars_values="$( [ -n "$defaulthclvars_values" ] && printf "%s\n" "$defaulthclvars_values"; printf "%s\n" "$val")"
