@@ -73,7 +73,7 @@ Options:
                        Enterprise workspace.
 
 
-  -var-file foo        Load variable values from a tfvars file.
+  -var-file foo.tfars  Load variable values from a tfvars file.
 
   -overwrite foo       Variable keys that should overwrite values in Terraform
                        Enterprise. If omitted for variables already set in
