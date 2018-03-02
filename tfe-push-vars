@@ -68,6 +68,13 @@ Options:
   -shcl-var 'foo=bar'  Set a sensitive HCL variable in the Terraform
                        Enterprise workspace.
 
+  -env-var 'foo=bar'   Set an environment variable in the Terraform
+                       Enterprise workspace.
+
+  -senv-var 'foo=bar'  Set a sensitive environment variable in the Terraform
+                       Enterprise workspace.
+
+
   -var-file foo        Load variable values from a tfvars file.
 
   -overwrite foo       Variable keys that should overwrite values in Terraform
@@ -94,22 +101,16 @@ Notes:
 
   2. Operate on command line args along with a Terraform configuration. All
      args are supported. "terraform init" must have been run. Variable file
-     loading follows the same rules as "terraform apply" since "terraform
-     console" is used to obtain the variable values.
+     loading, including autoloading, follows the same rules as "terraform
+     apply" since "terraform console" is used to obtain the variable values.
 
-  The mode of operation is determined by supplying a [CONFIG_DIR] at the end
+  The mode of operation is determined by supplying a CONFIG_DIR at the end
   of the invocation. Even if the present working directory contains a
   Terraform configuration '.' must be supplied to change the mode of operation.
 
 EOF
 
 # TODO options
-#  -env-var 'foo=bar'   Set an environment variable in the Terraform
-#                       Enterprise workspace.
-#
-#  -senv-var 'foo=bar'  Set a sensitive environment variable in the Terraform
-#                       Enterprise workspace.
-#
 #  -overwrite-all false Overwrite all variables with the variable values found
 #                       in the configuration. Defaults to false. Use with
 #                       extreme caution when operating with a config directory.
