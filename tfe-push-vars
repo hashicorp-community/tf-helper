@@ -38,8 +38,6 @@ Usage:
   Update variables in a Terraform Enterprise workspace. Please read the
   supplied notes for important usage details about the modes of operation.
 
-  Environment variables are not implemented yet but planned.
-
 Options:
 
   -name <name>         Name of the configuration in Terraform Enterprise.
