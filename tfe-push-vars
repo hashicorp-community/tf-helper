@@ -1,0 +1,706 @@
+#!/bin/sh
+
+## -------------------------------------------------------------------
+##
+## tfe-push-vars: Use the Terraform Enteprise API to create and update
+##                variables in a Terraform Enterprise workspace.
+##
+## -------------------------------------------------------------------
+##
+## Copyright (c) 2018 Brent W. Woodruff.  All Rights Reserved.
+##
+## This file is provided to you under the Mozilla Public License
+## Version 2.0 (the "License"); you may not use this file
+## except in compliance with the License.  You may obtain
+## a copy of the License at
+##
+##   https://www.mozilla.org/en-US/MPL/2.0/
+##
+## Unless required by applicable law or agreed to in writing,
+## software distributed under the License is distributed on an
+## "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+## KIND, either express or implied.  See the License for the
+## specific language governing permissions and limitations
+## under the License.
+##
+## -------------------------------------------------------------------
+
+###
+### Function declarations
+###
+
+usage () {
+cat << 'EOF'
+Usage:
+
+  tfe-push-vars -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS] [CONFIG_DIR]
+
+  Update variables in a Terraform Enterprise workspace. Please read the
+  supplied notes for important usage details about the modes of operation.
+
+  Environment variables are not implemented yet but planned.
+
+Options:
+
+  -name <name>         Name of the configuration in Terraform Enterprise.
+                       This can also be set in the configuration itself.
+                       Format is typically: "username_or_org/name".
+
+  -dry-run false       Show what would be done, but do not actually make
+                       any changes to variables in the workspace. Defaults
+                       to false.
+
+  -tfe-address <url>   An alternate address to an Terraform Enterprise
+                       instance. Defaults to https://app.terraform.io
+
+  -token <token>       Access token to use to upload. If blank or unspecified,
+                       the ATLAS_TOKEN environmental variable will be used.
+
+  -var 'foo=bar'       Set a non-HCL variable in the Terraform Enterprise
+                       workspace.
+
+  -svar 'foo=bar'      Set a sensitive non-HCL variable in the Terraform
+                       Enterprise workspace.
+
+  -hcl-var 'foo=bar'   Set an HCL variable in the Terraform Enterprise
+                       workspace.
+
+  -shcl-var 'foo=bar'  Set a sensitive HCL variable in the Terraform
+                       Enterprise workspace.
+
+  -var-file foo        Load variable values from a tfvars file.
+
+  -overwrite foo       Variable keys that should overwrite values in Terraform
+                       Enterprise. If omitted for variables already set in
+                       Terraform Enterprise, values will not be overwritten
+                       unless overwriting is specified with a different
+                       overwrite flag. This can be used multiple times.
+
+  -hide-sensitive true Do not show sensitive values in output. Defaults to
+                       true.
+Notes:
+
+  The curl and jq commands are required.
+
+  All -var style args (except -var-file) can be set multiple times to operate
+  on multiple variables with one command.
+
+  There are two modes of operation:
+
+  1. Operate only on variables specified on the command line. All args are
+     supported. There is no automatic variable loading when -var-file is used;
+     variable values come from the one variable file and the other command
+     line args.
+
+  2. Operate on command line args along with a Terraform configuration. All
+     args are supported. "terraform init" must have been run. Variable file
+     loading follows the same rules as "terraform apply" since "terraform
+     console" is used to obtain the variable values.
+
+  The mode of operation is determined by supplying a [CONFIG_DIR] at the end
+  of the invocation. Even if the present working directory contains a
+  Terraform configuration '.' must be supplied to change the mode of operation.
+
+EOF
+
+# TODO options
+#  -env-var 'foo=bar'   Set an environment variable in the Terraform
+#                       Enterprise workspace.
+#
+#  -senv-var 'foo=bar'  Set a sensitive environment variable in the Terraform
+#                       Enterprise workspace.
+#
+#  -overwrite-all false Overwrite all variables with the variable values found
+#                       in the configuration. Defaults to false. Use with
+#                       extreme caution when operating with a config directory.
+
+exit
+}
+
+echoerr () { echo "$@" 1>&2; }
+
+echodebug () {
+    if [ -n "$TF_LOG" ]; then
+        echoerr
+        echoerr "$@"
+        echoerr
+    fi
+}
+
+cleanup () {
+    if [ -f "$payload" ]; then
+        echodebug "[DEBUG] Deleting temporary content file"
+        rm "$payload" 
+        if [ 0 -ne $? ]; then
+            echoerr "Error deleting temporary payload file:"
+            echoerr "$payload"
+        fi
+    else
+        echodebug "[DEBUG] No temporary content file to delete"
+    fi
+}
+
+assign_arg () {
+    if [ -z "$2" ] || [ "${2#-}" != "$2" ]; then
+        echoerr "Parameter $1 is missing a value"
+        # exit here will not terminate the script. Using PIPE
+        # to kill the current process will not produce a kill
+        # message
+        kill -PIPE $$
+    else
+        echo $2
+    fi
+}
+
+tfe_api_call () {
+    #echoerr "curl $curl_silent --header \"Authorization: Bearer $token\" --header \"Content-Type: application/vnd.api+json\" $@"
+
+    curl $curl_silent \
+         --fail \
+         --header "Authorization: Bearer $token" \
+         --header "Content-Type: application/vnd.api+json" \
+         $@
+}
+
+escape_hcl () {
+    echo "$1" | awk '
+    {
+        gsub(/"/,"\\\"")
+    }
+    NR == 1 {
+        value_line = $0
+    }
+    NR != 1 {
+        value_line = value_line "\\n" $0
+    }
+    END {
+        printf "%s", value_line
+    }'
+}
+
+make_var_create_payload () {
+cat > "$payload" <<EOF
+{
+  "data": {
+    "type":"vars",
+    "attributes": {
+      "key":"$1",
+      "value":"$2",
+      "category":"$3",
+      "hcl":$4,
+      "sensitive":$5
+    }
+  },
+  "filter": {
+    "organization": {
+      "name":"$org"
+    },
+    "workspace": {
+      "name":"$workspace"
+    }
+  }
+}
+EOF
+}
+
+make_var_update_payload () {
+cat > "$payload" <<EOF
+{
+  "data": {
+    "id":"$1",
+    "attributes": {
+      "key":"$2",
+      "value":"$3",
+      "category":"$4",
+      "hcl":$5,
+      "sensitive":$6
+    },
+    "type":"vars"
+  }
+}
+EOF
+}
+
+process_vars () {
+    if [ -z "$1" ]; then
+        return
+    fi
+
+    i=1
+    for v in $1; do
+        var_id="$(printf "%s" "$var_get_resp" | \
+                     jq -r --arg var "$v" --arg type "$3" '.data[]
+            | select(.attributes.category == $type)
+            | select(.attributes.key == $var)
+            | .id')"
+        val="$(printf "%s" "$2" | awk -v i=$i 'NR==i{print;exit}')"
+        if [ -z "$var_id" ]; then
+            if [ "$hide_sensitive" = true ] && [ "$5" = true ]; then
+                output_val=REDACTED
+            else
+                output_val="$val"
+            fi
+
+            printf "Creating %s, type: %s, hcl: %s, sensitive: %s, value: %s\n" "$v" "$3" "$4" "$5" "$output_val"
+
+            if [ "$dry_run" != true ]; then
+                url="$tfe_address/api/v2/vars"
+                make_var_create_payload "$v" "$val" $3 "$4" "$5"
+                if [ 0 -ne $? ]; then
+                    echoerr "Error generating payload file for $v"
+                    i=$(($i + 1))
+                    continue
+                fi
+
+                var_create_resp="$(tfe_api_call -d @"$payload" "$url")"
+                if [ 0 -ne $? ]; then
+                    echoerr "Error creating variable $v"
+                fi
+
+                echodebug "[DEBUG] Variable create response:" 
+                echodebug "$(printf "%s" "$var_create_resp" | jq '')"
+            fi
+        else
+            if echo "$overwrites" | grep -E "^$v$" >/dev/null 2>&1; then
+                if [ "$hide_sensitive" = true ] && [ "$5" = true ]; then
+                    output_val=REDACTED
+                else
+                    output_val="$val"
+                fi
+
+                printf "Updating %s, type: %s, hcl: %s, sensitive: %s, value: %s\n" "$v" "$3" "$4" "$5" "$val"
+
+                if [ "$dry_run" != true ]; then
+                    url="$tfe_address/api/v2/vars/$var_id"
+                    make_var_update_payload "$var_id" "$v" "$val" "$3" "$4" "$5"
+                    if [ 0 -ne $? ]; then
+                        echoerr "Error generating payload file for $v"
+                        i=$(($i + 1))
+                        continue
+                    fi
+
+                    var_update_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"
+                    if [ 0 -ne $? ]; then
+                        echoerr "Error updating variable $v"
+                    fi
+
+                    echodebug "[DEBUG] Variable update response:" 
+                    echodebug "$(echo "$var_update_resp" | jq '')"
+                fi
+            fi
+        fi
+        i=$(($i + 1))
+    done
+}
+
+if [ -z "$(command -v jq)" ]; then
+    echoerr "The jq command must be installed"
+    exit 1
+fi
+
+if [ -z "$(command -v curl)" ]; then
+    echoerr "The curl command must be installed"
+    exit 1
+fi
+
+if [ -z "$TMPDIR" ]; then
+    TMPDIR=/tmp
+fi
+
+tfe_address=https://app.terraform.io
+payload="$TMPDIR/tfe-push-vars-payload-$(date +%s)"
+name=
+dry_run=false
+token=
+config_dir=
+curl_silent="-s"
+var_file=
+var_file_arg=
+overwrites=
+hide_sensitive=true
+
+vars=
+vars_values=
+svars=
+svars_values=
+hclvars=
+hclvars_values=
+shclvars=
+shclvars_values=
+envvars=
+envvars_values=
+sensvars=
+sensvars_values=
+defaultvars=
+defaultvars_values=
+defaulthclvars=
+defaulthclvars_values=
+
+###
+### Parse options
+###
+
+while [ -n "$1" ]; do
+    case "$1" in
+        help|-h|-help|--help)
+            usage
+            ;;
+        -name)
+            name=$(assign_arg "$1" "$2")
+            ;;
+        -dry-run)
+            case "$2" in
+                true)
+                    dry_run=true
+                    ;;
+                false)
+                    dry_run=false
+                    ;;
+                *)
+                    echoerr "-dry-run should be true or false"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        -tfe-address)
+            tfe_address=$(assign_arg "$1" "$2")
+            ;;
+        -token)
+            token=$(assign_arg "$1" "$2")
+            ;;
+        -overwrite)
+            new_overwrite="$(assign_arg "$1" "$2")"
+            overwrites="$( [ -n "$overwrites" ] && echo "$overwrites"; echo "$new_overwrite")"
+            ;;
+        #-overwrite-all)
+        #    ;;
+        -var)
+            new_var_arg="$(assign_arg "$1" "$2")"
+            new_var_name=${new_var_arg%%=*}
+            new_var_value=${new_var_arg#*=}
+            vars="$( [ -n "$vars" ] && echo "$vars"; echo "$new_var_name")"
+            vars_values="$( [ -n "$vars_values" ] && echo "$vars_values"; echo "$new_var_value")"
+            ;;
+        -svar)
+            new_var_arg="$(assign_arg "$1" "$2")"
+            new_var_name=${new_var_arg%%=*}
+            new_var_value=${new_var_arg#*=}
+            svars="$( [ -n "$svars" ] && echo "$svars"; echo "$new_var_name")"
+            svars_values="$( [ -n "$svars_values" ] && echo "$svars_values"; echo "$new_var_value")"
+            ;;
+        -hcl-var)
+            new_var_arg="$(assign_arg "$1" "$2")"
+            new_var_name=${new_var_arg%%=*}
+            new_var_value="$(escape_hcl "${new_var_arg#*=}")"
+            hclvars="$( [ -n "$hclvars" ] && echo "$hclvars"; echo "$new_var_name")"
+            hclvars_values="$( [ -n "$hclvars_values" ] && echo "$hclvars_values"; echo "$new_var_value")"
+            ;;
+        -shcl-var)
+            new_var_arg="$(assign_arg "$1" "$2")"
+            new_var_name=${new_var_arg%%=*}
+            new_var_value="$(escape_hcl "${new_var_arg#*=}")"
+            shclvars="$( [ -n "$shclvars" ] && echo "$shclvars"; echo "$new_var_name")"
+            shclvars_values="$( [ -n "$shclvars_values" ] && echo "$shclvars_values"; echo "$new_var_value")"
+            ;;
+        -env-var)
+            new_var_arg="$(assign_arg "$1" "$2")"
+            new_var_name=${new_var_arg%%=*}
+            new_var_value=${new_var_arg#*=}
+            envvars="$( [ -n "$envvars" ] && echo "$envvars"; echo "$new_var_name")"
+            envvars_values="$( [ -n "$envvars_values" ] && echo "$envvars_values"; echo "$new_var_value")"
+            ;;
+        -senv-var)
+            new_var_arg="$(assign_arg "$1" "$2")"
+            new_var_name=${new_var_arg%%=*}
+            new_var_value=${new_var_arg#*=}
+            senvvars="$( [ -n "$senvvars" ] && echo "$senvvars"; echo "$new_var_name")"
+            senvvars_values="$( [ -n "$senvvars_values" ] && echo "$senvvars_values"; echo "$new_var_value")"
+            ;;
+        -var-file)
+            var_file="$(assign_arg "$1" "$2")"
+            var_file_arg="-var-file=$var_file"
+            ;;
+        -hide-sensitive)
+            case "$2" in
+                true)
+                    hide_sensitive=true
+                    ;;
+                false)
+                    hide_sensitive=false
+                    ;;
+                *)
+                    echoerr "-hide-sensitive should be true or false"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        *)
+            # Shouldn't get here until the last option, the optional
+            # config directory
+            if [ $# -gt 1 ]; then
+                echoerr "Trailing options following config directory $1"
+                exit 1
+            fi
+
+            config_dir="$1"
+            ;;
+    esac
+    shift
+    shift
+done
+
+if [ -z "$name" ]; then
+    echoerr "-name is a required parameter"
+    exit 1
+else
+    org="${name%/*}"
+    workspace="${name#*/}"
+fi
+
+if [ -z "$token" ]; then
+    token="$ATLAS_TOKEN"
+    if [ -z "$token" ]; then
+        echoerr 'Set the API token with -token or $ATLAS_TOKEN'
+        exit 1
+    fi
+fi
+
+if [ -n "$TF_LOG" ]; then
+    curl_silent=
+fi
+
+# Get the variable listing for the workspace
+url="$tfe_address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$org&filter%5Bworkspace%5D%5Bname%5D=$workspace"
+
+echodebug "[DEBUG] API list variables URL:"
+echodebug "$url"
+
+var_get_resp="$(tfe_api_call $url)"
+if [ 0 -ne $? ]; then
+    echoerr "Error listing variables"
+    exit 1
+fi
+
+echodebug "[DEBUG] Variable list response:"
+echodebug "$(printf "%s" "$var_get_resp" | jq '.')"
+
+if [ -n "$config_dir" ]; then
+    cd "$config_dir"
+    if [ 0 -ne $? ]; then
+        echoerr "Error entering the config directory:"
+        echoerr "$config_dir"
+        exit 1
+    fi
+
+    # Get all of the variables from all of the .tf files
+    all_vars="$(awk '
+        BEGIN {
+            VARS="\"[-_[:alnum:]]*\""
+            seen_variable = 0
+            in_var = 0
+            in_default = 0
+            in_default_block = 0
+            in_value = 0
+            in_comment = 0
+        }
+        /^[[:space:]]*#/ {
+            # line starts with a comment
+            next
+        }
+        /\/\*/ {
+            # entering a comment block
+            in_comment = 1
+        }
+        in_comment == 1 && /\*\// {
+            # exiting a comment block
+            in_comment = 0
+            next
+        }
+        in_comment == 1 {
+            # still in a comment block
+            next
+        }
+        /variable/ && seen_variable == 0 {
+            seen_variable = 1
+        }
+        $0 ~ VARS && seen_variable == 1 {
+            in_var = 1
+            match($0, /\"[[:alnum:]]/)
+            l=RLENGTH
+            match($0, VARS)
+            name = substr($0, RSTART+1, RLENGTH-l)
+            seen_variable = 0
+        }
+        in_var == 1 && /{/ {
+            in_var_block = 1
+        }
+        in_var_block == 1 && in_default == 0 && in_value == 0 && /}/ {
+            # Variable block with no default. Its value may come from
+            # a tfvars file loaded later.
+            print "nonhcl", name
+            in_var = 0
+            in_var_block = 0
+            in_default = 0
+            in_default_block = 0
+            in_value = 0
+        }
+        # TODO: try to find "type"
+        in_var_block == 1 && /default/ {
+            in_default = 1
+        }
+        in_default == 1 && /=/{
+            in_value = 1
+        }
+        in_var == 1 && in_default == 1 && in_value == 1 && /["{<\[]/ {
+            # match all the things that are not Terraform variable values
+            m = match($0, /[^"{<\[]*/)
+            if(m != 0) {
+                # Get the first character after all of the things that are not
+                # Terraform variable values
+                value_char = substr($0, RLENGTH + 1, 1)
+
+                if(value_char == "\"") {
+                    print "nonhcl", name
+                } else {
+                    print "hcl", name
+                }
+
+                in_var = 0
+                in_var_block = 0
+                in_default = 0
+                in_default_block = 0
+                in_value = 0
+            }
+        } ' *.tf)"
+elif [ -n "$var_file" ]; then
+    tfvar_dir="$TMPDIR/tfe-push-vars-$(date +%s)"
+    mkdir "$tfvar_dir"
+    cp "$var_file" "$tfvar_dir"
+    if [ 0 -ne $? ]; then
+        echoerr "Error copying variable file to temporary path."
+        exit 1
+    fi
+
+    cd "$tfvar_dir"
+    if [ 0 -ne $? ]; then
+        echoerr "Error entering variable file temporary path."
+        exit 1
+    fi
+
+    # This is not a great "parser" but it hopefully overreaches on finding
+    # variable names, then we can silently ignore errors from terraform
+    # console (output when TF_LOG=1).
+    all_vars="$(awk '
+        BEGIN {
+            in_var = 0
+            in_value = 0
+            in_comment = 0
+        }
+        /^[[:space:]]*#/ {
+            # line starts with a comment
+            next
+        }
+        /\/\*/ {
+            # entering a comment block
+            in_comment = 1
+            next
+        }
+        in_comment == 1 && /\*\// {
+            # exiting a comment block
+            in_comment = 0
+            next
+        }
+        in_comment == 1 {
+            # still in a comment block
+            next
+        }
+        /^[[:space:]]*[[:alnum:]]/ && in_var == 0 && $0 !~ /,$/ {
+            in_var = 1
+            match($0, /[-_[:alnum:]]+/)
+            name = substr($0, RSTART, RLENGTH)
+        }
+        in_var == 1 && /=/ {
+            in_value = 1
+        }
+        in_var == 1 && in_value == 1 && /["{<\[]/ {
+            # match all the things that are not Terraform variable values
+            m = match($0, /[^"{<\[]*/)
+            if(m != 0) {
+                # Get the first character after all of the things that are not
+                # Terraform variable values
+                value_char = substr($0, RLENGTH + 1, 1)
+
+                if(value_char == "\"") {
+                    print "nonhcl", name
+                } else {
+                    print "hcl", name
+                }
+
+                printf "variable \"%s\" {}\n", name >> "vars.tf"
+                in_var = 0
+                in_value = 0
+            }
+        }' "$var_file")"
+
+    #cat vars.tf
+fi
+
+maybe_defaultvars="$(echo "${all_vars}" | while read var_info; do
+                if [ "${var_info%% *}" != "hcl" ]; then
+                    echo "${var_info#* }"
+                fi
+            done)"
+
+maybe_defaulthclvars="$(echo "${all_vars}" | while read var_info; do
+                if [ "${var_info%% *}" = "hcl" ]; then
+                    echo "${var_info#* }"
+                fi
+            done)"
+
+if [ -n "$maybe_defaultvars" ]; then
+    for var in $maybe_defaultvars; do
+        if [ -z "$var_file_arg" ]; then
+            val="$(echo "var.$var" | terraform console 2>/dev/null)"
+        else
+            val="$(echo "var.$var" | terraform console $var_file_arg 2>/dev/null)"
+        fi
+
+        if [ 0 -ne $? ]; then
+            echodebug "Unable to retrieve value for potential variable $var"
+            continue
+        fi
+
+        defaultvars="$( [ -n "$defaultvars" ] && echo "$defaultvars"; echo "$var")"
+        defaultvars_values="$( [ -n "$defaultvars_values" ] && echo "$defaultvars_values"; echo "$val")"
+    done
+fi
+
+if [ -n "$maybe_defaulthclvars" ]; then
+    for var in $maybe_defaulthclvars; do
+        if [ -z "$var_file_arg" ]; then
+            val_lines="$(echo "var.$var" | terraform console 2>/dev/null)"
+        else
+            val_lines="$(echo "var.$var" | terraform console $var_file_arg 2>/dev/null)"
+        fi
+        if [ 0 -ne $? ]; then
+            echodebug "Unable to retrieve value for potential variable $var"
+            continue
+        fi
+        val="$(escape_hcl "$val_lines")"
+
+        defaulthclvars="$( [ -n "$defaulthclvars" ] && echo "$defaulthclvars"; echo "$var")"
+        defaulthclvars_values="$( [ -n "$defaulthclvars_values" ] && printf "%s\n" "$defaulthclvars_values"; printf "%s\n" "$val")"
+    done
+fi
+
+#            variable list,    value list,              type,     hcl,  sensitive
+process_vars "$defaultvars"    "$defaultvars_values"    terraform false false
+process_vars "$defaulthclvars" "$defaulthclvars_values" terraform true  false
+process_vars "$vars"           "$vars_values"           terraform false false
+process_vars "$hclvars"        "$hclvars_values"        terraform true  false
+process_vars "$svars"          "$svars_values"          terraform false true
+process_vars "$shclvars"       "$shclvars_values"       terraform true  true
+process_vars "$envvars"        "$envvars_values"        env       false false
+process_vars "$senvvars"       "$senvvars_values"       env       false true
+
+cleanup
