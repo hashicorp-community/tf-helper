@@ -1,20 +1,57 @@
 # Terraform Enterprise Push
 
-* Terraform Enterprise API: https://www.terraform.io/docs/enterprise/api/index.html
+Terraform Enterprise API: https://www.terraform.io/docs/enterprise/api/index.html
 
 The Terraform Enterprise Push repository hosts scripts that replace and extend
 the functionality that was previously provided by the `terraform push` command.
-Where `terraform push` was previously used to upload configurations and perform
-variable manipulations in Terraform Enterprise Legacy environments, these
-scripts can be used to do the same (and more) using the new Terraform
-Enterprise API.
+Where `terraform push` was used to upload configurations and perform variable
+manipulations in Terraform Enterprise Legacy environments, these scripts can be
+used to do the same (and more) using the new Terraform Enterprise API.
 
 These scripts are written in POSIX Bourne shell and so should be used on UNIX,
 Linux, and MacOS systems. Use on Windows requires a POSIX compatible
-environment such as the Windows Subsystem for Linux (WSL) or Cygwin.
+environment such as the [Windows Subsystem for Linux
+(WSL)](https://docs.microsoft.com/en-us/windows/wsl/about) or
+[Cygwin](https://www.cygwin.com/).
 
 All scripts support extensive debugging output by setting the `TF_LOG`
 environment variable to any non-empty value, such as `TF_LOG=1`.
+
+## Installation of the scripts
+
+The Terraform Enterprise Push scripts will execute properly when referred to by
+an absolute path (`/path/to/tfe-push-config`), a relative path
+(`../terraform-enterprise-push/tfe-push-config`), or by being copied or
+symlinked to a directory in the `PATH` environment variable
+(`tfe-push-config`).
+
+It is recommended that the scripts be kept up to date with regular `git pull`
+operations. One recommended method of installation is to clone this repository
+and then add the `bin` path to the path environment variable.
+
+```
+git clone git@github.com:hashicorp/terraform-enterprise-push.git
+cd terraform-enterprise-push/bin
+
+# For BASH profile
+echo "export $PWD" >> ~/.bash_profile
+
+# Re-source or log out / back in to the console
+. ~/.bash_profile
+
+# For BASH rc file
+echo "export $PWD" >> ~/.bashrc
+. ~/.bashrc
+```
+
+Another recommended method of installation is to clone this repository and then
+place symlinks in a `PATH` directory such as `/usr/local/bin`.
+
+```
+git clone git@github.com:hashicorp/terraform-enterprise-push.git
+cd /usr/local/bin
+ln -s /path/to/terraform-enterprise-push/bin/* .
+```
 
 ## Push Terraform configurations
 
@@ -42,10 +79,10 @@ legacy and `tfe-push-config`.
   this information nor does it inspect the `.terraform/plugins` directory, so
   providers will be retrieved during the run according to the configuration.
   Modules *will* be uploaded because (1) the entire base directory containing
-  any local modules should be uploaded, and (2) the `.terraform/modules` will
-  be uploaded. If `-upload-modules` is `false`, then `.terraform` is excluded
-  entirely and `terraform init` will retrieve both providers and modules as
-  normal.
+  any local modules should be uploaded, and (2) the `.terraform/modules`
+  directory will be uploaded. If `-upload-modules` is `false`, then
+  `.terraform` is excluded entirely and `terraform init` will retrieve both
+  providers and modules as usual according to the configuration.
 
 See `tfe-push-config -h` for more information and usage details.
 
@@ -67,8 +104,8 @@ infrastructure
         └── mod2.tf
 ```
 
-With `terraform push` with Terraform Enterprise Legacy the `env/prod` directory
-would have been supplied as the argument, even if `env/prod/prod.tf`
+With `terraform push` and Terraform Enterprise Legacy, the `env/prod` directory
+would have been supplied as the argument even if `env/prod/prod.tf`
 instantiated `modules/mod1`.
 
 ```
@@ -81,8 +118,8 @@ instantiated `modules/mod1`.
 [infrastructure/env/prod]$ terraform push
 ```
 
-With `tfe-push-config` the `infrastructure` directory, which contains _all_ of
-the configuration files, including the root module and other modules, would be
+With `tfe-push-config`, the `infrastructure` directory containing _all_ of the
+configuration files, including the root module and other modules, would be
 specified.
 
 ```
@@ -96,7 +133,18 @@ specified.
 [anywhere]$ tfe-push-config -name org_name/workspace_name path/to/infrastructure
 ```
 
-## Push Terraform and environment variables
+### Example: Push a configuration and poll the resulting run
+
+Additionally, `tfe-push-config` can poll the run resulting from the
+configuration upload. Polling will continue until a non-active status such as
+"errored" or "planned" occurs.
+
+```
+# Upload the configuration to start a run, then poll the run every 5s.
+[infrastructure]$ tfe-push-config -name org_name/workspace_name -poll 5
+```
+
+## Push Terraform variables and environment variables
 
 Use `tfe-push-vars` to create and modify variables in a Terraform Enterprise
 workspace. This script replaces and extends the variable manipulation features
@@ -114,11 +162,11 @@ These options are `-svar`, `-shcl-var`, and `-senv-var`.
 The variable manipulation logic follows the earlier `terraform push` behavior.
 If a variable is specified on the command line or discovered from a
 configuration or `.tfvars` file, then it will be created in the workspace if it
-does not exist, and it will be modified if `-overwrite` is specified for the
-variable. If the variable exists and `-overwrite` is *not* specified, then the
-variable will not be overwritten.  The update / overwrite logic also applies
-when `tfe-push-vars` is run with a `-var-file` specified, or with a
-configuration directory specified.
+does not exist and it will be modified if it does exist and `-overwrite` is
+specified for the variable. If the variable exists and `-overwrite` is *not*
+specified, then the variable will not be overwritten. The update / overwrite
+logic also applies when `tfe-push-vars` is run with a `-var-file` specified, or
+with a configuration directory specified.
 
 A `-dry-run` option is supplied to show what changes would be made if the
 command were run. Please use this option liberally to ensure that variables
@@ -126,7 +174,7 @@ are, for example, detected properly from the correct sources: command line,
 `.tfvars`, configurations, and automatic variables files with configurations.
 
 When a configuration directory *is not* provided, no configuration is inspected
-for variable information, even if the present working directory contains a
+for variable information even if the present working directory contains a
 configuration. This makes it possible to use `tfe-push-vars` completely
 independent of a Terraform configuration. Variables can be specified on the
 command line and also using `-var-file` with a `.tfvars` file. When using a
@@ -152,6 +200,9 @@ tfe-push-vars -name org_name/workspace_name -var 'foo=bar'
 
 # Output a dry run of what would be attempted when running the above command.
 tfe-push-vars -name org_name/workspace_name -var 'foo=bar' -dry-run
+
+# Set the environment variable CONFIRM_DESTROY to 1 to enable destroy plans.
+tfe-push-vars -name org_name/workspace_name -env-var 'CONFIRM_DESTROY=1`
 
 # Create Terraform variable 'foo' if it does not exist, overwrite its value
 # with 'bar' if it does exist.
