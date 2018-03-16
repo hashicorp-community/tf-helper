@@ -2,9 +2,7 @@
 
 ## -------------------------------------------------------------------
 ##
-## tfe-push-config: Use the Terraform Enteprise API to push a
-##                  configuration into a TFE environment and start a
-##                  run / plan.
+## tfe: Use the Terraform Enterprise API to perform operations in TFE
 ##
 ## -------------------------------------------------------------------
 ##
@@ -26,8 +24,22 @@
 ##
 ## -------------------------------------------------------------------
 
+# The following variables will be set for the purpose of aiding subcommands. All
+# bets are off for any other variables used in this script before subcommands
+# are executed.
+#
+# tfe_cmd_dir
+# tfe_payload_dir
+# tfe_log_redirect
+# tfe_tar_verbose
+# tfe_curl_silent
+# tfe_address
+# tfe_org
+# tfe_workspace
+# tfe_token
+
 ###
-### Function declarations
+### Utility function declarations
 ###
 
 echoerr () { printf "%s\n" "$@" 1>&2; }
@@ -47,6 +59,21 @@ cleanup () {
     fi
 }
 
+tfe_usage_args () {
+cat << EOF
+ -name <name>         Name of the configuration in Terraform Enterprise.
+                      This can also be set in the configuration itself.
+                      Format is typically: "username_or_org/name".
+
+ -tfe-address <url>   An alternate address to an Terraform Enterprise
+                      instance. Defaults to https://app.terraform.io
+
+ -token <token>       Access token to use to upload. If blank or unspecified,
+                      the ATLAS_TOKEN environmental variable will be used.
+
+EOF
+}
+
 assign_arg () {
     if [ -z "$2" ] || [ "${2#-}" != "$2" ]; then
         echoerr "Parameter $1 is missing a value"
@@ -60,51 +87,10 @@ assign_arg () {
 }
 
 tfe_api_call () {
-    curl $curl_silent \
-         --header "Authorization: Bearer $token" \
+    curl -f $tfe_curl_silent \
+         --header "Authorization: Bearer $tfe_token" \
          --header "Content-Type: application/vnd.api+json" \
          $@
-}
-
-usage () {
-cat << 'EOF'
-Usage:
-
-  tfe-push-config -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS] [CONFIG_DIR]
-
-  Upload a Terraform configuration to a Terraform Enterprise workspace
-  and begin a run.
-
-Options:
-
-  -name <name>         This parameter is required. Name of the configuration
-                       in Atlas. Format is: "username_or_org/workspace".
-
-  -tfe-address <url>   An alternate address to an Atlas instance. Defaults
-                       to https://app.terraform.io
-
-  -upload-modules true If true (default), then the modules are locked at
-                       their current checkout and uploaded completely. This
-                       prevents modules from being retrieved with "terraform
-                       init". This does not lock provider versions. Use the
-                       "version" parameter in provider blocks in the
-                       configuration to accomplish that.
-
-  -vcs true            If true (default), push will upload only files
-                       committed to your VCS, if detected.
-
-  -token <token>       Access token to use to upload. If blank or unspecified,
-                       the ATLAS_TOKEN environment variable will be used.
-
-  -poll <seconds>      Number of seconds to wait between polling the submitted
-                       run for a non-active status. Defaults to 0 (no polling).
-
-Notes:
-
-  The curl and jq commands are required.
-
-EOF
-exit
 }
 
 if [ -z "$(command -v jq)" ]; then
@@ -117,114 +103,199 @@ if [ -z "$(command -v curl)" ]; then
     exit 1
 fi
 
+if [ -z "$(command -v readlink)" ]; then
+    echoerr "The readlink command must be installed"
+    exit 1
+fi
+
 if [ -z "$TMPDIR" ]; then
     TMPDIR=/tmp
 fi
 
+if [ -n "$TF_LOG" ]; then
+    tfe_log_redirect=/dev/stderr
+    tfe_tar_verbose=v
+    tfe_curl_silent=
+else
+    tf_log_redirect=/dev/null
+    tfe_tar_verbose=
+    tfe_curl_silent="-s"
+fi
+
 tfe_address=https://app.terraform.io
-name=
-token=
-upload_modules=true
-vcs=true
-config_dir=.
-tar_verbose=
-curl_silent="-s"
-poll_run=0
+tfe_name=
+
+tfe_token="$TFE_TOKEN"
+if [ -z "$tfe_token" ]; then
+    tfe_token="$ATLAS_TOKEN"
+fi
+
+
+# Need to determine the script location and prefix to the needed lib directory.
+# The prefix should be the directory that contains the riak-manage directory.
+# i.e. /users/usertfe_name/gitclones/terraform-enterprise push (contains lib/tfe)
+#      /usr (contains lib/tfe)
+
+# Note that this is not POSIX but portable to many systems with nearly any
+# kind of implementation of readlink.
+
+# Get the command used to start this script
+target=$0
+
+# If executing via a series of symlinks, resolve them all the way back to the
+# script itself. Some danger here of infinitely cycling.
+while [ -h "$target" ]; do
+    link=$(readlink "$target")
+    if [ "${link:0:1}" = "/" ]; then
+        # link path is absolute, just need to follow it
+        target="$link"
+    else
+        # link path is relative, need to relatively follow it
+        target="${target%/*}"
+        target="${target}/${link}"
+    fi
+done
+
+# Now target should be like the following, where 'script' is not a symlink:
+# /some/path/to/the/actual/script
+
+# Get the script tfe_name by removing everything up to the last /
+bin_tfe_name="${target##*/}"
+
+# Get the script path, go there, and resolve the full path of symlinks with pwd
+tfe_prefix=$(cd ${target%/$bin_tfe_name} && pwd -P)
+
+# Remove /bin and /sbin from the prefix if there is one (i.e. /usr/bin)
+tfe_prefix=${tfe_prefix%/bin}
+tfe_prefix=${tfe_prefix%/sbin}
+
+# tfe_prefix should now be to something like /usr or /path/to/gitclone/riak-manage
+
+# Set some additional convenience variables
+tfe_cmd_dir="${tfe_prefix}/lib/tfe/commands"
+tfe_payload_dir="${tfe_prefix}/share/tfe/commands"
+
+# Make sure there's a commands directory
+if [ ! -d "${tfe_cmd_dir}" ]; then
+    echoerr "Error obtaining commands. Check:"
+    echoerr "${tfe_cmd_dir}"
+    exit 1
+fi
+
+# The help command is handled as a special case to cope with incorrect
+# invocations. It is also one of two commands that can be run without giving a
+# cluster tfe_name (the other is info). Structuring it this way also allows for it
+# to work even if a cluster tfe_name is given.
+
+# Make sure we can load help and info. If not, that's a red flag.
+if [ -f "${tfe_cmd_dir}/help" ] ; then
+    . "${tfe_cmd_dir}/help"
+else
+    error_msg "Could not load essential commands. Please check your paths."
+    exit 1
+fi
+
+# No command was supplied. Try to error out helpfully.
+if [ 0 -eq $# ]; then
+    tfe_help
+    exit 1
+fi
+
+# At least one argument given. If is help, run help with any arguments supplied.
+# Exit with help's return value.
+if [ "help" = $1 ]; then
+    shift
+    tfe_help $@
+    exit $?
+fi
+
+# Now, if we haven't exited:
+#   First argument is a command
+#   Additional arguments are parameters to the command to be run
+
+# Pop the command
+cmd="$1"
+shift
+
+# Ensure the command exists
+if [ ! -f "$tfe_cmd_dir/$cmd" ]; then
+    echoerr "Command '$cmd' not found. See 'tfe help' for usage."
+    exit 1
+fi
+
+# Handle a special case of help dyslexia, e.g.:
+#   tfe pushconfig help
+if [ 0 -eq $# ] && [ "help" = $cmd ]; then
+    # See if the cmd is actually a command that the user probably
+    # wants help information for.
+    if [ -f "$tfe_cmd_dir/$cmd" ]; then
+        tfe_help "$cmd"
+        exit 0
+    fi
+fi
 
 ###
-### Parse options
+### Comb through options for name, token, and address while building
+### a list of other arguments to go to the subcommand
 ###
+
+subcmd_args=
 
 while [ -n "$1" ]; do
     case "$1" in
-        help|-h|-help|--help)
-            usage
-            ;;
         -tfe-address)
             tfe_address=$(assign_arg "$1" "$2")
-            ;;
-        -upload-modules)
-            case "$2" in
-                true)
-                    upload_modules=true
-                    ;;
-                false)
-                    upload_modules=false
-                    ;;
-                *)
-                    echoerr "-upload-modules should be true or false"
-                    exit 1
-                    ;;
-            esac
-            ;;
-        -vcs)
-            case "$2" in
-                true)
-                    vcs=true
-                    ;;
-                false)
-                    vcs=false
-                    ;;
-                *)
-                    echoerr "-vcs should be true or false"
-                    exit 1
-                    ;;
-            esac
-            ;;
-        -poll)
-            if [ "$2" -eq "$2" ] >/dev/null 2>&1; then
-                poll_run=$(assign_arg "$1" "$2")
-            else
-                echoerr "-poll must be an integer"
-                exit 1
-            fi
+            shift
+            shift
             ;;
         -name)
-            name=$(assign_arg "$1" "$2")
+            tfe_name=$(assign_arg "$1" "$2")
+            shift
+            shift
             ;;
         -token)
-            token=$(assign_arg "$1" "$2")
+            tfe_token=$(assign_arg "$1" "$2")
+            shift
+            shift
             ;;
         *)
-            # Shouldn't get here until the last option, the optional
-            # config directory
-            if [ $# -gt 1 ]; then
-                echoerr "Trailing options following config directory $1"
-                exit 1
-            fi
-
-            config_dir=$1
+            subcmd_args="$subcmd_args $1"
+            shift
             ;;
     esac
-    shift
-    shift
 done
 
-if [ -z "$name" ]; then
+if [ -z "$tfe_name" ]; then
     echoerr "-name is a required parameter"
     exit 1
 else
-    org="${name%/*}"
-    workspace="${name#*/}"
+    tfe_org="${tfe_name%/*}"
+    tfe_workspace="${tfe_name#*/}"
 fi
 
-if [ -z "$token" ]; then
-    token="$ATLAS_TOKEN"
-    if [ -z "$token" ]; then
-        echoerr 'Set the API token with -token or $ATLAS_TOKEN'
+# Dispatch the command with all of the following arguments to the appropriate,
+# sourced function
+. "$tfe_cmd_dir/$cmd"
+tfe_$cmd $subcmd_args
+
+# Exit with the exit code returned by the command
+exit $?
+
+
+if [ -z "$tfe_token" ]; then
+    tfe_token="$ATLAS_TOKEN"
+    if [ -z "$tfe_token" ]; then
+        echoerr 'Set the API tfe_token with -tfe_token or $ATLAS_TOKEN'
         exit 1
     fi
 fi
 
-if [ -n "$TF_LOG" ]; then
-    TF_LOG_REDIRECT=/dev/stderr
-    tar_verbose=v
-    curl_silent=
-else
-    TF_LOG_REDIRECT=/dev/null
+if [ -z "$tfe_token" ]; then
+    echoerr 'Set the API token with $TFE_TOKEN, -token, or $ATLAS_TOKEN'
+    exit 1
 fi
 
-# Gets the workspace ID given the organization name and workspace name
+# Gets the workspace ID given the organization tfe_name and workspace tfe_name
 workspace_id="$( (
     set -e
     echodebug "[DEBUG] Requesting workspace information for $org/$workspace"

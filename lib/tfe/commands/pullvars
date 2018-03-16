@@ -1,0 +1,231 @@
+#!/bin/sh
+
+## -------------------------------------------------------------------
+##
+## Copyright (c) 2018 HashiCorp. All Rights Reserved.
+##
+## This file is provided to you under the Mozilla Public License
+## Version 2.0 (the "License"); you may not use this file
+## except in compliance with the License.  You may obtain
+## a copy of the License at
+##
+##   https://www.mozilla.org/en-US/MPL/2.0/
+##
+## Unless required by applicable law or agreed to in writing,
+## software distributed under the License is distributed on an
+## "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+## KIND, either express or implied.  See the License for the
+## specific language governing permissions and limitations
+## under the License.
+##
+## -------------------------------------------------------------------
+
+tfe_pullvars_description () (
+    echo "Get one or more variables and values from a TFE workspace"
+)
+
+tfe_pullvars_help () (
+cat << EOF
+
+SYNOPSIS
+ tfe pullvars -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS]
+
+DESCRIPTION
+ Output Terraform variables from a Terraform Enterprise workspace in tfvars
+ format or environment variables in shell format.
+
+$(tfe_usage_args)
+
+ -var <var-name>      Get a Terraform variable from the Terraform Enterprise
+                      workspace. This argument may be specified multiple
+                      times.
+
+ -env-var <var-name>  Get an environment variable from the Terraform
+                      Enterprise workspace. This argument may be specified
+                      multiple times.
+
+ -env false           Get all environment variables instead of Terraform
+                       variables.
+
+NOTES
+ Sensitive variable names are provided but their values are empty.
+
+EOF
+)
+
+tfe_pullvars () (
+    vars=
+    env=false
+    env_vars=
+
+    ###
+    ### Parse options
+    ###
+
+    while [ -n "$1" ]; do
+        case "$1" in
+            help|-h|-help|--help)
+                tfe_pullvars_help
+                return 1
+                ;;
+            -var)
+                # -var can be specified multiple times
+                new_var="$(assign_arg "$1" "$2")"
+                vars="$( [ -n "$vars" ] && echo "$vars"; echo "$new_var")"
+                ;;
+            -env-var)
+                # -env-var can be specified multiple times
+                new_var="$(assign_arg "$1" "$2")"
+                env_vars="$( [ -n "$env_vars" ] && echo "$env_vars"; echo "$new_var")"
+                ;;
+            -env)
+                case "$2" in
+                    true)
+                        env=true
+                        ;;
+                    false)
+                        env=false
+                        ;;
+                    *)
+                        echoerr "-env should be true or false"
+                        exit 1
+                        ;;
+                esac
+                ;;
+            *)
+                echoerr "Unknown option $1"
+                exit 1
+                ;;
+        esac
+        shift
+        shift
+    done
+
+    if [ "$env" = true ] && ( [ -n "$vars" ] || [ -n "$env_vars" ] ); then
+        echoerr "-env true cannot be specified along with -var and/or -env-var"
+        return 1
+    fi
+
+    # request template
+    url="$tfe_address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$tfe_org&filter%5Bworkspace%5D%5Bname%5D=$tfe_workspace"
+
+    echodebug "[DEBUG] API list variables URL:"
+    echodebug "$url"
+
+    var_get_resp="$(tfe_api_call $url)"
+    if [ 0 -ne $? ]; then
+        echoerr "Error listing variables"
+        return 1
+    fi
+
+    echodebug "[DEBUG] Variable list response:"
+    echodebug "$(printf "%s" "$var_get_resp" | jq '.')"
+
+    vars_retval=0
+    tfevar=
+
+    if [ -n "$vars" ]; then
+        for v in $vars; do
+            tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
+                | select(.attributes.category == "terraform")
+                | select(.attributes.key == $var)
+                | [
+                    .attributes.key + " = ",
+                    (if .attributes.hcl == false or .attributes.sensitive == true then "\"" else empty end),
+                    .attributes.value,
+                    (if .attributes.hcl == false or .attributes.sensitive == true then "\"" else empty end)
+                  ]
+                | join("")')"
+
+            if [ -z "$tfevar" ]; then
+                echoerr "Variable $v not found"
+                vars_retval=1
+            else
+                echo "$tfevar"
+            fi
+
+        done
+    fi
+
+    if [ -n "$env_vars" ]; then
+        for v in $env_vars; do
+            tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
+                | select(.attributes.category == "env")
+                | select(.attributes.key == $var)
+                | .attributes.key + "=\"" + .attributes.value + "\""')"
+
+            if [ -z "$tfevar" ]; then
+                echoerr "Variable $v not found"
+                vars_retval=1
+            else
+                echo "$tfevar"
+            fi
+        done
+    fi
+
+    if [ -n "$vars" ] || [ -n "$env_vars" ]; then
+        exit $vars_retval
+    fi
+
+    terraform_tfvars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
+        | select(.attributes.category == "terraform")
+        | select(.attributes.sensitive == false)
+        | [
+            .attributes.key + " = ",
+            (if .attributes.hcl == false then "\"" else empty end),
+            .attributes.value,
+            (if .attributes.hcl == false then "\"" else empty end)
+          ]
+        | join("")')"
+    if [ 0 -ne $? ]; then
+        echoerr "Error parsing API response for Terraform variables"
+        exit 1
+    fi
+
+    sensitive_tfvars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
+        | select(.attributes.category == "terraform")
+        | select(.attributes.sensitive == true)
+        | .attributes.key + " = \"\""')"
+    if [ 0 -ne $? ]; then
+        echoerr "Error parsing API response for sensitive Terraform variables"
+        exit 1
+    fi
+
+    env_vars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
+        | select(.attributes.category == "env")
+        | select(.attributes.sensitive == false)
+        | .attributes.key + "=\"" + .attributes.value + "\""')"
+    if [ 0 -ne $? ]; then
+        echoerr "Error parsing API response for environment variables"
+        exit 1
+    fi
+
+    sensitive_env_vars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
+        | select(.attributes.category == "env")
+        | select(.attributes.sensitive == true)
+        | .attributes.key + "="')"
+    if [ 0 -ne $? ]; then
+        echoerr "Error parsing API response for sensitive environment variables"
+        exit 1
+    fi
+
+    if [ "$env" = true ]; then
+        if [ -n "$sensitive_env_vars" ]; then
+            echo "$sensitive_env_vars"
+        fi
+
+        if [ -n "$env_vars" ]; then
+            echo "$env_vars"
+        fi
+
+        exit
+    fi
+
+    if [ -n "$sensitive_tfvars" ]; then
+        echo "$sensitive_tfvars"
+    fi
+
+    if [ -n "$terraform_tfvars" ]; then
+        echo "$terraform_tfvars"
+    fi
+)
