@@ -182,7 +182,7 @@ process_vars () {
                 output_val="$val"
             fi
 
-            printf "Creating %s, type: %s, hcl: %s, sensitive: %s, value: %s\n" "$v" "$3" "$4" "$5" "$output_val"
+            printf "Creating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5" "$output_val"
 
             if [ "$dry_run" != true ]; then
                 url="$tfe_address/api/v2/vars"
@@ -209,7 +209,7 @@ process_vars () {
                     output_val="$val"
                 fi
 
-                printf "Updating %s, type: %s, hcl: %s, sensitive: %s, value: %s\n" "$v" "$3" "$4" "$5" "$val"
+                printf "Updating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5" "$val"
 
                 if [ "$dry_run" != true ]; then
                     url="$tfe_address/api/v2/vars/$var_id"
