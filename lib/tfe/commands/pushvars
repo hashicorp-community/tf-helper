@@ -199,7 +199,7 @@ process_vars () {
                 fi
 
                 echodebug "[DEBUG] Variable create response:" 
-                echodebug "$(printf "%s" "$var_create_resp" | jq '')"
+                echodebug "$var_create_resp"
             fi
         else
             if echo "$overwrites" | grep -E "^$v$" >/dev/null 2>&1; then
@@ -226,7 +226,7 @@ process_vars () {
                     fi
 
                     echodebug "[DEBUG] Variable update response:" 
-                    echodebug "$(echo "$var_update_resp" | jq '')"
+                    echodebug "$var_update_resp"
                 fi
             fi
         fi
@@ -377,7 +377,7 @@ tfe_pushvars () (
     fi
 
     echodebug "[DEBUG] Variable list response:"
-    echodebug "$(printf "%s" "$var_get_resp" | jq '.')"
+    echodebug "$var_get_resp"
 
     if [ -n "$config_dir" ]; then
         cd "$config_dir"

@@ -119,7 +119,7 @@ tfe_pullvars () (
     fi
 
     echodebug "[DEBUG] Variable list response:"
-    echodebug "$(printf "%s" "$var_get_resp" | jq '.')"
+    echodebug "$var_get_resp"
 
     vars_retval=0
     tfevar=
