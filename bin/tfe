@@ -42,10 +42,14 @@
 ### Utility function declarations
 ###
 
+# Print messages to stderr. Use printf to ensure the message is verbatim.
+# E.g. do not interpret \n in JSON.
 echoerr () { printf "%s\n" "$@" 1>&2; }
 
+# Print debug messages if the TF_LOG environment variable is set.
 echodebug () { [ -n "$TF_LOG" ] && echoerr "$@"; return 0; }
 
+# Remove temporary files
 cleanup () {
     if [ -f "$config_payload" ]; then
         echodebug "[DEBUG] Deleting temporary content file"
@@ -59,6 +63,7 @@ cleanup () {
     fi
 }
 
+# Usage description for options common to all subcommands
 tfe_usage_args () {
 cat << EOF
  -name <name>         Name of the configuration in Terraform Enterprise.
@@ -74,6 +79,7 @@ cat << EOF
 EOF
 }
 
+# Take two arguments; if the 2nd is empty then die
 assign_arg () {
     if [ -z "$2" ] || [ "${2#-}" != "$2" ]; then
         echoerr "Parameter $1 is missing a value"
@@ -86,12 +92,15 @@ assign_arg () {
     fi
 }
 
+# Common options to curl. Fail on HTTP error codes.
 tfe_api_call () {
     curl -f $tfe_curl_silent \
          --header "Authorization: Bearer $tfe_token" \
          --header "Content-Type: application/vnd.api+json" \
          $@
 }
+
+# Check for commands that must be present to function
 
 if [ -z "$(command -v jq)" ]; then
     echoerr "The jq command must be installed"
@@ -108,36 +117,54 @@ if [ -z "$(command -v readlink)" ]; then
     exit 1
 fi
 
+# Use TMPDIR if it is set. If not, set it to /tmp
+
 if [ -z "$TMPDIR" ]; then
     TMPDIR=/tmp
 fi
 
 if [ -n "$TF_LOG" ]; then
+    # Debugging. Print command errors and make them verbose
     tfe_log_redirect=/dev/stderr
     tfe_tar_verbose=v
     tfe_curl_silent=
 else
+    # Not debugging. Shut everyting up.
     tf_log_redirect=/dev/null
     tfe_tar_verbose=
     tfe_curl_silent="-s"
 fi
 
-tfe_address=https://app.terraform.io
-tfe_name=
+# Allow setting the URL to TFE with TFE_URL
+tfe_address=${TFE_URL:-"https://app.terraform.io"}
 
+# Allow setting the TFE organization with TFE_ORG
+tfe_org="$TFE_ORG"
+
+# Allow setting the TFE workspace with TFE_WORKSPACE
+tfe_workspace="$TFE_ORG"
+
+# Prefer TFE_TOKEN, fall back to ATLAS_TOKEN.
+# Keep going if it's not set - can be set by -token
 tfe_token="$TFE_TOKEN"
 if [ -z "$tfe_token" ]; then
     tfe_token="$ATLAS_TOKEN"
 fi
 
+# Allow setting 
+tfe_token="$TFE_TOKEN"
+if [ -z "$tfe_token" ]; then
+    tfe_token="$ATLAS_TOKEN"
+fi
 
 # Need to determine the script location and prefix to the needed lib directory.
-# The prefix should be the directory that contains the riak-manage directory.
-# i.e. /users/usertfe_name/gitclones/terraform-enterprise push (contains lib/tfe)
-#      /usr (contains lib/tfe)
+# The prefix should be the directory that contains the bin and lib directories.
+# i.e. /users/username/gitclones/terraform-enterprise-push (contains lib/tfe/)
+#      /usr (contains bin/tfe and lib/tfe/)
 
 # Note that this is not POSIX but portable to many systems with nearly any
-# kind of implementation of readlink.
+# kind of implementation of readlink. We already require jq and curl, so
+# requiring readline is not that big of a deal.
 
 # Get the command used to start this script
 target=$0
@@ -159,17 +186,18 @@ done
 # Now target should be like the following, where 'script' is not a symlink:
 # /some/path/to/the/actual/script
 
-# Get the script tfe_name by removing everything up to the last /
-bin_tfe_name="${target##*/}"
+# Get the script name by removing everything up to the last /
+bin_name="${target##*/}"
 
 # Get the script path, go there, and resolve the full path of symlinks with pwd
-tfe_prefix=$(cd ${target%/$bin_tfe_name} && pwd -P)
+tfe_prefix=$(cd ${target%/$bin_name} && pwd -P)
 
 # Remove /bin and /sbin from the prefix if there is one (i.e. /usr/bin)
 tfe_prefix=${tfe_prefix%/bin}
 tfe_prefix=${tfe_prefix%/sbin}
 
-# tfe_prefix should now be to something like /usr or /path/to/gitclone/riak-manage
+# tfe_prefix should now be to something like /usr or
+# /path/to/gitclone/terraform-enterprise-push
 
 # Set some additional convenience variables
 tfe_cmd_dir="${tfe_prefix}/lib/tfe/commands"
@@ -183,9 +211,7 @@ if [ ! -d "${tfe_cmd_dir}" ]; then
 fi
 
 # The help command is handled as a special case to cope with incorrect
-# invocations. It is also one of two commands that can be run without giving a
-# cluster tfe_name (the other is info). Structuring it this way also allows for it
-# to work even if a cluster tfe_name is given.
+# invocations.
 
 # Make sure we can load help and info. If not, that's a red flag.
 if [ -f "${tfe_cmd_dir}/help" ] ; then
@@ -234,10 +260,8 @@ if [ 0 -eq $# ] && [ "help" = $cmd ]; then
     fi
 fi
 
-###
-### Comb through options for name, token, and address while building
-### a list of other arguments to go to the subcommand
-###
+# Comb through options for name, token, and address while building
+# a list of other arguments to go to the subcommand
 
 subcmd_args=
 
@@ -265,12 +289,40 @@ while [ -n "$1" ]; do
     esac
 done
 
-if [ -z "$tfe_name" ]; then
-    echoerr "-name is a required parameter"
+# Check for required values
+
+# Did we get org and workspace from the environment?
+if [ -z "$tfe_org" ] && [ -z "$tfe_workspace" ]; then
+    # No. Did we get it from -name?
+    if [ -z "$tfe_name" ]; then
+        # No.
+        echoerr 'Org and workspace required.'
+        echoerr 'Set with $TFE_ORG and $TFE_WORKSPACE or use -name'
+        exit 1
+    else
+        # Separate the org and workspace in name
+        tfe_org="${tfe_name%/*}"
+        tfe_workspace="${tfe_name#*/}"
+    fi
+fi
+
+# Org and workspace could still be possibly unset if they're malformed
+if [ -z "$tfe_org" ] || [ -z "$tfe_workspace" ]; then
+    echoerr 'Org and workspace required.'
+    echoerr 'Set with $TFE_ORG and $TFE_WORKSPACE or use -name'
     exit 1
-else
-    tfe_org="${tfe_name%/*}"
-    tfe_workspace="${tfe_name#*/}"
+fi
+
+if [ -z "$tfe_token" ]; then
+    echoerr 'Set the API token with $TFE_TOKEN, -token, or $ATLAS_TOKEN'
+    exit 1
+fi
+
+# This really shouldn't happen. Someone would have to explicitly pass in
+# an empty string to the command line argument.
+if [ -z "$tfe_address" ]; then
+    echoerr 'TFE address was not set'
+    exit 1
 fi
 
 # Dispatch the command with all of the following arguments to the appropriate,
@@ -281,189 +333,3 @@ tfe_$cmd $subcmd_args
 # Exit with the exit code returned by the command
 exit $?
 
-
-if [ -z "$tfe_token" ]; then
-    tfe_token="$ATLAS_TOKEN"
-    if [ -z "$tfe_token" ]; then
-        echoerr 'Set the API tfe_token with -tfe_token or $ATLAS_TOKEN'
-        exit 1
-    fi
-fi
-
-if [ -z "$tfe_token" ]; then
-    echoerr 'Set the API token with $TFE_TOKEN, -token, or $ATLAS_TOKEN'
-    exit 1
-fi
-
-# Gets the workspace ID given the organization tfe_name and workspace tfe_name
-workspace_id="$( (
-    set -e
-    echodebug "[DEBUG] Requesting workspace information for $org/$workspace"
-
-    url="$tfe_address/api/v2/organizations/$org/workspaces/$workspace"
-    workspace_id_resp="$(tfe_api_call "$url")"
-    echodebug "[DEBUG] Workspace ID response:"
-    echodebug "$workspace_id_resp"
-
-    workspace_id="$(printf "%s" "$workspace_id_resp" | jq -r '.data.id')"
-    echodebug "[DEBUG] Workspace ID: $workspace_id"
-
-    test "$workspace_id"
-    echo "$workspace_id"
-) 2>$TF_LOG_REDIRECT )"
-[ 0 -ne $? ] && { echoerr "Error obtaining workspace ID"; exit 1; }
-
-# Creates a tar.gz of the VCS or directory with the configuration
-
-echodebug "[DEBUG] Creating file for upload"
-config_payload="$TMPDIR/content-$(date +%s).tar.gz"
-
-(
-    set -e
-    cd "$config_dir"
-    if [ "$vcs" = true ]; then
-        git_branch="$(git rev-parse --abbrev-ref HEAD)"
-        git_base_dir="$(git rev-parse --show-toplevel)"
-        cd "$git_base_dir"
-        git_rel_dir="${PWD/${git_base_dir}\/}"
-
-        tf_state_file="$git_rel_dir/.terraform/terraform.tfstate"
-        has_tf_state="$([ -f "$tf_state_file" ] && echo true || echo false)"
-
-        tf_modules_dir="$git_rel_dir/.terraform/modules"
-        has_modules="$([ -d "$tf_modules_dir" ] && echo true || echo false)"
-
-        # tar is extremely sensitive to being passed empty values so this case is
-        # unfortunately necessary
-        case ${has_tf_state}${has_modules}${upload_modules} in
-            truetruetrue)
-                tar -${tar_verbose}zcf "$config_payload" \
-                    $(git ls-tree -r "$git_branch" --name-only --full-tree) \
-                    "$tf_state_file" \
-                    "$tf_modules_dir"
-                ;;
-            truefalse*)
-                tar -${tar_verbose}zcf "$config_payload" \
-                    $(git ls-tree -r "$git_branch" --name-only --full-tree) \
-                    "$tf_state_file"
-                ;;
-            falsetruetrue)
-                tar -${tar_verbose}zcf "$config_payload" \
-                    $(git ls-tree -r "$git_branch" --name-only --full-tree) \
-                    "$tf_modules_dir"
-                ;;
-            falsefalse*)
-                tar -${tar_verbose}zcf "$config_payload" \
-                    $(git ls-tree -r "$git_branch" --name-only --full-tree)
-                ;;
-        esac
-    else
-        tar -${tar_verbose}zcf "$config_payload" .
-    fi
-) 2>$TF_LOG_REDIRECT
-[ 0 -ne $? ] && { echoerr "Error creating config archive payload"; exit 1; }
-
-echo "Uploading Terraform config..."
-
-echodebug "[DEBUG] Creating a new config version for $workspace"
-
-# The JSON Payload used to create the new configuration version
-config_ver_payload='{"data":{"type":"configuration-version"}}'
-
-echodebug "[DEBUG] Creating config version in workspace $workspace_id"
-
-# Creates the configuration version and extractes the upload-url
-url=$tfe_address/api/v2/workspaces/$workspace_id/configuration-versions
-
-echodebug "[DEBUG] URL: $url"
-
-upload_url_resp="$(tfe_api_call -d "$config_ver_payload" $url)"
-[ 0 -ne $? ] && { echoerr "Error creating config version"; cleanup; exit 1; }
-
-echodebug "[DEBUG] Upload URL response:"
-echodebug "$upload_url_resp"
-
-config_id="$(printf "%s" "$upload_url_resp" | jq -r '.data.id')"
-[ 0 -ne $? ] && { echoerr "Error parsing API response for config ID"
-                 cleanup; exit 1; }
-
-(
-    set -e
-    url="$(printf "%s" "$upload_url_resp" | jq -r '.data.attributes."upload-url"')"
-    echodebug "[DEBUG] Upload URL: $url"
-    echodebug "[DEBUG] Uploading content to upload URL"
-
-    upload_config_resp="$(curl $curl_silent -X PUT --data-binary "@$config_payload" ${url})"
-
-    echodebug "[DEBUG] Upload config response:"
-    echodebug "$upload_config_resp"
-) 2>$TF_LOG_REDIRECT
-[ 0 -ne $? ] && { echoerr "Error uploading config archive"; cleanup; exit 1; }
-
-cleanup
-
-run_id="$( (
-    set -e
-    url=$tfe_address/api/v2/workspaces/$workspace_id/runs
-    run_check_resp="$(tfe_api_call $url)"
-
-    echodebug "[DEBUG] Run check response:"
-    echodebug "$run_check_resp"
-
-    run_id="$(printf "%s" "$run_check_resp" | jq -r '.data[] | select(.relationships."configuration-version".data.id == "'$config_id'") | .id')"
-
-    echodebug "[DEBUG] Run ID: $run_id"
-
-    test "$run_id"
-    echo "$run_id"
-) 2>$TF_LOG_REDIRECT )"
-[ 0 -ne $? ] && { echoerr "Error obtaining run ID"; exit 1; }
-
-echo "Run $run_id submitted with config $config_id on $org/$workspace"
-
-(
-    set -e
-    run_status=pending
-    lock_id=
-
-    while [ 0 != "$poll_run" ] &&
-            ( [ pending = "$run_status"   ] ||
-              [ planning = "$run_status"  ] ||
-              [ applying = "$run_status"  ] ||
-              [ confirmed = "$run_status" ] ); do
-        # if the workspace was determined to be locked in the previous
-        # poll, don't delay getting the final status and exiting.
-        if [ true != "$workspace_locked" ]; then
-            sleep $poll_run
-        fi
-
-        url=$tfe_address/api/v2/workspaces/$workspace_id/runs
-        poll_run_resp=$(tfe_api_call $url)
-
-        echodebug "[DEBUG] Poll run response:"
-        echodebug "$poll_run_resp"
-
-        run_status="$(printf "%s" "$poll_run_resp" | jq -r '.data[] | select(.id == "'$run_id'") | .attributes.status')"
-        [ 0 -ne $? ] && continue
-
-        echo "$run_status"
-
-        echodebug "[DEBUG] Requesting workspace info for $org/$workspace"
-        url="$tfe_address/api/v2/organizations/$org/workspaces/$workspace"
-        workspace_info_resp="$(tfe_api_call "$url")"
-
-        echodebug "[DEBUG] Workspace info response:"
-        echodebug "$workspace_info_resp"
-
-        workspace_locked="$(printf "%s" "$workspace_info_resp" | jq -r '.data.attributes.locked')"
-
-        if [ true = "$workspace_locked" ]; then
-            lock_id="$(printf "%s" "$workspace_info_resp" | jq -r '.data.relationships."locked-by".data.id')"
-            if [ "$lock_id" != "$run_id" ]; then
-                echo "locked by $lock_id"
-                exit
-            fi
-        fi
-    done
-) 2>$TF_LOG_REDIRECT
-[ 0 -ne $? ] && { echoerr "Error polling run"; exit 1; }
