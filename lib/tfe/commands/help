@@ -34,6 +34,7 @@ DESCRIPTION
 
 EOF
 
+    # List all of the commands and their descriptions in the help
     (
     cd "$tfe_cmd_dir"
 
@@ -47,9 +48,11 @@ EOF
 
 tfe_help () (
     if [ $# -eq 0 ]; then
+        # Just ran 'tfe help'
         tfe_help_help
         return 0
     else
+        # Ran 'tfe help <cmd>'
         cmd=$1
         if [ ! -f "$tfe_cmd_dir/$cmd" ]; then
             echoerr "Command $cmd not found. Cannot provide help information."

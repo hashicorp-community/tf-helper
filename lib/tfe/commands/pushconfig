@@ -25,6 +25,7 @@ tfe_pushconfig_description () (
 )
 
 tfe_pushconfig_help () (
+# Be sure to include the common options with tfe_usage_args
 cat << EOF
 Usage:
 
@@ -63,9 +64,7 @@ tfe_pushconfig () (
     config_dir=.
     poll_run=0
 
-    ###
-    ### Parse options
-    ###
+    # Parse options
 
     while [ -n "$1" ]; do
         case "$1" in
@@ -164,28 +163,33 @@ tfe_pushconfig () (
             # tar is extremely sensitive to being passed empty values so this case is
             # unfortunately necessary
             case ${has_tf_state}${has_modules}${upload_modules} in
+                # has state, has modules, should upload modules
                 truetruetrue)
                     tar -${tar_verbose}zcf "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_state_file" \
                         "$tf_modules_dir"
                     ;;
+                # has state, no modules, no modules so don't care about uploading
                 truefalse*)
                     tar -${tar_verbose}zcf "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_state_file"
                     ;;
+                # no state, has modules, should upload modules
                 falsetruetrue)
                     tar -${tar_verbose}zcf "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_modules_dir"
                     ;;
+                # no state, no modules, no modules so don't care about uploading
                 falsefalse*)
                     tar -${tar_verbose}zcf "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree)
                     ;;
             esac
         else
+            # No VCS, upload this whole dir
             tar -${tar_verbose}zcf "$config_payload" .
         fi
     ) 2>$tf_log_redirect
@@ -254,6 +258,7 @@ tfe_pushconfig () (
         run_status=pending
         lock_id=
 
+        # Go until we don't see one of these states
         while [ 0 != "$poll_run" ] &&
                 ( [ pending = "$run_status"   ] ||
                   [ planning = "$run_status"  ] ||

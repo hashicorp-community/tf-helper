@@ -25,6 +25,7 @@ tfe_pullvars_description () (
 )
 
 tfe_pullvars_help () (
+# Be sure to include the common options with tfe_usage_args
 cat << EOF
 
 SYNOPSIS
@@ -54,13 +55,16 @@ EOF
 )
 
 tfe_pullvars () (
+    # List of vars to retrieve
     vars=
-    env=false
+
+    # List of env vars to retrieve
     env_vars=
 
-    ###
-    ### Parse options
-    ###
+    # Whether to list all env vars instead of tf vars
+    env=false
+
+    # Parse options
 
     while [ -n "$1" ]; do
         case "$1" in
@@ -101,6 +105,7 @@ tfe_pullvars () (
         shift
     done
 
+    # Handle conflicting options
     if [ "$env" = true ] && ( [ -n "$vars" ] || [ -n "$env_vars" ] ); then
         echoerr "-env true cannot be specified along with -var and/or -env-var"
         return 1
@@ -112,6 +117,7 @@ tfe_pullvars () (
     echodebug "[DEBUG] API list variables URL:"
     echodebug "$url"
 
+    # API call to get all of the variables
     var_get_resp="$(tfe_api_call $url)"
     if [ 0 -ne $? ]; then
         echoerr "Error listing variables"
@@ -126,6 +132,7 @@ tfe_pullvars () (
 
     if [ -n "$vars" ]; then
         for v in $vars; do
+            # Get this tf var out of the variable list with jq
             tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
                 | select(.attributes.category == "terraform")
                 | select(.attributes.key == $var)
@@ -143,12 +150,12 @@ tfe_pullvars () (
             else
                 echo "$tfevar"
             fi
-
         done
     fi
 
     if [ -n "$env_vars" ]; then
         for v in $env_vars; do
+            # Get this env var out of the variable list with jq
             tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
                 | select(.attributes.category == "env")
                 | select(.attributes.key == $var)
@@ -164,9 +171,11 @@ tfe_pullvars () (
     fi
 
     if [ -n "$vars" ] || [ -n "$env_vars" ]; then
-        exit $vars_retval
+        return $vars_retval
     fi
 
+    # Didn't retrieve a specific list of vars so
+    # either list all tf or all env vars
     terraform_tfvars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
         | select(.attributes.category == "terraform")
         | select(.attributes.sensitive == false)
@@ -179,7 +188,7 @@ tfe_pullvars () (
         | join("")')"
     if [ 0 -ne $? ]; then
         echoerr "Error parsing API response for Terraform variables"
-        exit 1
+        return 1
     fi
 
     sensitive_tfvars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
@@ -188,7 +197,7 @@ tfe_pullvars () (
         | .attributes.key + " = \"\""')"
     if [ 0 -ne $? ]; then
         echoerr "Error parsing API response for sensitive Terraform variables"
-        exit 1
+        return 1
     fi
 
     env_vars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
@@ -197,7 +206,7 @@ tfe_pullvars () (
         | .attributes.key + "=\"" + .attributes.value + "\""')"
     if [ 0 -ne $? ]; then
         echoerr "Error parsing API response for environment variables"
-        exit 1
+        return 1
     fi
 
     sensitive_env_vars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
@@ -206,9 +215,10 @@ tfe_pullvars () (
         | .attributes.key + "="')"
     if [ 0 -ne $? ]; then
         echoerr "Error parsing API response for sensitive environment variables"
-        exit 1
+        return 1
     fi
 
+    # All env vars were requested
     if [ "$env" = true ]; then
         if [ -n "$sensitive_env_vars" ]; then
             echo "$sensitive_env_vars"
@@ -218,9 +228,10 @@ tfe_pullvars () (
             echo "$env_vars"
         fi
 
-        exit
+        return 0
     fi
 
+    # All tf vars were requested
     if [ -n "$sensitive_tfvars" ]; then
         echo "$sensitive_tfvars"
     fi
