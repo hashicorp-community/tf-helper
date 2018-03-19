@@ -38,9 +38,9 @@
 # tfe_workspace
 # tfe_token
 
-###
-### Utility function declarations
-###
+##
+## Utility function declarations
+##
 
 # Print messages to stderr. Use printf to ensure the message is verbatim.
 # E.g. do not interpret \n in JSON.
@@ -99,6 +99,10 @@ tfe_api_call () {
          --header "Content-Type: application/vnd.api+json" \
          $@
 }
+
+##
+## Program begins here
+##
 
 # Check for commands that must be present to function
 
