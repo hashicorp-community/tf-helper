@@ -260,9 +260,7 @@ tfe_pushvars () (
     defaulthclvars=
     defaulthclvars_values=
 
-    ###
-    ### Parse options
-    ###
+    # Parse options
 
     while [ -n "$1" ]; do
         case "$1" in
