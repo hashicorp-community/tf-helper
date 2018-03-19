@@ -283,7 +283,7 @@ tfe_pushvars () (
                 ;;
             -overwrite)
                 new_overwrite="$(assign_arg "$1" "$2")"
-                overwrites="$( [ -n "$overwrites" ] && echo "$overwrites"; echo "$new_overwrite")"
+                overwrites="$(append "$overwrites" "$new_overwrite")"
                 ;;
             #-overwrite-all)
             #    ;;
@@ -291,43 +291,43 @@ tfe_pushvars () (
                 new_var_arg="$(assign_arg "$1" "$2")"
                 new_var_name=${new_var_arg%%=*}
                 new_var_value=${new_var_arg#*=}
-                vars="$( [ -n "$vars" ] && echo "$vars"; echo "$new_var_name")"
-                vars_values="$( [ -n "$vars_values" ] && echo "$vars_values"; echo "$new_var_value")"
+                vars="$(append "$vars" "$new_var_name")"
+                vars_values="$(append "$vars_values" "$new_var_value")"
                 ;;
             -svar)
                 new_var_arg="$(assign_arg "$1" "$2")"
                 new_var_name=${new_var_arg%%=*}
                 new_var_value=${new_var_arg#*=}
-                svars="$( [ -n "$svars" ] && echo "$svars"; echo "$new_var_name")"
-                svars_values="$( [ -n "$svars_values" ] && echo "$svars_values"; echo "$new_var_value")"
+                svars="$(append "$svars" "$new_var_name")"
+                svars_values="$(append "$svars_values" "$new_var_value")"
                 ;;
             -hcl-var)
                 new_var_arg="$(assign_arg "$1" "$2")"
                 new_var_name=${new_var_arg%%=*}
                 new_var_value="$(escape_value "${new_var_arg#*=}")"
-                hclvars="$( [ -n "$hclvars" ] && echo "$hclvars"; echo "$new_var_name")"
-                hclvars_values="$( [ -n "$hclvars_values" ] && echo "$hclvars_values"; echo "$new_var_value")"
+                hclvars="$(append "$hclvars" "$new_var_name")"
+                hclvars_values="$(append "$hclvars_values" "$new_var_value")"
                 ;;
             -shcl-var)
                 new_var_arg="$(assign_arg "$1" "$2")"
                 new_var_name=${new_var_arg%%=*}
                 new_var_value="$(escape_value "${new_var_arg#*=}")"
-                shclvars="$( [ -n "$shclvars" ] && echo "$shclvars"; echo "$new_var_name")"
-                shclvars_values="$( [ -n "$shclvars_values" ] && echo "$shclvars_values"; echo "$new_var_value")"
+                shclvars="$(append "$shclvars" "$new_var_name")"
+                shclvars_values="$(append "$shclvars_values" "$new_var_value")"
                 ;;
             -env-var)
                 new_var_arg="$(assign_arg "$1" "$2")"
                 new_var_name=${new_var_arg%%=*}
                 new_var_value=${new_var_arg#*=}
-                envvars="$( [ -n "$envvars" ] && echo "$envvars"; echo "$new_var_name")"
-                envvars_values="$( [ -n "$envvars_values" ] && echo "$envvars_values"; echo "$new_var_value")"
+                envvars="$(append "$envvars" "$new_var_name")"
+                envvars_values="$(append "$envvars_values" "$new_var_value")"
                 ;;
             -senv-var)
                 new_var_arg="$(assign_arg "$1" "$2")"
                 new_var_name=${new_var_arg%%=*}
                 new_var_value=${new_var_arg#*=}
-                senvvars="$( [ -n "$senvvars" ] && echo "$senvvars"; echo "$new_var_name")"
-                senvvars_values="$( [ -n "$senvvars_values" ] && echo "$senvvars_values"; echo "$new_var_value")"
+                senvvars="$(append "$senvvars" "$new_var_name")"
+                senvvars_values="$(append "$senvvars_values" "$new_var_value")"
                 ;;
             -var-file)
                 var_file="$(assign_arg "$1" "$2")"
@@ -538,13 +538,13 @@ tfe_pushvars () (
         #cat vars.tf
     fi
 
-    maybe_defaultvars="$(echo "${all_vars}" | while read var_info; do
+    maybe_defaultvars="$(echo "$all_vars" | while read var_info; do
                     if [ "${var_info%% *}" != "hcl" ]; then
                         echo "${var_info#* }"
                     fi
                 done)"
 
-    maybe_defaulthclvars="$(echo "${all_vars}" | while read var_info; do
+    maybe_defaulthclvars="$(echo "$all_vars" | while read var_info; do
                     if [ "${var_info%% *}" = "hcl" ]; then
                         echo "${var_info#* }"
                     fi
@@ -564,8 +564,8 @@ tfe_pushvars () (
             fi
             val="$(escape_value "$val_lines")"
 
-            defaultvars="$( [ -n "$defaultvars" ] && echo "$defaultvars"; echo "$var")"
-            defaultvars_values="$( [ -n "$defaultvars_values" ] && printf "%s\n" "$defaultvars_values"; printf "%s\n" "$val")"
+            defaultvars="$(append "$defaultvars" "$var")"
+            defaultvars_values="$(append "$defaultvars_values" "$val")"
         done
     fi
 
@@ -582,8 +582,8 @@ tfe_pushvars () (
             fi
             val="$(escape_value "$val_lines")"
 
-            defaulthclvars="$( [ -n "$defaulthclvars" ] && echo "$defaulthclvars"; echo "$var")"
-            defaulthclvars_values="$( [ -n "$defaulthclvars_values" ] && printf "%s\n" "$defaulthclvars_values"; printf "%s\n" "$val")"
+            defaulthclvars="$(append "$defaulthclvars" "$var")"
+            defaulthclvars_values="$(append "$defaulthclvars_values" "$val")"
         done
     fi
 

@@ -49,6 +49,14 @@ echoerr () { printf "%s\n" "$@" 1>&2; }
 # Print debug messages if the TF_LOG environment variable is set.
 echodebug () { [ -n "$TF_LOG" ] && echoerr "$@"; return 0; }
 
+# Return (print) $1\n$2 if $1 is not empty. Usage:
+#   my_str_list="$(append "$my_str_list" "line")"
+# This will facilitate a later iteration:
+#   echo "$my_str_list" | while read line; do <operations with "$line">; done
+append () {
+    printf "%s\n" "$( [ -n "$1" ] && printf "%s\n" "$1"; printf "%s\n" "$2" )"
+}
+
 # Remove temporary files
 cleanup () {
     if [ -f "$config_payload" ]; then
