@@ -146,7 +146,7 @@ tfe_address=${TFE_URL:-"https://app.terraform.io"}
 tfe_org="$TFE_ORG"
 
 # Allow setting the TFE workspace with TFE_WORKSPACE
-tfe_workspace="$TFE_ORG"
+tfe_workspace="$TFE_WORKSPACE"
 
 # Prefer TFE_TOKEN, fall back to ATLAS_TOKEN.
 # Keep going if it's not set - can be set by -token
