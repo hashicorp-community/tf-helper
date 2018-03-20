@@ -384,6 +384,14 @@ tfe_pushvars () (
         shift
     done
 
+    if [ -n "$config_dir" ] || [ -n "$var_file" ]; then
+        if [ -z "$(command -v terraform)" ]; then
+            echoerr "The terraform command must be installed when operating"
+            echoerr "on tfvars files or Terraform configurations."
+            exit 1
+        fi
+    fi
+
     # Get the variable listing for the workspace
     url="$tfe_address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$tfe_org&filter%5Bworkspace%5D%5Bname%5D=$tfe_workspace"
 
