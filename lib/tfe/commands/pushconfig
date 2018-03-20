@@ -135,7 +135,7 @@ tfe_pushconfig () (
         workspace_id="$(printf "%s" "$workspace_id_resp" | jq -r '.data.id')"
         echodebug "[DEBUG] Workspace ID: $workspace_id"
 
-        test "$workspace_id"
+        test -n "$workspace_id"
         echo "$workspace_id"
     ) 2>$tfe_log_redirect )"
     [ 0 -ne $? ] && { echoerr "Error obtaining workspace ID"; exit 1; }
