@@ -26,70 +26,73 @@ tfe_pushvars_description () (
 
 tfe_pushvars_help () (
 cat << EOF
-Usage:
+SYNOPSIS
+ tfe pushvars -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS] [CONFIG_DIR]
 
-  tfe pushvars -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS] [CONFIG_DIR]
-
-  Update variables in a Terraform Enterprise workspace. Please read the
-  supplied notes for important usage details about the modes of operation.
-
-Options:
+DESCRIPTION
+ Update variables in a Terraform Enterprise workspace. Please read the
+ supplied notes for important usage details about the modes of operation.
 
 $(tfe_usage_args)
 
-  -dry-run false       Show what would be done, but do not actually make
-                       any changes to variables in the workspace. Defaults
-                       to false.
+ -dry-run <boolean>   Show what would be done, but do not actually make
+                      any changes to variables in the workspace. Defaults
+                      to false.
 
-  -var 'foo=bar'       Set a non-HCL variable in the Terraform Enterprise
-                       workspace.
+ -var 'foo=bar'       Set a non-HCL variable in the Terraform Enterprise
+                      workspace.
 
-  -svar 'foo=bar'      Set a sensitive non-HCL variable in the Terraform
-                       Enterprise workspace.
+ -svar 'foo=bar'      Set a sensitive non-HCL variable in the Terraform
+                      Enterprise workspace.
 
-  -hcl-var 'foo=bar'   Set an HCL variable in the Terraform Enterprise
-                       workspace.
+ -hcl-var 'foo=bar'   Set an HCL variable in the Terraform Enterprise
+                      workspace.
 
-  -shcl-var 'foo=bar'  Set a sensitive HCL variable in the Terraform
-                       Enterprise workspace.
+ -shcl-var 'foo=bar'  Set a sensitive HCL variable in the Terraform
+                      Enterprise workspace.
 
-  -env-var 'foo=bar'   Set an environment variable in the Terraform
-                       Enterprise workspace.
+ -env-var 'foo=bar'   Set an environment variable in the Terraform
+                      Enterprise workspace.
 
-  -senv-var 'foo=bar'  Set a sensitive environment variable in the Terraform
-                       Enterprise workspace.
+ -senv-var 'foo=bar'  Set a sensitive environment variable in the Terraform
+                      Enterprise workspace.
 
 
-  -var-file foo.tfars  Load variable values from a tfvars file.
+ -var-file foo.tfars  Load variable values from a tfvars file.
 
-  -overwrite foo       Variable keys that should overwrite values in Terraform
-                       Enterprise. If omitted for variables already set in
-                       Terraform Enterprise, values will not be overwritten
-                       unless overwriting is specified with a different
-                       overwrite flag. This can be used multiple times.
+ -overwrite foo       Variable keys that should overwrite values in Terraform
+                      Enterprise. If omitted for variables already set in
+                      Terraform Enterprise, values will not be overwritten
+                      unless overwriting is specified with a different
+                      overwrite flag. This can be used multiple times.
 
-  -hide-sensitive true Do not show sensitive values in output. Defaults to
-                       true.
-Notes:
+ -hide-sensitive <boolean>
+                      Do not show sensitive values in output. Defaults to
+                      true.
+NOTES
+ All -var style args (except -var-file) can be set multiple times to operate
+ on multiple variables with one command.
 
-  All -var style args (except -var-file) can be set multiple times to operate
-  on multiple variables with one command.
+ There are two modes of operation:
 
-  There are two modes of operation:
+ 1. Operate only on variables specified on the command line. All args are
+    supported. There is no automatic variable loading when -var-file is used;
+    variable values come from the one variable file and the other command
+    line args.
 
-  1. Operate only on variables specified on the command line. All args are
-     supported. There is no automatic variable loading when -var-file is used;
-     variable values come from the one variable file and the other command
-     line args.
+ 2. Operate on command line args along with a Terraform configuration. All
+    args are supported. "terraform init" must have been run. Variable file
+    loading, including autoloading, follows the same rules as "terraform
+    apply" since "terraform console" is used to obtain the variable values.
 
-  2. Operate on command line args along with a Terraform configuration. All
-     args are supported. "terraform init" must have been run. Variable file
-     loading, including autoloading, follows the same rules as "terraform
-     apply" since "terraform console" is used to obtain the variable values.
+ The mode of operation is determined by supplying a CONFIG_DIR at the end
+ of the invocation. Even if the present working directory contains a
+ Terraform configuration '.' must be supplied to change the mode of operation.
 
-  The mode of operation is determined by supplying a CONFIG_DIR at the end
-  of the invocation. Even if the present working directory contains a
-  Terraform configuration '.' must be supplied to change the mode of operation.
+ The curl and jq commands are required.
+
+ The terraform command is required if operating on a tfvars file or a
+ Terraform configuration.
 
 EOF
 

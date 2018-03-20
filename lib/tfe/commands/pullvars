@@ -45,11 +45,13 @@ $(tfe_usage_args)
                       Enterprise workspace. This argument may be specified
                       multiple times.
 
- -env false           Get all environment variables instead of Terraform
+ -env <boolean>       Get all environment variables instead of all Terraform
                       variables. Defaults to false.
 
 NOTES
  Sensitive variable names are provided but their values are empty.
+
+ The curl and jq commands are required.
 
 EOF
 )

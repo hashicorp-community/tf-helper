@@ -27,33 +27,32 @@ tfe_pushconfig_description () (
 tfe_pushconfig_help () (
 # Be sure to include the common options with tfe_usage_args
 cat << EOF
-Usage:
+SYNOPSIS
+ tfe pushconfig -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS] [CONFIG_DIR]
 
-  tfe pushconfig -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS] [CONFIG_DIR]
-
-  Upload a Terraform configuration to a Terraform Enterprise workspace
-  and begin a run.
-
-Options:
+DESCRIPTION
+ Upload a Terraform configuration to a Terraform Enterprise workspace
+ and begin a run.
 
 $(tfe_usage_args)
 
-  -upload-modules true If true (default), then the modules are locked at
-                       their current checkout and uploaded completely. This
-                       prevents modules from being retrieved with "terraform
-                       init". This does not lock provider versions. Use the
-                       "version" parameter in provider blocks in the
-                       configuration to accomplish that.
+ -upload-modules <boolean>
+                      If true (default), then the modules are locked at
+                      their current checkout and uploaded completely. This
+                      prevents modules from being retrieved with "terraform
+                      init". This does not lock provider versions. Use the
+                      "version" parameter in provider blocks in the
+                      configuration to accomplish that.
 
-  -vcs true            If true (default), push will upload only files
-                       committed to your VCS, if detected.
+ -vcs <boolean>       If true (default), push will upload only files
+                      committed to your VCS, if detected. Currently supports
+                      git repositories.
 
-  -poll <seconds>      Number of seconds to wait between polling the submitted
+ -poll <seconds>      Number of seconds to wait between polling the submitted
                        run for a non-active status. Defaults to 0 (no polling).
 
-Notes:
-
-  The curl and jq commands are required.
+NOTES
+ The curl and jq commands are required.
 
 EOF
 )
