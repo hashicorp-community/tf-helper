@@ -162,11 +162,22 @@ cat > "$payload" <<EOF
 EOF
 }
 
+# Given a list of variables followed by the properties all of those variables
+# should have, either create or update them in TFE.
+# $1 variables list
+# $2 corresponding variable values list
+# $3 variables type (terraform or env)
+# $4 if the variables are hcl (true) or not (false)
+# $5 if the variables are sensitive (true) or not (false)
 process_vars () {
+    # Bail out if the list is empty
     if [ -z "$1" ]; then
         return
     fi
 
+    # Loop through the given variables. See if they are already in the
+    # workspace. If so create them, else update them if they should be
+    # updated.
     i=1
     for v in $1; do
         var_id="$(printf "%s" "$var_get_resp" | \
@@ -204,6 +215,8 @@ process_vars () {
                 echodebug "$var_create_resp"
             fi
         else
+            # This existing variable should only be overwritten if it was
+            # specified with -overwrite NAME
             if echo "$overwrites" | grep -E "^$v$" >/dev/null 2>&1; then
                 if [ "$hide_sensitive" = true ] && [ "$5" = true ]; then
                     output_val=REDACTED
@@ -381,6 +394,8 @@ tfe_pushvars () (
     echodebug "[DEBUG] Variable list response:"
     echodebug "$var_get_resp"
 
+    # If a config directory was given, then variables with defaults in
+    # the configuration need to be discovered.
     if [ -n "$config_dir" ]; then
         cd "$config_dir"
         if [ 0 -ne $? ]; then
@@ -418,9 +433,11 @@ tfe_pushvars () (
                 next
             }
             /variable/ && seen_variable == 0 {
+                # the variable keyword
                 seen_variable = 1
             }
             $0 ~ VARS && seen_variable == 1 {
+                # get the variable name
                 in_var = 1
                 match($0, /\"[[:alnum:]]/)
                 l=RLENGTH
@@ -429,6 +446,7 @@ tfe_pushvars () (
                 seen_variable = 0
             }
             in_var == 1 && /{/ {
+                # entered the variable block to look for default
                 in_var_block = 1
             }
             in_var_block == 1 && in_default == 0 && in_value == 0 && /}/ {
@@ -443,12 +461,16 @@ tfe_pushvars () (
             }
             # TODO: try to find "type"
             in_var_block == 1 && /default/ {
+                # this variable has a default
                 in_default = 1
             }
             in_default == 1 && /=/{
+                # entering the RHS of default =
                 in_value = 1
             }
             in_var == 1 && in_default == 1 && in_value == 1 && /["{<\[]/ {
+                # inside the RHS and found something that looks like a value.
+                # determine the variable type (hcl, non-hcl).
                 # match all the things that are not Terraform variable values
                 m = match($0, /[^"{<\[]*/)
                 if(m != 0) {
@@ -456,12 +478,15 @@ tfe_pushvars () (
                     # Terraform variable values
                     value_char = substr($0, RLENGTH + 1, 1)
 
+                    # Quotes and heredocs are non-hcl, others are hcl
                     if(value_char == "\"" || value_char == "<") {
                         print "nonhcl", name
                     } else {
                         print "hcl", name
                     }
 
+                    # can safely start the search over now without
+                    # needing to locate the end of the variable block.
                     in_var = 0
                     in_var_block = 0
                     in_default = 0
@@ -470,6 +495,10 @@ tfe_pushvars () (
                 }
             } ' *.tf)"
     elif [ -n "$var_file" ]; then
+        # Going to locate all of the variables from a tfvars file.
+        # Will get the values by using the tfvars file and creating a
+        # temporary config with just variable names in it for use with
+        # the terraform console command.
         tfvar_dir="$TMPDIR/tfe-push-vars-$(date +%s)"
         mkdir "$tfvar_dir"
         cp "$var_file" "$tfvar_dir"
@@ -512,14 +541,17 @@ tfe_pushvars () (
                 next
             }
             /^[[:space:]]*[[:alnum:]]/ && in_var == 0 && $0 !~ /,$/ {
+                # this looks like a variable name
                 in_var = 1
                 match($0, /[-_[:alnum:]]+/)
                 name = substr($0, RSTART, RLENGTH)
             }
             in_var == 1 && /=/ {
+                # have a variable name and entering its RHS, the value
                 in_value = 1
             }
             in_var == 1 && in_value == 1 && /["{<\[]/ {
+                # determine the variable type (hcl, non-hcl).
                 # match all the things that are not Terraform variable values
                 m = match($0, /[^"{<\[]*/)
                 if(m != 0) {
@@ -527,6 +559,7 @@ tfe_pushvars () (
                     # Terraform variable values
                     value_char = substr($0, RLENGTH + 1, 1)
 
+                    # Quotes and heredocs are non-hcl, others are hcl
                     if(value_char == "\"" || value_char == "<") {
                         print "nonhcl", name
                     } else {
@@ -542,6 +575,10 @@ tfe_pushvars () (
         #cat vars.tf
     fi
 
+    # All of the 'parsed' variable names are just candidates, as they may
+    # not have defaults or may not be variable names at all (e.g. map
+    # assignments).
+
     maybe_defaultvars="$(echo "$all_vars" | while read var_info; do
                     if [ "${var_info%% *}" != "hcl" ]; then
                         echo "${var_info#* }"
@@ -554,6 +591,8 @@ tfe_pushvars () (
                     fi
                 done)"
 
+    # See if these string variables have values using the terraform console
+    # command
     if [ -n "$maybe_defaultvars" ]; then
         for var in $maybe_defaultvars; do
             if [ -z "$var_file_arg" ]; then
@@ -573,6 +612,8 @@ tfe_pushvars () (
         done
     fi
 
+    # See if these hcl variables have values using the terraform console
+    # command
     if [ -n "$maybe_defaulthclvars" ]; then
         for var in $maybe_defaulthclvars; do
             if [ -z "$var_file_arg" ]; then
@@ -590,6 +631,9 @@ tfe_pushvars () (
             defaulthclvars_values="$(append "$defaulthclvars_values" "$val")"
         done
     fi
+
+    # Send each list of the different types of variables through to be created
+    # or updated, along with the properties that that list should abide by.
 
     #            variable list,    value list,              type,     hcl,  sensitive
     process_vars "$defaultvars"    "$defaultvars_values"    terraform false false
