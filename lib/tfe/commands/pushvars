@@ -597,5 +597,5 @@ tfe_pushvars () (
     process_vars "$envvars"        "$envvars_values"        env       false false
     process_vars "$senvvars"       "$senvvars_values"       env       false true
 
-    cleanup
+    cleanup "$payload"
 )

@@ -57,17 +57,19 @@ append () {
     printf "%s\n" "$( [ -n "$1" ] && printf "%s\n" "$1"; printf "%s\n" "$2" )"
 }
 
-# Remove temporary files
+# Remove specified files
 cleanup () {
-    if [ -f "$config_payload" ]; then
-        echodebug "[DEBUG] Deleting temporary content file"
-        rm "$config_payload" 
-        if [ 0 -ne $? ]; then
-            echoerr "Error deleting temporary config payload file:"
-            echoerr "$config_payload"
-        fi
+    if [ -n "$1" ]; then
+        echo "$1" | while read f; do
+            echodebug "[DEBUG] cleaning up $f"
+            rm "$f" 2>$tfe_log_redirect
+            if [ 0 -ne $? ]; then
+                echoerr "Error cleaning up $f"
+                echoerr "$f"
+            fi
+        done
     else
-        echodebug "[DEBUG] No temporary content file to delete"
+        echodebug "[DEBUG] No file to clean up"
     fi
 }
 
@@ -130,10 +132,12 @@ if [ -z "$(command -v readlink)" ]; then
 fi
 
 # Use TMPDIR if it is set. If not, set it to /tmp
-
 if [ -z "$TMPDIR" ]; then
     TMPDIR=/tmp
 fi
+
+# Strip the trailing / from TMPDIR if there is one
+TMPDIR="$(echo "$TMPDIR" | sed 's#/$##')"
 
 if [ -n "$TF_LOG" ]; then
     # Debugging. Print command errors and make them verbose
@@ -142,7 +146,7 @@ if [ -n "$TF_LOG" ]; then
     tfe_curl_silent=
 else
     # Not debugging. Shut everyting up.
-    tf_log_redirect=/dev/null
+    tfe_log_redirect=/dev/null
     tfe_tar_verbose=
     tfe_curl_silent="-s"
 fi
