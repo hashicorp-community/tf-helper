@@ -167,12 +167,6 @@ if [ -z "$tfe_token" ]; then
     tfe_token="$ATLAS_TOKEN"
 fi
 
-# Allow setting 
-tfe_token="$TFE_TOKEN"
-if [ -z "$tfe_token" ]; then
-    tfe_token="$ATLAS_TOKEN"
-fi
-
 # Need to determine the script location and prefix to the needed lib directory.
 # The prefix should be the directory that contains the bin and lib directories.
 # i.e. /users/username/gitclones/terraform-enterprise-push (contains lib/tfe/)
