@@ -198,6 +198,8 @@ process_vars () {
                     echoerr "Error creating variable $v"
                 fi
 
+                cleanup "$payload"
+
                 echodebug "[DEBUG] Variable create response:" 
                 echodebug "$var_create_resp"
             fi
@@ -224,6 +226,8 @@ process_vars () {
                     if [ 0 -ne $? ]; then
                         echoerr "Error updating variable $v"
                     fi
+
+                    cleanup "$payload"
 
                     echodebug "[DEBUG] Variable update response:" 
                     echodebug "$var_update_resp"
@@ -596,6 +600,4 @@ tfe_pushvars () (
     process_vars "$shclvars"       "$shclvars_values"       terraform true  true
     process_vars "$envvars"        "$envvars_values"        env       false false
     process_vars "$senvvars"       "$senvvars_values"       env       false true
-
-    cleanup "$payload"
 )
