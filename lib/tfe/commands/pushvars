@@ -423,33 +423,27 @@ tfe_pushvars () (
                 seen_variable = 0
             }
             /^[[:space:]]*#/ {
-#print "1"
                 # line starts with a comment
                 next
             }
             /\/\*/ {
-#print "2"
                 # entering a comment block
                 in_comment = 1
             }
             in_comment == 1 && /\*\// {
-#print "3"
                 # exiting a comment block
                 in_comment = 0
                 next
             }
             in_comment == 1 {
-#print "4"
                 # still in a comment block
                 next
             }
             in_map == 1 && $0 !~ /}/ {
-#print "5"
                 # in a map and do not see a "}" to close it
                 next
             }
             in_map == 1 && /}/ {
-#print "15"
                 # in a map and see a "}" to close it.
                 # assuming that a variable identifier is not going to follow
                 # the "}" on the same line, which could be a bad assumption
@@ -458,12 +452,10 @@ tfe_pushvars () (
                 next
             }
             /variable/ && seen_variable == 0 {
-#print "6"
                 # the variable keyword
                 seen_variable = 1
             }
             $0 ~ VARS && seen_variable == 1 {
-#print "7"
                 # get the variable name
                 in_var = 1
                 match($0, /\"[[:alnum:]]/)
@@ -473,29 +465,24 @@ tfe_pushvars () (
                 seen_variable = 0
             }
             in_heredoc == 1 && $0 !~ "^" heredoc_id "$" {
-#print "8"
                 # in a heredoc and have not seen the id to end it
                 next
             }
             in_heredoc == 1 && $0 ~ "^" heredoc_id "$" {
-#print "9"
                 # exiting a heredoc
                 in_heredoc = 0
                 heredoc_id = ""
                 next
             }
             in_var == 1 && /{/ {
-#print "10"
                 # entered the variable block to look for default
                 in_var_block = 1
             }
             in_var_block == 1 && /default/ {
-#print "12"
                 # this variable has a default
                 in_default = 1
             }
             in_var_block == 1 && in_default == 0 && in_value == 0 && /}/ {
-#print "11"
                 # Variable block with no default. Its value may come from
                 # a tfvars file loaded later.
                 #print name
@@ -507,12 +494,10 @@ tfe_pushvars () (
                 next
             }
             in_default == 1 && /=/{
-#print "13"
                 # entering the RHS of default =
                 in_value = 1
             }
             in_var == 1 && in_default == 1 && in_value == 1 && /["{<\[]/ {
-#print "14"
                 # inside the RHS and found something that looks like a value.
                 # determine the variable type (hcl, non-hcl).
                 # match all the things that are not Terraform variable values

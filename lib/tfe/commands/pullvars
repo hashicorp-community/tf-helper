@@ -46,7 +46,7 @@ $(tfe_usage_args)
                       multiple times.
 
  -env false           Get all environment variables instead of Terraform
-                       variables.
+                      variables. Defaults to false.
 
 NOTES
  Sensitive variable names are provided but their values are empty.
