@@ -75,12 +75,12 @@ tfe_pullvars () (
             -var)
                 # -var can be specified multiple times
                 new_var="$(assign_arg "$1" "$2")"
-                vars="$( [ -n "$vars" ] && echo "$vars"; echo "$new_var")"
+                vars="$(append "$vars" "$new_var")"
                 ;;
             -env-var)
                 # -env-var can be specified multiple times
                 new_var="$(assign_arg "$1" "$2")"
-                env_vars="$( [ -n "$env_vars" ] && echo "$env_vars"; echo "$new_var")"
+                env_vars="$(append "$env_vars" "$new_var")"
                 ;;
             -env)
                 case "$2" in
