@@ -106,6 +106,8 @@ EOF
 ## Helper functions
 ##
 
+# Replace quotes and newlines with escape characters to prepare the
+# value for insertion into JSON.
 escape_value () {
     echo "$1" | awk '
     {
