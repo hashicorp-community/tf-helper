@@ -405,6 +405,10 @@ tfe_pushvars () (
         fi
 
         # Get all of the variables from all of the .tf files
+        # Outputs:
+        #   TYPE NAME
+        # e.g.
+        #   hcl my_var
         all_vars="$(awk '
             BEGIN {
                 VARS="\"[-_[:alnum:]]*\""
@@ -516,6 +520,11 @@ tfe_pushvars () (
         # This is not a great "parser" but it hopefully overreaches on finding
         # variable names, then we can silently ignore errors from terraform
         # console (output when TF_LOG=1).
+
+        # Outputs:
+        #   TYPE NAME
+        # e.g.
+        #   hcl my_var
         all_vars="$(awk '
             BEGIN {
                 in_var = 0
@@ -571,13 +580,12 @@ tfe_pushvars () (
                     in_value = 0
                 }
             }' "$var_file")"
-
-        #cat vars.tf
     fi
 
-    # All of the 'parsed' variable names are just candidates, as they may
-    # not have defaults or may not be variable names at all (e.g. map
-    # assignments).
+    # Separate all_vars into hcl and non-hcl lists.
+    # TODO: Consider separating them while looping with the terraform
+    #       console command and looking at the first character of the
+    #       values discovered. Could eliminate parser pain too.
 
     maybe_defaultvars="$(echo "$all_vars" | while read var_info; do
                     if [ "${var_info%% *}" != "hcl" ]; then
@@ -590,6 +598,10 @@ tfe_pushvars () (
                         echo "${var_info#* }"
                     fi
                 done)"
+
+    # All of the 'parsed' variable names are just candidates, as they may
+    # not have defaults or may not be variable names at all (e.g. map
+    # assignments).
 
     # See if these string variables have values using the terraform console
     # command
