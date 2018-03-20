@@ -226,7 +226,7 @@ tfe_pushconfig () (
         echodebug "[DEBUG] Upload URL: $url"
         echodebug "[DEBUG] Uploading content to upload URL"
 
-        upload_config_resp="$(curl $curl_silent -X PUT --data-binary "@$config_payload" ${url})"
+        upload_config_resp="$(curl -f $curl_silent -X PUT --data-binary "@$config_payload" ${url})"
 
         echodebug "[DEBUG] Upload config response:"
         echodebug "$upload_config_resp"
