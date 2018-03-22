@@ -76,15 +76,15 @@ cleanup () {
 # Usage description for options common to all subcommands
 tfe_usage_args () {
 cat << EOF
- -name <name>         Name of the configuration in Terraform Enterprise.
-                      This can also be set in the configuration itself.
-                      Format is typically: "username_or_org/name".
+ -name <NAME>         The name of the Terraform Enterprise workspace,
+                      formatted as "<ORGANIZATION>/<WORKSPACE>". If unspecified,
+                      uses the TFE_ORG and TFE_WORKSPACE environment variables.
 
- -tfe-address <url>   An alternate address to an Terraform Enterprise
-                      instance. Defaults to https://app.terraform.io
+ -tfe-address <URL>   The address of your Terraform Enterprise instance.
+                      Defaults to the SaaS hostname at https://app.terraform.io
 
- -token <token>       Access token to use to upload. If blank or unspecified,
-                      the ATLAS_TOKEN environmental variable will be used.
+ -token <TOKEN>       Access token for Terraform Enterprise API requests. If
+                      unspecified, uses the ATLAS_TOKEN environment variable.
 
 EOF
 }
