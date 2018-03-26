@@ -2,11 +2,12 @@
 
 Terraform Enterprise API: https://www.terraform.io/docs/enterprise/api/index.html
 
-The scripts in this repository replace and extend the functionality of the
-deprecated `terraform push` command. You can use them to upload configurations,
-start runs, and change variables using the new Terraform Enterprise API.
-These scripts are not necessary to use Terraform Enterprise's core workflows,
-but they offer a convenient interface for manual actions on the command line.
+The `tfe` command in this repository replaces and extends the functionality of
+the deprecated `terraform push` command. You can use it to upload
+configurations, start runs, and change and retrieve variables using the new
+Terraform Enterprise API.  These scripts are not necessary to use Terraform
+Enterprise's core workflows, but they offer a convenient interface for manual
+actions on the command line.
 
 These scripts are written in POSIX Bourne shell and so should be used on UNIX,
 Linux, and MacOS systems. Use on Windows requires a POSIX compatible
@@ -14,8 +15,8 @@ environment such as the [Windows Subsystem for Linux
 (WSL)](https://docs.microsoft.com/en-us/windows/wsl/about) or
 [Cygwin](https://www.cygwin.com/).
 
-All scripts support extensive debugging output by setting the `TF_LOG`
-environment variable to any non-empty value, such as `TF_LOG=yes`.
+Extensive debugging output is provided by setting the `TF_LOG` environment
+variable to any non-empty value, such as `TF_LOG=1`.
 
 ## Installation
 
@@ -66,24 +67,16 @@ See `tfe help pushconfig` for more information and usage details.
 If you've used `terraform push` with the legacy version of Terraform Enterprise,
 here are the important differences to notice:
 
-- If the root configuration references modules on the local filesystem, you must
-  ensure those modules are included in the configuration directory you push.
-  `tfe pushconfig` won't automatically upload modules from outside the targeted
-  configuration directory. See the example below for details.
-
-- If the configuration references remote modules (via the module registry or via
-  VCS repositories), you can let TFE retrieve them during the run or you can use
-  the `-upload-modules` option to include the `.terraform/modules` directory in
-  the upload.
-
 - `tfe pushconfig` does not read the remote configuration name from an `atlas`
-  block in the configuration. You have to provide it with the `-name` option or
+  block in the configuration. It must be provided with the `-name` option or
   with the `TFE_ORG` and `TFE_WORKSPACE` environment variables.
 
-- `tfe pushconfig` does not upload providers or pin provider versions; Terraform
-  Enterprise always downloads providers during the run. Use Terraform's built-in
-  support for [pinning provider versions][pin] by setting `version` in the
-  provider configuration block.
+- `tfe pushconfig` does not upload providers or pin provider versions.
+  Terraform Enterprise always downloads providers during the run. Use
+  Terraform's built-in support for [pinning provider versions][pin] by setting
+  `version` in the provider configuration block. Custom providers will be
+  uploaded and used if they are tracked by the VCS and placed in the directory
+  where `terraform` will be executed.
 
 [pin]: https://www.terraform.io/docs/configuration/providers.html#provider-versions
 
@@ -106,26 +99,18 @@ infrastructure
         └── mod2.tf
 ```
 
-The old `terraform push` command would target the `infrastructure/env/prod` directory; the new `tfe pushconfig` command would target the `infrastructure` directory, in order to include the local modules in the `modules`  directory. You would need to use Terraform Enterprise's UI to configure the workspace to use the `env/prod` subdirectory as the configuration root.
-
-Old push command:
-
-```
-# If run from the root of the repository
-[infrastructure]$ terraform push env/prod
-
-# If run from the root module of the configuration
-[infrastructure/env/prod]$ terraform push
-```
-
-New push command (note that `-name` must be specified):
+Run any of the following commands to push the `prod` configuration (note that
+`-name` must be specified):
 
 ```
 # If run from the root of the repository
-[infrastructure]$ tfe pushconfig -name org_name/workspace_name
+[infrastructure]$ tfe pushconfig -name org_name/workspace_name env/prod
+
+# If run from the prod directory
+[prod]$ tfe pushconfig -name org_name/workspace_name
 
 # If run from anywhere else on the filesystem
-[anywhere]$ tfe pushconfig -name org_name/workspace_name path/to/infrastructure
+[anywhere]$ tfe pushconfig -name org_name/workspace_name path/to/infrastructure/env/prod
 ```
 
 
@@ -142,24 +127,31 @@ lists and maps use `-hcl-var`. Also, environment variables can be set
 using `-env-var`. Each option has a "sensitive" counterpart for creating
 write-only variables. These options are `-svar`, `-shcl-var`, and `-senv-var`.
 
-You can also specify a tfvars file to read from with the `-var-file` option, and
-you can load `terraform.tfvars` and `*.auto.tfvars` files from a configuration
-directory by specifying the directory as the command's last argument. (Use `.`
-if you want to load automatic variables from the current working directory.)
-Files are loading using the `terraform console` command.
+A configuration directory can be supplied in the same manner as with `terraform
+push`. The configuration will be inspected for default variables, use
+automatically loaded tfvars files such as `terraform.tfvars`, and can use
+`-var-file` to load any additional tfvars file. Unlike `terraform push`, when a
+configuration should be used as a source for variables, the configuration
+directory must be explicitly provided. If the current directory contains a
+configuration that should be inspected then `.` should be supplied as the
+directory.
 
-The variable manipulation logic follows the earlier `terraform push` behavior.
-By default, it skips variables that already have a value in Terraform
-Enterprise; to replace existing values, use the `-overwrite <NAME>` option.
+The `tfe pushconfig` command allows tfvars files and `-var` style arguments to
+be used independently, outside the context of any configuration. To operate on
+a tfvars file, supply the `-var-file` argument and do not provide any path to a
+Terraform configuration. The variables and values in the tfvars file will be
+used to create and update variables, along with any additional `-var` style
+argument (`-var`, `-svar`, `-env-var`, etc).
+
+The variable manipulation logic for all command variations follows the earlier
+`terraform push` behavior.  By default, variables that already exist in
+Terraform Enterprise are not created or updated. To overwrite existing values
+use the `-overwrite <NAME>` option.
 
 The `-dry-run` option can show what changes would be made if the command were
 run. Use it to avoid surprises, especially if you are loading variables from
 multiple sources.
 
-When a configuration directory *is not* provided, no configuration is inspected
-for variable information even if the present working directory contains a
-configuration. This makes it possible to use `tfe pushvars` completely
-independent of a Terraform configuration.
 
 #### Examples
 
@@ -171,7 +163,7 @@ tfe pushvars -name org_name/workspace_name -var 'foo=bar'
 tfe pushvars -name org_name/workspace_name -var 'foo=bar' -dry-run
 
 # Set the environment variable CONFIRM_DESTROY to 1 to enable destroy plans.
-tfe pushvars -name org_name/workspace_name -env-var 'CONFIRM_DESTROY=1`
+tfe pushvars -name org_name/workspace_name -env-var 'CONFIRM_DESTROY=1'
 
 # Create Terraform variable 'foo' if it does not exist, overwrite its value
 # with 'bar' if it does exist.
@@ -183,8 +175,9 @@ tfe pushvars -name org_name/workspace_name \
   -shcl-var 'my_list=["one", "two"]' \
   -hcl-var 'my_map={foo="bar", baz="qux"}'
 
-# Create all variables from a my.tfvars file, which does not need to exist in
-# the workspace. Note that tfvars files can only set non-sensitive variables.
+# Create all variables from a my.tfvars file only. The tfvars file does not
+# need to be associated with any Terraform config. Note that tfvars files can
+# only set non-sensitive variables.
 tfe pushvars -name org_name/workspace_name -var-file my.tfvars
 
 # Create any number of variables from my.tfvars, and overwrite one variable if
@@ -194,7 +187,8 @@ tfe pushvars -name org_name/workspace_name -var-file my.tfvars \
 
 # Inspect a configuration in the current directory for variable information;
 # create any variables that do not exist in the Terraform Enterprise workspace
-# but which have values in the automatically loaded tfvars sources.
+# but which may have values in the automatically loaded tfvars sources such as
+# terraform.tfvars.
 tfe pushvars -name org_name/workspace_name .
 
 # Same as above but also specify a -var-file to include, just as when
@@ -226,7 +220,7 @@ API. When requested, sensitive variable names are printed with an empty value.
 
 ```
 # Pull all Terraform variables from a workspace and output them
-# in .tfvars format
+# in .tfvars format to stdout
 tfe pullvars -name org_name/workspace_name
 
 # Same as above, but redirect into a tfvars file
