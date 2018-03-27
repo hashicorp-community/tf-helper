@@ -130,11 +130,10 @@ write-only variables. These options are `-svar`, `-shcl-var`, and `-senv-var`.
 A configuration directory can be supplied in the same manner as with `terraform
 push`. The configuration will be inspected for default variables, use
 automatically loaded tfvars files such as `terraform.tfvars`, and can use
-`-var-file` to load any additional tfvars file. Unlike `terraform push`, when a
-configuration should be used as a source for variables, the configuration
-directory must be explicitly provided. If the current directory contains a
-configuration that should be inspected then `.` should be supplied as the
-directory.
+`-var-file` to load any additional tfvars file. Unlike `terraform push` the
+configuration directory must be explicitly provided when using a configuration.
+If the current directory contains a configuration that should be inspected then
+`.` should be supplied as the directory.
 
 The `tfe pushconfig` command allows tfvars files and `-var` style arguments to
 be used independently, outside the context of any configuration. To operate on
