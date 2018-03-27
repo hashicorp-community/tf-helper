@@ -74,7 +74,8 @@ NOTES
  All -var style args (except -var-file) can be set multiple times to operate
  on multiple variables with one command.
 
- This command can only use config dirs where "terraform init" has been run.
+ If you specify a config directory to load variables from, it must be a
+ directory where "terraform init" has been run.
 
  The curl and jq commands are required.
 
