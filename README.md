@@ -1,4 +1,4 @@
-# Terraform Enterprise Push
+# Terraform Enterprise Command Line Tool
 
 Terraform Enterprise API: https://www.terraform.io/docs/enterprise/api/index.html
 
