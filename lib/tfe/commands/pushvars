@@ -21,73 +21,61 @@
 ## -------------------------------------------------------------------
 
 tfe_pushvars_description () (
-    echo "Upload Terraform and environment variables to a TFE workspace"
+    echo "Upload Terraform and/or environment variables to a TFE workspace"
 )
 
 tfe_pushvars_help () (
 cat << EOF
 SYNOPSIS
- tfe pushvars -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS] [CONFIG_DIR]
+  tfe pushvars -name <ORGANIZATION>/<WORKSPACE> [OPTIONS] [CONFIG_DIR]
 
 DESCRIPTION
- Update variables in a Terraform Enterprise workspace. Please read the
- supplied notes for important usage details about the modes of operation.
+  Update variables in a Terraform Enterprise workspace, using values from files
+  or from the command line. By default, this command skips variables that
+  already have a value in Terraform Enterprise; to replace existing values,
+  use the '-overwrite <NAME>' option.
 
+  If a config dir is specified, pushvars loads the terraform.tfvars and
+  *.auto.tfvars files in that directory and adds them to the variables set on
+  the command line. If the config dir is omitted, pushvars only uses variables
+  from the command line.
+
+OPTIONS
 $(tfe_usage_args)
 
- -dry-run <boolean>   Show what would be done, but do not actually make
-                      any changes to variables in the workspace. Defaults
-                      to false.
+  -dry-run <BOOLEAN>   Show what would be done without changing any variables
+                       in the workspace. Defaults to false.
 
- -var 'foo=bar'       Set a non-HCL variable in the Terraform Enterprise
-                      workspace.
+  -var 'name=val'      Set a Terraform variable with a basic string value.
 
- -svar 'foo=bar'      Set a sensitive non-HCL variable in the Terraform
-                      Enterprise workspace.
+  -svar 'name=val'     Set a sensitive Terraform variable with a basic string
+                       value.
 
- -hcl-var 'foo=bar'   Set an HCL variable in the Terraform Enterprise
-                      workspace.
+  -hcl-var 'name=val'  Set a Terraform variable with an HCL value.
 
- -shcl-var 'foo=bar'  Set a sensitive HCL variable in the Terraform
-                      Enterprise workspace.
+  -shcl-var 'name=val' Set a sensitive Terraform variable with an HCL value.
 
- -env-var 'foo=bar'   Set an environment variable in the Terraform
-                      Enterprise workspace.
+  -env-var 'name=val'  Set an environment variable.
 
- -senv-var 'foo=bar'  Set a sensitive environment variable in the Terraform
-                      Enterprise workspace.
+  -senv-var 'name=val' Set a sensitive environment variable.
 
+  -var-file <FILE>     Load Terraform variables from a tfvars file. Files can
+                       only set non-sensitive variables.
 
- -var-file foo.tfars  Load variable values from a tfvars file.
+  -overwrite <NAME>    Overwrite an existing value if the <NAME> variable is
+                       already set in Terraform Enterprise. You must enable this
+                       for every variable you want to overwrite. Can be
+                       set multiple times.
 
- -overwrite foo       Variable keys that should overwrite values in Terraform
-                      Enterprise. If omitted for variables already set in
-                      Terraform Enterprise, values will not be overwritten
-                      unless overwriting is specified with a different
-                      overwrite flag. This can be used multiple times.
-
- -hide-sensitive <boolean>
-                      Do not show sensitive values in output. Defaults to
-                      true.
+ -hide-sensitive <BOOLEAN>
+                       Whether to hide sensitive values in output. Defaults to
+                       true.
 NOTES
  All -var style args (except -var-file) can be set multiple times to operate
  on multiple variables with one command.
 
- There are two modes of operation:
-
- 1. Operate only on variables specified on the command line. All args are
-    supported. There is no automatic variable loading when -var-file is used;
-    variable values come from the one variable file and the other command
-    line args.
-
- 2. Operate on command line args along with a Terraform configuration. All
-    args are supported. "terraform init" must have been run. Variable file
-    loading, including autoloading, follows the same rules as "terraform
-    apply" since "terraform console" is used to obtain the variable values.
-
- The mode of operation is determined by supplying a CONFIG_DIR at the end
- of the invocation. Even if the present working directory contains a
- Terraform configuration '.' must be supplied to change the mode of operation.
+ If you specify a config directory to load variables from, it must be a
+ directory where "terraform init" has been run.
 
  The curl and jq commands are required.
 
@@ -216,7 +204,7 @@ process_vars () {
 
                 cleanup "$payload"
 
-                echodebug "[DEBUG] Variable create response:" 
+                echodebug "[DEBUG] Variable create response:"
                 echodebug "$var_create_resp"
             fi
         else
@@ -247,7 +235,7 @@ process_vars () {
 
                     cleanup "$payload"
 
-                    echodebug "[DEBUG] Variable update response:" 
+                    echodebug "[DEBUG] Variable update response:"
                     echodebug "$var_update_resp"
                 fi
             fi

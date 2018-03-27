@@ -29,27 +29,34 @@ tfe_pullvars_help () (
 cat << EOF
 
 SYNOPSIS
- tfe pullvars -name [USER_OR_ORG]/[WORKSPACE] [OPTIONS]
+ tfe pullvars -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
 
 DESCRIPTION
- Output Terraform variables from a Terraform Enterprise workspace in tfvars
- format or environment variables in shell format.
+ Get variables from a Terraform Enterprise workspace and write them to stdout.
+ Displays Terraform variables in tfvars format and environment variables in
+ shell format.
 
+ By default, this command returns all Terraform variables. You can output all
+ environment variables with '-env true', or output specific variables with the
+ -var or -env-var options.
+
+OPTIONS
 $(tfe_usage_args)
 
- -var <var-name>      Get a Terraform variable from the Terraform Enterprise
-                      workspace. This argument may be specified multiple
+ -var <NAME>          Get a Terraform variable from the Terraform Enterprise
+                      workspace. This argument can be specified multiple
                       times.
 
- -env-var <var-name>  Get an environment variable from the Terraform
-                      Enterprise workspace. This argument may be specified
+ -env-var <NAME>      Get an environment variable from the Terraform
+                      Enterprise workspace. This argument can be specified
                       multiple times.
 
- -env <boolean>       Get all environment variables instead of all Terraform
-                      variables. Defaults to false.
+ -env <BOOLEAN>       Whether to get all environment variables instead of
+                      Terraform variables. Defaults to false.
 
 NOTES
- Sensitive variable names are provided but their values are empty.
+ Sensitive variable names are listed with empty values, since sensitive values
+ can't be retrieved.
 
  The curl and jq commands are required.
 
