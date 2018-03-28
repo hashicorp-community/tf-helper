@@ -118,8 +118,8 @@ tfe_pushconfig () (
                 config_dir=$1
                 ;;
         esac
-        shift
-        shift
+        [ -n "$1" ] && shift
+        [ -n "$1" ] && shift
     done
 
     # Gets the workspace ID given the organization name and workspace name
@@ -161,7 +161,7 @@ tfe_pushconfig () (
             # (no config dir specified, config dir is repo base dir) or
             # something like ./environment/prod (config dir was specified or
             # current dir is not repo base dir but rather environment/prod).
-            git_rel_dir=".${PWD/$git_base_dir}"
+            git_rel_dir=".${PWD#$git_base_dir}"
 
             cd "$git_base_dir"
 

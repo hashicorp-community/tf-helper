@@ -183,7 +183,7 @@ target=$0
 # script itself. Some danger here of infinitely cycling.
 while [ -h "$target" ]; do
     link=$(readlink "$target")
-    if [ "${link:0:1}" = "/" ]; then
+    if [ "$(echo "$link" | cut -c -1)" = "/" ]; then
         # link path is absolute, just need to follow it
         target="$link"
     else
@@ -240,7 +240,7 @@ fi
 # At least one argument given. If is help, run help with any arguments supplied.
 # Exit with help's return value.
 if [ "help" = $1 ]; then
-    shift
+    [ -n "$1" ] && shift
     tfe_help $@
     exit $?
 fi
@@ -251,7 +251,7 @@ fi
 
 # Pop the command
 cmd="$1"
-shift
+[ -n "$1" ] && shift
 
 # Ensure the command exists
 if [ ! -f "$tfe_cmd_dir/$cmd" ]; then
@@ -279,22 +279,22 @@ while [ -n "$1" ]; do
     case "$1" in
         -tfe-address)
             tfe_address=$(assign_arg "$1" "$2")
-            shift
-            shift
+            [ -n "$1" ] && shift
+            [ -n "$1" ] && shift
             ;;
         -name)
             tfe_name=$(assign_arg "$1" "$2")
-            shift
-            shift
+            [ -n "$1" ] && shift
+            [ -n "$1" ] && shift
             ;;
         -token)
             tfe_token=$(assign_arg "$1" "$2")
-            shift
-            shift
+            [ -n "$1" ] && shift
+            [ -n "$1" ] && shift
             ;;
         *)
             subcmd_args="$subcmd_args $1"
-            shift
+            [ -n "$1" ] && shift
             ;;
     esac
 done
