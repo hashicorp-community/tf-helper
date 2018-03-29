@@ -1,0 +1,180 @@
+#!/bin/sh
+
+## -------------------------------------------------------------------
+##
+## Copyright (c) 2018 HashiCorp. All Rights Reserved.
+##
+## This file is provided to you under the Mozilla Public License
+## Version 2.0 (the "License"); you may not use this file
+## except in compliance with the License.  You may obtain
+## a copy of the License at
+##
+##   https://www.mozilla.org/en-US/MPL/2.0/
+##
+## Unless required by applicable law or agreed to in writing,
+## software distributed under the License is distributed on an
+## "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+## KIND, either express or implied.  See the License for the
+## specific language governing permissions and limitations
+## under the License.
+##
+## -------------------------------------------------------------------
+
+tfe_migrate_description () (
+    echo "Migrate a legacy TFE environment to a new TFE workspace"
+)
+
+tfe_migrate_help () (
+# Be sure to include the common options with tfe_usage_args
+cat << EOF
+SYNOPSIS
+ tfe migrate -legacy-name <ORGANIZATION>/<ENVIRONMENT>
+             -name <ORGANIZATION>/<WORKSPACE> -vcs-id <ID> [OPTIONS]
+
+DESCRIPTION
+ Migrate a legacy Terraform Enterprise environment to a new Terraform
+ Enterprise workspace. The new workspace will be created.
+
+OPTIONS
+$(tfe_usage_args)
+
+ -legacy-name <NAME>  The name of the legacy Terraform Enterprise environment,
+                      formatted as "<ORGANIZATION>/<ENVIRONMENT>". This
+                      parameter is required.
+
+ -vcs-id <ID>         The name of the VCS repository ID. Typically in a
+                      format similar to "<VCS_ORG_NAME>/<VCS_REPO>".
+
+ -oauth-id <ID>       The OAuth ID, obtained from the Terraform Enterprise
+                      API, which corresponds to the VCS ID provided. Defaults
+                      to the OAuth ID of the configured client if there is
+                      only one.
+
+NOTES
+ The curl and jq commands are required.
+
+ If more than one OAuth client is configured use the OAuth Tokens API
+ to list the clients and their IDs. Provide the appropriate ID from the
+ list to the -oauth-id option.
+
+ https://www.terraform.io/docs/enterprise/api/oauth-tokens.html
+
+EOF
+)
+
+##
+## Helper functions
+##
+
+make_migrate_payload () {
+# $1 new workspace
+# $2 legacy environment in the format "org/env"
+# $3 VCS repo ID (e.g. "github_org/github_repo")
+# $4 oauth token ID
+cat > "$payload" <<EOF
+{
+  "data": {
+    "attributes": {
+      "name":"$1",
+      "migration-environment":"$2",
+      "vcs-repo": {
+        "identifier":"$3",
+        "oauth-token-id": "$4"
+      }
+    },
+    "type":"workspaces"
+  }
+}
+EOF
+}
+
+tfe_migrate () (
+    payload="$TMPDIR/tfe-migrate-payload-$(date +%s)"
+    legacy_name=
+    vcs_id=
+    oauth_id=
+
+    # Parse options
+
+    while [ -n "$1" ]; do
+        case "$1" in
+            help|-h|-help|--help)
+                usage
+                ;;
+            -legacy-name)
+                legacy_name=$(assign_arg "$1" "$2")
+                ;;
+            -vcs-id)
+                vcs_id=$(assign_arg "$1" "$2")
+                ;;
+            -oauth-id)
+                oauth_id=$(assign_arg "$1" "$2")
+                ;;
+            *)
+                echoerr "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+        [ -n "$1" ] && shift
+        [ -n "$1" ] && shift
+    done
+
+    # Must have a legacy name
+    if [ -z "$legacy_name" ]; then
+        echoerr 'Legacy environment name is required.'
+        exit 1
+    fi
+
+    # Must have a VCS ID
+    if [ -z "$vcs_id" ]; then
+        echoerr 'VCS ID is required.'
+        exit 1
+    fi
+
+    # If no oauth id was given, then see if there is only one and use
+    # that one
+    if [ -z "$oauth_id" ]; then
+        oauth_id="$( (
+            set -e
+            echodebug "[DEBUG] Requesting OAuth tokens for $tfe_org"
+
+            url="$tfe_address/api/v2/organizations/$tfe_org/oauth-tokens"
+            oauth_list_resp="$(tfe_api_call "$url")"
+            echodebug "[DEBUG] OAuth list response:"
+            echodebug "$oauth_list_resp"
+
+            oauth_ids="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .id')"
+            echodebug "[DEBUG] OAuth IDs:"
+            echodebug "$oauth_ids"
+
+            test -n "$oauth_ids"
+            test 1 -eq "$(echo $oauth_ids | wc -l)"
+
+            echo "$oauth_ids"
+        ) 2>$tfe_log_redirect )"
+        [ 0 -ne $? ] && { echoerr "Error obtaining a default OAuth ID"; return 1; }
+    fi
+
+    make_migrate_payload "$tfe_workspace" "$legacy_name" "$vcs_id" "$oauth_id"
+    if [ 0 -ne $? ]; then
+        echoerr "Error generating payload file for migration"
+        return 1
+    fi
+
+    echodebug "[DEBUG] Migration payload:"
+    echodebug "$(cat $payload)"
+
+    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces"
+    migrate_resp="$(tfe_api_call -d @"$payload" "$url")"
+    if [ 0 -ne $? ]; then
+        echoerr "Error migrating legacy environment"
+        return 1
+    fi
+
+    cleanup "$payload"
+
+    echodebug "[DEBUG] Legacy migration response:"
+    echodebug "$migrate_resp"
+
+    echo "Migration complete: $legacy_name -> $tfe_org/$tfe_workspace"
+)
