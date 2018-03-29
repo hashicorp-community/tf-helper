@@ -223,7 +223,7 @@ fi
 # The help command is handled as a special case to cope with incorrect
 # invocations.
 
-# Make sure we can load help and info. If not, that's a red flag.
+# Make sure we can load help. If not, that's a red flag.
 if [ -f "${tfe_cmd_dir}/help" ] ; then
     . "${tfe_cmd_dir}/help"
 else
@@ -261,11 +261,12 @@ fi
 
 # Handle a special case of help dyslexia, e.g.:
 #   tfe pushconfig help
-if [ 0 -eq $# ] && [ "help" = $cmd ]; then
+if [ 1 -eq $# ] && [ "help" = "$1" ]; then
     # See if the cmd is actually a command that the user probably
     # wants help information for.
-    if [ -f "$tfe_cmd_dir/$cmd" ]; then
-        tfe_help "$cmd"
+    if [ -f "$tfe_cmd_dir/$1" ]; then
+        . "$tfe_cmd_dir/$cmd"
+        tfe_${cmd}_help
         exit 0
     fi
 fi
