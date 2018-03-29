@@ -486,7 +486,6 @@ tfe_pushvars () (
             in_var_block == 1 && in_default == 0 && in_value == 0 && /}/ {
                 # Variable block with no default. Its value may come from
                 # a tfvars file loaded later.
-                #print name
                 in_var = 0
                 in_var_block = 0
                 in_default = 0
