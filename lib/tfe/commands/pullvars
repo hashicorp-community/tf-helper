@@ -190,9 +190,22 @@ tfe_pullvars () (
         | select(.attributes.sensitive == false)
         | [
             .attributes.key + " = ",
-            (if .attributes.hcl == false then "\"" else empty end),
+            (if .attributes.hcl == false then
+                if .attributes.value | contains("\n") then
+                    "<<EOF\n"
+                else
+                    "\""
+                end
+            else empty end),
             .attributes.value,
-            (if .attributes.hcl == false then "\"" else empty end)
+            (if .attributes.hcl == false then
+                if .attributes.value | contains("\n") then
+                    "\nEOF"
+                else
+                    "\""
+                end
+            else empty end),
+            "\n"
           ]
         | join("")')"
     if [ 0 -ne $? ]; then
