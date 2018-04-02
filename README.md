@@ -53,6 +53,7 @@ This repository includes three subcommands:
 - `tfe pushvars` — Set variables in a Terraform Enterprise workspace.
 - `tfe pullvars` — Get variables from a Terraform Enterprise workspace and write
   them to stdout.
+- `tfe migrate` — Migrate a legacy TFE environment to a new TFE workspace
 
 There's also a `tfe help` subcommand to list syntax and options for each
 subcommand.
@@ -233,4 +234,49 @@ tfe pullvars -name org_name/workspace_name -env true > workspace.sh
 
 # Output a Terraform variable and an environment variable
 tfe pullvars -name org_name/workspace_name -var foo -env-var CONFIRM_DESTROY
+```
+
+### Migrate a Legacy TFE environment to a new TFE workspace
+
+Use the `tfe migrate` command to perform a migration of a Legacy Terraform
+Enterprise environment to a new Terraform Enterprise workspace.
+
+See `tfe help migrate` for detailed usage options.
+
+The legacy environment specified must exist and not be locked by any run or
+user other than the current user. The environment may either be unlocked or may
+be locked already by the user performing the migration. The target workspace
+name should not exist, as it will be created.
+
+When migrating, the current state and variables are copied to the new
+workspace, and the VCS settings are set to those provided when running the
+command. The legacy environment is left in a locked state to serve as a signal
+to other users that the environment should not be used for runs, although the
+environment remains fully functional otherwise.
+
+A legacy environment name, new workspace name, and VCS repository identifier
+must be specified when performing a migration. Additionally, an OAuth token
+will be used and can be specified. If only one OAuth client is configured for
+the target organization then it will be used and does not need to be specified.
+
+If more than one OAuth client is configured then it is necessary to obtain the
+OAuth token ID using the [Terraform Enterprise
+API](https://www.terraform.io/docs/enterprise/api/oauth-tokens.html).
+
+Examples:
+
+```
+# Migrate an existing legacy environment to a newly created workspace, where
+# the workspace has only one OAuth client configured.
+$ tfe migrate -legacy-name my_old_org/my_environment \
+              -name my_org/my_new_workspace \
+              -vcs-id vcs_org_name/vcs_repo
+Migration complete: my_old_org/my_environment -> my_org/my_new_workspace
+
+# Migrate and specify the OAuth ID
+$ tfe migrate -legacy-name my_old_org/my_environment \
+              -name my_org/my_new_workspace \
+              -vcs-id vcs_org_name/vcs_repo \
+              -oauth-id ot-ATnEXAMPLE7BAAE5
+Migration complete: my_old_org/my_environment -> my_org/my_new_workspace
 ```
