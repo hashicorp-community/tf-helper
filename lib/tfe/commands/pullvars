@@ -110,8 +110,8 @@ tfe_pullvars () (
                 exit 1
                 ;;
         esac
-        shift
-        shift
+        [ -n "$1" ] && shift
+        [ -n "$1" ] && shift
     done
 
     # Handle conflicting options

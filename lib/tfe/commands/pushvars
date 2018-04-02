@@ -368,8 +368,8 @@ tfe_pushvars () (
                 config_dir="$1"
                 ;;
         esac
-        shift
-        shift
+        [ -n "$1" ] && shift
+        [ -n "$1" ] && shift
     done
 
     if [ -n "$config_dir" ] || [ -n "$var_file" ]; then
@@ -412,7 +412,7 @@ tfe_pushvars () (
         #   hcl my_var
         all_vars="$(awk '
             BEGIN {
-                VARS="\"[-_[:alnum:]]*\""
+                VARS="\"[-_a-zA-Z0-9]*\""
                 in_var = 0
                 in_value = 0
                 in_default = 0
@@ -423,7 +423,7 @@ tfe_pushvars () (
                 in_default_block = 0
                 seen_variable = 0
             }
-            /^[[:space:]]*#/ {
+            /^[ \t\r\n\v\f]*#/ {
                 # line starts with a comment
                 next
             }
@@ -459,7 +459,7 @@ tfe_pushvars () (
             $0 ~ VARS && seen_variable == 1 {
                 # get the variable name
                 in_var = 1
-                match($0, /\"[[:alnum:]]/)
+                match($0, /\"[a-zA-Z0-9]/)
                 l=RLENGTH
                 match($0, VARS)
                 name = substr($0, RSTART+1, RLENGTH-l)
@@ -518,7 +518,7 @@ tfe_pushvars () (
                             # entering a heredoc. valid anchors should be directly
                             # next to the brackets
                             in_heredoc = 1
-                            match($0, /<<[-_[:alnum:]]+/)
+                            match($0, /<<[-_a-zA-Z0-9]+/)
                             heredoc_id = substr($0, RSTART+2, RLENGTH-2)
                         }
                     }
@@ -575,7 +575,7 @@ tfe_pushvars () (
                 heredoc_id = ""
                 in_map = 0
             }
-            /^[[:space:]]*#/ {
+            /^[ \t\r\n\v\f]*#/ {
                 # line starts with a comment
                 next
             }
@@ -615,24 +615,24 @@ tfe_pushvars () (
                 heredoc_id = ""
                 next
             }
-            /^[[:space:]]*[[:alnum:]]/ && in_var == 0 && $0 !~ /,$/ {
+            /^[ \t\r\n\v\f]*[a-zA-Z0-9]/ && in_var == 0 && $0 !~ /,$/ {
                 # token text, not in a variable already, does not end in ",".
                 # this looks like a variable name
                 in_var = 1
-                match($0, /[-_[:alnum:]]+/)
+                match($0, /[-_a-zA-Z0-9]+/)
                 name = substr($0, RSTART, RLENGTH)
 
                 # remove the potential variable name from $0 so a search
                 # for "=" can continue on this line as well as subsequent lines
                 sub(name, "")
             }
-            in_var == 1 && /^[[:space:]]+[^=]/ {
+            in_var == 1 && /^[ \t\r\n\v\f]+[^=]/ {
                 # have a potential variable name but the next thing seen
                 # is not "=", so this is not a variable name.
                 in_var = 0
                 next
             }
-            in_var == 1 && /^[[:space:]]*=/ {
+            in_var == 1 && /^[ \t\r\n\v\f]*=/ {
                 # have a variable name and the next thing seen is =
                 in_value = 1
             }
@@ -657,7 +657,7 @@ tfe_pushvars () (
                             # entering a heredoc. valid anchors should be directly
                             # next to the brackets
                             in_heredoc = 1
-                            match($0, /<<[-_[:alnum:]]+/)
+                            match($0, /<<[-_a-zA-Z0-9]+/)
                             heredoc_id = substr($0, RSTART+2, RLENGTH-2)
                         }
                     }
