@@ -248,11 +248,9 @@ user other than the current user. The environment may either be unlocked or may
 be locked already by the user performing the migration. The target workspace
 name should not exist, as it will be created.
 
-When migrating, the current state and variables are copied to the new
-workspace, and the VCS settings are set to those provided when running the
-command. The legacy environment is left in a locked state to serve as a signal
-to other users that the environment should not be used for runs, although the
-environment remains fully functional otherwise.
+Please refer to the Terraform Enterprise documentation for [details on the
+actions taken during
+migration](https://www.terraform.io/docs/enterprise/api/workspaces.html#create-a-workspace-which-is-migrated-from-a-legacy-environment).
 
 A legacy environment name, new workspace name, and VCS repository identifier
 must be specified when performing a migration. Additionally, an OAuth token
