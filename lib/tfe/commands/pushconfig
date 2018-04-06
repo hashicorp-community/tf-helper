@@ -254,6 +254,7 @@ tfe_pushconfig () (
     config_id="$(printf "%s" "$upload_url_resp" | jq -r '.data.id')"
     [ 0 -ne $? ] && { echoerr "Error parsing API response for config ID"
                       cleanup "$config_payload"; exit 1; }
+    echodebug "[DEBUG] Config ID: $config_id"
 
     # Perform the upload of the config archive to the upload URL
     (
