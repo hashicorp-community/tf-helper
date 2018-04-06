@@ -114,6 +114,9 @@ tfe_api_call () {
 ## Program begins here
 ##
 
+echodebug "[DEBUG] $PWD"
+echodebug "[DEBUG] $0 $*"
+
 # Check for commands that must be present to function
 
 if [ -z "$(command -v jq)" ]; then
