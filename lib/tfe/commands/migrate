@@ -151,7 +151,7 @@ tfe_migrate () (
             test 1 -eq "$(echo $oauth_ids | wc -l)"
 
             echo "$oauth_ids"
-        ) 2>$tfe_log_redirect )"
+        ) 2>&3 )"
         [ 0 -ne $? ] && { echoerr "Error obtaining a default OAuth ID"; return 1; }
     fi
 
