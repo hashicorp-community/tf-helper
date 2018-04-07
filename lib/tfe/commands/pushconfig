@@ -193,6 +193,10 @@ tfe_pushconfig () (
             # tar is extremely sensitive to being passed empty values so this case
             # statement is unfortunately necessary
             echodebug "[DEBUG] Case ${has_tf_state}${has_modules}${upload_modules}"
+
+            # Note a verbose tar produces stdout, so the tar stdout has to be
+            # redirected as well.
+
             case ${has_tf_state}${has_modules}${upload_modules} in
                 # has state, has modules, should upload modules
                 truetruetrue)
@@ -200,33 +204,37 @@ tfe_pushconfig () (
                     tar ${tfe_tar_verbose}zcfh "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_state_file" \
-                        "$tf_modules_dir"
+                        "$tf_modules_dir" \
+                        >$tfe_log_redirect
                     ;;
                 # has state, no modules, no modules so don't care about uploading
                 truefalse*)
                     echodebug "[DEBUG] tar: state, no modules"
                     tar ${tfe_tar_verbose}zcfh "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
-                        "$tf_state_file"
+                        "$tf_state_file" \
+                        >$tfe_log_redirect
                     ;;
                 # no state, has modules, should upload modules
                 falsetruetrue)
                     echodebug "[DEBUG] tar: no state, modules, upload modules"
                     tar ${tfe_tar_verbose}zcfh "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
-                        "$tf_modules_dir"
+                        "$tf_modules_dir" \
+                        >$tfe_log_redirect
                     ;;
                 # no state, no modules, no modules so don't care about uploading
                 falsefalse*)
                     echodebug "[DEBUG] tar: no state, no modules"
                     tar ${tfe_tar_verbose}zcfh "$config_payload" \
-                        $(git ls-tree -r "$git_branch" --name-only --full-tree)
+                        $(git ls-tree -r "$git_branch" --name-only --full-tree) \
+                        >$tfe_log_redirect
                     ;;
             esac
         else
             # No VCS, upload this whole dir
             echodebug "[DEBUG] tar: no vcs detected. Uploading all of $PWD"
-            tar ${tfe_tar_verbose}zcfh "$config_payload" .
+            tar ${tfe_tar_verbose}zcfh "$config_payload" . >$tfe_log_redirect
         fi
     ) 2>$tfe_log_redirect
     [ 0 -ne $? ] && { echoerr "Error creating config archive payload"; exit 1; }
