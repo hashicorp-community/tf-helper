@@ -196,7 +196,7 @@ tfe_pushconfig () (
                 # has state, has modules, should upload modules
                 truetruetrue)
                     echodebug "[DEBUG] tar: state, modules, upload modules"
-                    tar -${tfe_tar_verbose}zcf "$config_payload" \
+                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_state_file" \
                         "$tf_modules_dir"
@@ -204,28 +204,28 @@ tfe_pushconfig () (
                 # has state, no modules, no modules so don't care about uploading
                 truefalse*)
                     echodebug "[DEBUG] tar: state, no modules"
-                    tar -${tfe_tar_verbose}zcf "$config_payload" \
+                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_state_file"
                     ;;
                 # no state, has modules, should upload modules
                 falsetruetrue)
                     echodebug "[DEBUG] tar: no state, modules, upload modules"
-                    tar -${tfe_tar_verbose}zcf "$config_payload" \
+                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_modules_dir"
                     ;;
                 # no state, no modules, no modules so don't care about uploading
                 falsefalse*)
                     echodebug "[DEBUG] tar: no state, no modules"
-                    tar -${tfe_tar_verbose}zcf "$config_payload" \
+                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree)
                     ;;
             esac
         else
             # No VCS, upload this whole dir
             echodebug "[DEBUG] tar: no vcs detected. Uploading all of $PWD"
-            tar -${tfe_tar_verbose}zcf "$config_payload" .
+            tar ${tfe_tar_verbose}zcfh "$config_payload" .
         fi
     ) 2>$tfe_log_redirect
     [ 0 -ne $? ] && { echoerr "Error creating config archive payload"; exit 1; }
