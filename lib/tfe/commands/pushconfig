@@ -148,7 +148,7 @@ tfe_pushconfig () (
     (
         set -e
 
-        echodebug "[DEBUG] entering dir $config_dir"
+        echodebug "[DEBUG] Entering dir $config_dir"
         cd "$config_dir"
 
         if [ "$vcs" = true ]; then
@@ -192,6 +192,7 @@ tfe_pushconfig () (
 
             # tar is extremely sensitive to being passed empty values so this case
             # statement is unfortunately necessary
+            echodebug "[DEBUG] Case ${has_tf_state}${has_modules}${upload_modules}"
             case ${has_tf_state}${has_modules}${upload_modules} in
                 # has state, has modules, should upload modules
                 truetruetrue)
