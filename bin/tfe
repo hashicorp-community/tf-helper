@@ -30,7 +30,6 @@
 #
 # tfe_cmd_dir
 # tfe_payload_dir
-# tfe_log_redirect
 # tfe_tar_verbose
 # tfe_curl_silent
 # tfe_address
@@ -62,7 +61,7 @@ cleanup () {
     if [ -n "$1" ]; then
         echo "$1" | while read f; do
             echodebug "[DEBUG] cleaning up $f"
-            rm "$f" 2>$tfe_log_redirect
+            rm "$f" 2>&3
             if [ 0 -ne $? ]; then
                 echoerr "Error cleaning up $f"
                 echoerr "$f"
@@ -114,6 +113,9 @@ tfe_api_call () {
 ## Program begins here
 ##
 
+echodebug "[DEBUG] $PWD"
+echodebug "[DEBUG] $0 $*"
+
 # Check for commands that must be present to function
 
 if [ -z "$(command -v jq)" ]; then
@@ -141,14 +143,14 @@ TMPDIR="$(echo "$TMPDIR" | sed 's#/$##')"
 
 if [ -n "$TF_LOG" ]; then
     # Debugging. Print command errors and make them verbose
-    tfe_log_redirect=/dev/stderr
     tfe_tar_verbose=v
     tfe_curl_silent=
+    exec 3>&2
 else
     # Not debugging. Shut everyting up.
-    tfe_log_redirect=/dev/null
     tfe_tar_verbose=
     tfe_curl_silent="-s"
+    exec 3>/dev/null
 fi
 
 # Allow setting the URL to TFE with TFE_URL
