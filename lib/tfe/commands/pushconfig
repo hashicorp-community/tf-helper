@@ -202,7 +202,6 @@ tfe_pushconfig () (
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_state_file" \
                         "$tf_modules_dir"
-                        cp "$config_payload" .
                     ;;
                 # has state, has modules, should not upload modules
                 truetruefalse)
@@ -210,7 +209,6 @@ tfe_pushconfig () (
                     tar ${tfe_tar_verbose}zcfh "$config_payload" \
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_state_file"
-                        cp "$config_payload" .
                     ;;
                 # has state, no modules, no modules so don't care about uploading
                 truefalse*)
