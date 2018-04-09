@@ -203,6 +203,13 @@ tfe_pushconfig () (
                         "$tf_state_file" \
                         "$tf_modules_dir"
                     ;;
+                # has state, has modules, should not upload modules
+                truetruetrue)
+                    echodebug "[DEBUG] tar: state, modules, no upload modules"
+                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
+                        $(git ls-tree -r "$git_branch" --name-only --full-tree) \
+                        "$tf_state_file"
+                    ;;
                 # has state, no modules, no modules so don't care about uploading
                 truefalse*)
                     echodebug "[DEBUG] tar: state, no modules"
