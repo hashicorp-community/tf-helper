@@ -202,8 +202,8 @@ tfe_pushconfig () (
                         $(git ls-tree -r "$git_branch" --name-only --full-tree) \
                         "$tf_state_file" \
                         "$tf_modules_dir"
+                        cp "$config_payload" .
                     ;;
-                    cp "$config_payload" .
                 # has state, has modules, should not upload modules
                 truetruefalse)
                     echodebug "[DEBUG] tar: state, modules, no upload modules"
