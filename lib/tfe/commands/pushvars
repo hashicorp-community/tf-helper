@@ -373,11 +373,7 @@ tfe_pushvars () (
     done
 
     if [ -n "$config_dir" ] || [ -n "$var_file" ]; then
-        if [ -z "$(command -v terraform)" ]; then
-            echoerr "The terraform command must be installed when operating"
-            echoerr "on tfvars files or Terraform configurations."
-            exit 1
-        fi
+        tf_version_required 0 11 6
     fi
 
     # Get the variable listing for the workspace
