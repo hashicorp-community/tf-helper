@@ -109,6 +109,35 @@ tfe_api_call () {
          $@
 }
 
+# Check the version of terraform in use. Commands can use this
+# to verify that their use of Terraform will go as expected.
+tf_version_required () {
+    if [ $# -ne 3 ]; then
+        echoerr "Unable to check the version of Terraform. This is a bug."
+        exit 1
+    fi
+
+    # Verify the terraform command is present
+    if [ -z "$(command -v terraform)" ]; then
+        echoerr "The terraform command must be installed"
+        exit 1
+    fi
+
+    # Test the version numbers provided in the output with the three arguments
+    if ! terraform -version | awk -v major=$1 -v minor=$2 -v micro=$3 -F. '
+        NR==1 {
+            sub(/[^[0-9]*/, "", $1)
+            if($1 > major) exit 0
+            if($1 == major && $2 > minor) exit 0
+            if($1 == major && $2 == minor && $3 >= micro) exit 0
+            exit 1
+        }'
+    then
+        echoerr "This operation requires at least Terraform $1.$2.$3"
+        exit 1
+    fi
+}
+
 ##
 ## Program begins here
 ##
