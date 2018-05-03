@@ -101,7 +101,8 @@ infrastructure
 ```
 
 Run any of the following commands to push the `prod` configuration (note that
-`-name` must be specified):
+the workspace name must be specified on the command line with `-name` or using
+`TFE_ORG` and `TFE_WORKSPACE`):
 
 ```
 # If run from the root of the repository
@@ -113,6 +114,15 @@ Run any of the following commands to push the `prod` configuration (note that
 # If run from anywhere else on the filesystem
 [anywhere]$ tfe pushconfig -name org_name/workspace_name path/to/infrastructure/env/prod
 ```
+
+In each of the above commands the contents of the `env/prod` directory
+(`prod.tf`) that are tracked by the VCS (git) are archived and uploaded to the
+Terraform Enterprise workspace. The files are located using effectively `cd
+env/prod && git ls-files`.
+
+If `-vcs false` is specified then all files in `env/prod` are uploaded. If
+`-upload-modules false` is specified then the `.terraform/modules` directory
+will not be uploaded even if it is present.
 
 
 ### Push Terraform Variables and Environment Variables

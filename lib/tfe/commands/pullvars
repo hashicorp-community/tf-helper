@@ -101,13 +101,13 @@ tfe_pullvars () (
                         ;;
                     *)
                         echoerr "-env should be true or false"
-                        exit 1
+                        return 1
                         ;;
                 esac
                 ;;
             *)
                 echoerr "Unknown option $1"
-                exit 1
+                return 1
                 ;;
         esac
         [ -n "$1" ] && shift

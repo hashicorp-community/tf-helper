@@ -147,20 +147,12 @@ echodebug "[DEBUG] $0 $*"
 
 # Check for commands that must be present to function
 
-if [ -z "$(command -v jq)" ]; then
-    echoerr "The jq command must be installed"
-    exit 1
-fi
-
-if [ -z "$(command -v curl)" ]; then
-    echoerr "The curl command must be installed"
-    exit 1
-fi
-
-if [ -z "$(command -v readlink)" ]; then
-    echoerr "The readlink command must be installed"
-    exit 1
-fi
+for required_cmd in jq curl readlink; do
+    if [ -z "$(command -v $required_cmd)" ]; then
+        echoerr "The $required_cmd command must be installed"
+        exit 1
+    fi
+done
 
 # Use TMPDIR if it is set. If not, set it to /tmp
 if [ -z "$TMPDIR" ]; then

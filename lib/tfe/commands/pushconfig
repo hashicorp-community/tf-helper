@@ -20,6 +20,122 @@
 ##
 ## -------------------------------------------------------------------
 
+list_vcs () {
+    git ls-files
+}
+
+list_files () {
+    find -L . -type f | grep -E -v '^\.$|.git|.terraform'
+}
+
+list_modules () {
+    find -L .terraform/modules -type f |  grep -E -v '^\.$|\.git'
+}
+
+list_hardlinked () {
+    find -L . -type f -links +1 | grep -E -v '^\.$|.git|.terraform' | cut -c 3-
+}
+
+list_not_hardlinked () {
+    find -L . -type f -links 1 | grep -E -v '^\.$|.git|.terraform' | cut -c 3-
+}
+
+list_hardlinked_modules () {
+    find -L .terraform/modules -type f -links +1 |  grep -E -v '^\.$|\.git'
+}
+
+list_not_hardlinked_modules () {
+    find -L .terraform/modules -type f -links 1 |  grep -E -v '^\.$|\.git'
+}
+
+# Use GNU tar to archive the current directory
+gnutar () {
+    echodebug "[DEBUG] Using GNU tar"
+
+    if [ true = $vcs ]; then
+        list_vcs > "$tarlist"
+    else
+        list_files > "$tarlist"
+    fi
+
+    if [ true = $upload_modules ]; then
+        list_modules >> "$tarlist"
+    fi
+
+    tar ${tfe_tar_verbose}zcfh \
+        "$1" -T "$tarlist" --hard-dereference
+}
+
+# Use BSD tar to archive the current directory
+bsdtar () {
+    echodebug "[DEBUG] Using BSD tar"
+
+    vcslist="$TMPDIR/vcslist-$(date +%s)"
+    hardlinklist="$TMPDIR/hardlinklist-$(date +%s)"
+
+    hardlinks="$(list_hardlinked | sort)"
+    echo "$hardlinks" > "$hardlinklist"
+
+    if [ true = $vcs ]; then
+        list_vcs | sort > "$vcslist"
+        hardlinks="$(comm -12 "$vcslist" "$hardlinklist")"
+    fi
+
+    if [ -z "$hardlinks" ]; then
+        # If there are no hardlinks then the job is easy and
+        # the same as GNU tar without --hard-dereference
+        echodebug "[DEBUG] No hardlinks to manually resolve"
+        if [ true = $vcs ]; then
+            list_vcs > "$tarlist"
+        else
+            list_files > "$tarlist"
+        fi
+
+        if [ true = $upload_modules ]; then
+            list_modules >> "$tarlist"
+        fi
+
+        tar ${tfe_tar_verbose}zcfh \
+            "$1" -T "$tarlist"
+    else
+        # If there are hardlinks they have to be added separately
+        # to the archive one by one
+        echodebug "[DEBUG] Resolving hardlinks manually"
+
+        if [ true = $vcs ]; then
+            # Tracked hardlinks are in the hard link list already.
+            # Need tracked non-hardlinks to tar.
+            comm -23 "$vcslist" "$hardlinklist" > "$tarlist"
+        else
+            # Need all of the hardlinks, including ones that might be
+            # in the modules dir if uploading modules
+            list_hardlinked > "$hardlinklist"
+
+            # Need the non-hardlinks to tar
+            list_not_hardlinked > "$tarlist"
+        fi
+
+        if [ true = $upload_modules ]; then
+            list_hardlinked_modules >> "$hardlinklist"
+            list_not_hardlinked_modules >> "$tarlist"
+        fi
+
+        # Start by creating an uncompressed tar of the non-hardlinks
+        echodebug "[DEBUG] Creating initial tar"
+        tar ${tfe_tar_verbose}cfh "${1%.gz}" -T "$tarlist"
+
+        # Add each hardlink to the archive individually
+        echodebug "[DEBUG] Adding each hardlink"
+        cat "$hardlinklist" | while read -r hl; do
+            tar ${tfe_tar_verbose}rf "${1%.gz}" "$hl"
+        done
+
+        # Compress the completed archive
+        echodebug "[DEBUG] Compressing ${1%.gz}"
+        gzip "${1%.gz}"
+    fi
+}
+
 tfe_pushconfig_description () (
     echo "Upload a Terraform config to a TFE workspace and begin a run"
 )
@@ -64,6 +180,28 @@ tfe_pushconfig () (
     config_dir=.
     poll_run=0
 
+    # Check for additional required commands.
+    if [ -z "$(command -v tar)" ]; then
+        echoerr "The tar command must be installed"
+        return 1
+    fi
+
+    if tar --version | grep GNU; then
+        tarcmd=gnutar
+    else
+        tarcmd=bsdtar
+
+        # Using bsdtar might result in a two step process where first the
+        # tar is created and then compressed, which requires the separate
+        # gzip command. It may not be strictly required under all
+        # circumstances but it's probably better to error earlier rather
+        # than later, considering how common the gzip command is.
+        if [ -z "$(command -v gzip)" ]; then
+            echoerr "The gzip command must be installed"
+            return 1
+        fi
+    fi
+
     # Parse options
 
     while [ -n "$1" ]; do
@@ -81,7 +219,7 @@ tfe_pushconfig () (
                         ;;
                     *)
                         echoerr "-upload-modules should be true or false"
-                        exit 1
+                        return 1
                         ;;
                 esac
                 ;;
@@ -95,7 +233,7 @@ tfe_pushconfig () (
                         ;;
                     *)
                         echoerr "-vcs should be true or false"
-                        exit 1
+                        return 1
                         ;;
                 esac
                 ;;
@@ -104,7 +242,7 @@ tfe_pushconfig () (
                     poll_run=$(assign_arg "$1" "$2")
                 else
                     echoerr "-poll must be an integer"
-                    exit 1
+                    return 1
                 fi
                 ;;
             *)
@@ -112,7 +250,7 @@ tfe_pushconfig () (
                 # config directory
                 if [ $# -gt 1 ]; then
                     echoerr "Trailing options following config directory $1"
-                    exit 1
+                    return 1
                 fi
 
                 config_dir=$1
@@ -121,6 +259,12 @@ tfe_pushconfig () (
         [ -n "$1" ] && shift
         [ -n "$1" ] && shift
     done
+
+    # Check for additional required commands.
+    if [ -z "$(command -v git)" ]; then
+        echoerr "The git command is required for VCS detection"
+        return 1
+    fi
 
     # Gets the workspace ID given the organization name and workspace name
     workspace_id="$( (
@@ -138,106 +282,47 @@ tfe_pushconfig () (
         test -n "$workspace_id"
         echo "$workspace_id"
     ) 2>&3 )"
-    [ 0 -ne $? ] && { echoerr "Error obtaining workspace ID"; exit 1; }
+
+    if [ 0 -ne $? ]; then
+        echoerr "Error obtaining workspace ID"
+        return 1
+    fi
 
     # Creates a tar.gz of the VCS or directory with the configuration
 
     echodebug "[DEBUG] Creating file for upload"
     config_payload="$TMPDIR/content-$(date +%s).tar.gz"
+    tarlist="$TMPDIR/tarlist-$(date +%s)"
 
-    (
+    if ! (
         set -e
 
         echodebug "[DEBUG] Entering dir $config_dir"
         cd "$config_dir"
 
         if [ "$vcs" = true ]; then
-            # Current branch
-            git_branch="$(git rev-parse --abbrev-ref HEAD)"
-            echodebug "[DEBUG] Git branch is $git_branch"
-
-            # Absolute path to the root of the repo
-            git_base_dir="$(git rev-parse --show-toplevel)"
-            echodebug "[DEBUG] Git base dir is $git_base_dir"
-
-            # Path to the config dir relative to the base of the git repo.
-            # Config dir is either the current directory or was specified
-            # as an argument on the command line. So this may resolve to ""
-            # (no config dir specified, config dir is repo base dir) or
-            # something like /environment/prod (config dir was specified or
-            # current dir is not repo base dir but rather environment/prod).
-            git_rel_dir="${PWD#$git_base_dir}"
-
-            if [ -n "$git_rel_dir" ]; then
-                # The relative dir needs to have the preceding / removed
-                # and a / added to the end. This makes the git_rel_dir
-                # work in the later commands whether it was empty or not.
-                git_rel_dir="${git_rel_dir#/}"
-                git_rel_dir="$git_rel_dir/"
+            # VCS detection was requested so it must actually be present
+            if ! git status 2>&1 >/dev/null; then
+                echoerr "VCS not present in $config_dir"
+                echoerr "Disable VCS detection with -vcs false"
+                return 1
             fi
-            echodebug "[DEBUG] Git relative dir is $git_rel_dir"
-
-            echodebug "[DEBUG] Entering dir $git_base_dir"
-            cd "$git_base_dir"
-
-            # If there is a state file or modules we might want to upload them.
-
-            tf_state_file="${git_rel_dir}.terraform/terraform.tfstate"
-            has_tf_state="$([ -f "$tf_state_file" ] && echo true || echo false)"
-            echodebug "[DEBUG] Has $tf_state_file - $has_tf_state"
-
-            tf_modules_dir="${git_rel_dir}.terraform/modules"
-            has_modules="$([ -d "$tf_modules_dir" ] && echo true || echo false)"
-            echodebug "[DEBUG] Has $tf_modules_dir - $has_modules"
-
-            # tar is extremely sensitive to being passed empty values so this case
-            # statement is unfortunately necessary
-            echodebug "[DEBUG] Case ${has_tf_state}${has_modules}${upload_modules}"
-
-            case ${has_tf_state}${has_modules}${upload_modules} in
-                # has state, has modules, should upload modules
-                truetruetrue)
-                    echodebug "[DEBUG] tar: state, modules, upload modules"
-                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
-                        $(git ls-tree -r "$git_branch" --name-only --full-tree) \
-                        "$tf_state_file" \
-                        "$tf_modules_dir"
-                    ;;
-                # has state, has modules, should not upload modules
-                truetruefalse)
-                    echodebug "[DEBUG] tar: state, modules, no upload modules"
-                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
-                        $(git ls-tree -r "$git_branch" --name-only --full-tree) \
-                        "$tf_state_file"
-                    ;;
-                # has state, no modules, no modules so don't care about uploading
-                truefalse*)
-                    echodebug "[DEBUG] tar: state, no modules"
-                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
-                        $(git ls-tree -r "$git_branch" --name-only --full-tree) \
-                        "$tf_state_file"
-                    ;;
-                # no state, has modules, should upload modules
-                falsetruetrue)
-                    echodebug "[DEBUG] tar: no state, modules, upload modules"
-                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
-                        $(git ls-tree -r "$git_branch" --name-only --full-tree) \
-                        "$tf_modules_dir"
-                    ;;
-                # no state, no modules, no modules so don't care about uploading
-                falsefalse*)
-                    echodebug "[DEBUG] tar: no state, no modules"
-                    tar ${tfe_tar_verbose}zcfh "$config_payload" \
-                        $(git ls-tree -r "$git_branch" --name-only --full-tree)
-                    ;;
-            esac
+            echodebug "[DEBUG] tar: Uploading vcs tracked files"
+            echodebug "[DEBUG] excluding any plugins"
         else
-            # No VCS, upload this whole dir
-            echodebug "[DEBUG] tar: no vcs detected. Uploading all of $PWD"
-            tar ${tfe_tar_verbose}zcfh "$config_payload" .
+            echodebug "[DEBUG] tar: Uploading all of $PWD"
+            echodebug "[DEBUG] excluding VCS files and any plugins"
         fi
-    ) 2>&3
-    [ 0 -ne $? ] && { echoerr "Error creating config archive payload"; exit 1; }
+
+        # If there are modules we might want to upload them.
+        has_modules="$([ -d .terraform/modules ] && echo true || echo false)"
+        echodebug "[DEBUG] Has .terraform/modules: $has_modules"
+
+        $tarcmd "$config_payload" $vcs $upload_modules
+    ) 2>&3; then
+        echoerr "Error creating config archive payload"
+        return 1
+    fi
 
     echo "Uploading Terraform config..."
 
@@ -254,19 +339,25 @@ tfe_pushconfig () (
     echodebug "[DEBUG] URL: $url"
 
     upload_url_resp="$(tfe_api_call -d "$config_ver_payload" $url)"
-    [ 0 -ne $? ] && { echoerr "Error creating config version"
-                      cleanup "$config_payload"; exit 1; }
+    if [ 0 -ne $? ]; then
+        echoerr "Error creating config version"
+        cleanup "$config_payload" "$tarlist"
+        return 1
+    fi
 
     echodebug "[DEBUG] Upload URL response:"
     echodebug "$upload_url_resp"
 
     config_id="$(printf "%s" "$upload_url_resp" | jq -r '.data.id')"
-    [ 0 -ne $? ] && { echoerr "Error parsing API response for config ID"
-                      cleanup "$config_payload"; exit 1; }
+    if [ 0 -ne $? ]; then
+        echoerr "Error parsing API response for config ID"
+        cleanup "$config_payload" "$tarlist"
+        return 1
+    fi
     echodebug "[DEBUG] Config ID: $config_id"
 
     # Perform the upload of the config archive to the upload URL
-    (
+    if ! (
         set -e
         url="$(printf "%s" "$upload_url_resp" | jq -r '.data.attributes."upload-url"')"
         echodebug "[DEBUG] Upload URL: $url"
@@ -276,15 +367,22 @@ tfe_pushconfig () (
 
         echodebug "[DEBUG] Upload config response:"
         echodebug "$upload_config_resp"
-    ) 2>&3
-    [ 0 -ne $? ] && { echoerr "Error uploading config archive"
-                     cleanup "$config_payload"; exit 1; }
+    ) 2>&3; then
+        echoerr "Error uploading config archive"
+        cleanup "$config_payload" "$tarlist"
+        return 1
+    fi
 
-    cleanup "$config_payload"
+    cleanup "$config_payload" "$tarlist"
 
-    # Get the run ID using the config ID obtained earlier
-    run_id="$( (
-        set -e
+    # Get the run ID using the config ID obtained earlier.
+    # Try to get it 10 times with a 1s sleep between tries.
+    try=0
+    while [ $try -lt 10 ] && [ -z "$run_id" ]; do
+        try=$(( try + 1 ))
+
+        echodebug "[DEBUG] Polling for run ID. Attempt $try"
+
         url=$tfe_address/api/v2/workspaces/$workspace_id/runs
         run_check_resp="$(tfe_api_call $url)"
 
@@ -295,27 +393,35 @@ tfe_pushconfig () (
 
         echodebug "[DEBUG] Run ID: $run_id"
 
-        test "$run_id"
-        echo "$run_id"
-    ) 2>&3 )"
-    [ 0 -ne $? ] && { echoerr "Error obtaining run ID"; exit 1; }
+        if [ -z "$run_id" ]; then
+            sleep 1
+        fi
+    done
+
+    if [ -z "$run_id" ]; then
+        echoerr "Error obtaining run ID"
+        return 1
+    fi
 
     echo "Run $run_id submitted with config $config_id on $tfe_org/$tfe_workspace"
+
+    if [ 0 -eq "$poll_run" ]; then
+        return 0
+    fi
 
     # Repeatedly poll the system every N seconds specified with -poll to get
     # the run status until it reaches a non-active status. By default -poll is
     # 0 and there is no polling.
-    (
+    if ! (
         set -e
         run_status=pending
         lock_id=
 
         # Go until we don't see one of these states
-        while [ 0 != "$poll_run" ] &&
-                ( [ pending = "$run_status"   ] ||
-                  [ planning = "$run_status"  ] ||
-                  [ applying = "$run_status"  ] ||
-                  [ confirmed = "$run_status" ] ); do
+        while [ pending = "$run_status"   ] ||
+              [ planning = "$run_status"  ] ||
+              [ applying = "$run_status"  ] ||
+              [ confirmed = "$run_status" ]; do
             # if the workspace was determined to be locked in the previous
             # poll, don't delay getting the final status and exiting.
             if [ true != "$workspace_locked" ]; then
@@ -346,10 +452,12 @@ tfe_pushconfig () (
                 lock_id="$(printf "%s" "$workspace_info_resp" | jq -r '.data.relationships."locked-by".data.id')"
                 if [ "$lock_id" != "$run_id" ]; then
                     echo "locked by $lock_id"
-                    exit
+                    return 0
                 fi
             fi
         done
-    ) 2>&3
-    [ 0 -ne $? ] && { echoerr "Error polling run"; exit 1; }
+    ) 2>&3; then
+        echoerr "Error polling run"
+        return 1
+    fi
 )

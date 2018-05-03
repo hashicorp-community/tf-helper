@@ -67,11 +67,27 @@ EOF
 ##
 
 make_migrate_payload () {
-# $1 new workspace
-# $2 legacy environment in the format "org/env"
-# $3 VCS repo ID (e.g. "github_org/github_repo")
-# $4 oauth token ID
-cat > "$payload" <<EOF
+    # $1 new workspace
+    # $2 legacy environment in the format "org/env"
+    # $3 VCS repo ID (e.g. "github_org/github_repo")
+    # $4 oauth token ID
+
+    if [ -z "$3" ]; then
+        # Migrate without VCS
+        cat > "$payload" <<EOF
+{
+  "data": {
+    "attributes": {
+      "name":"$1",
+      "migration-environment":"$2"
+    },
+    "type":"workspaces"
+  }
+}
+EOF
+    else
+        # Migrate with VCS
+        cat > "$payload" <<EOF
 {
   "data": {
     "attributes": {
@@ -86,6 +102,7 @@ cat > "$payload" <<EOF
   }
 }
 EOF
+    fi
 }
 
 tfe_migrate () (
@@ -112,7 +129,7 @@ tfe_migrate () (
                 ;;
             *)
                 echoerr "Unknown option: $1"
-                exit 1
+                return 1
                 ;;
         esac
         [ -n "$1" ] && shift
@@ -122,37 +139,38 @@ tfe_migrate () (
     # Must have a legacy name
     if [ -z "$legacy_name" ]; then
         echoerr 'Legacy environment name is required.'
-        exit 1
+        return 1
     fi
 
-    # Must have a VCS ID
-    if [ -z "$vcs_id" ]; then
-        echoerr 'VCS ID is required.'
-        exit 1
-    fi
+    # Need oauth if vcs was specified
+    if [ -n "$vcs_id" ]; then
+        # If no oauth id was given, then see if there is only one and use
+        # that one
+        if [ -z "$oauth_id" ]; then
+            oauth_id="$( (
+                set -e
+                echodebug "[DEBUG] Requesting OAuth tokens for $tfe_org"
 
-    # If no oauth id was given, then see if there is only one and use
-    # that one
-    if [ -z "$oauth_id" ]; then
-        oauth_id="$( (
-            set -e
-            echodebug "[DEBUG] Requesting OAuth tokens for $tfe_org"
+                url="$tfe_address/api/v2/organizations/$tfe_org/oauth-tokens"
+                oauth_list_resp="$(tfe_api_call "$url")"
+                echodebug "[DEBUG] OAuth list response:"
+                echodebug "$oauth_list_resp"
 
-            url="$tfe_address/api/v2/organizations/$tfe_org/oauth-tokens"
-            oauth_list_resp="$(tfe_api_call "$url")"
-            echodebug "[DEBUG] OAuth list response:"
-            echodebug "$oauth_list_resp"
+                oauth_ids="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .id')"
+                echodebug "[DEBUG] OAuth IDs:"
+                echodebug "$oauth_ids"
 
-            oauth_ids="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .id')"
-            echodebug "[DEBUG] OAuth IDs:"
-            echodebug "$oauth_ids"
+                test -n "$oauth_ids"
+                test 1 -eq "$(echo $oauth_ids | wc -l)"
 
-            test -n "$oauth_ids"
-            test 1 -eq "$(echo $oauth_ids | wc -l)"
+                echo "$oauth_ids"
+            ) 2>&3 )"
 
-            echo "$oauth_ids"
-        ) 2>&3 )"
-        [ 0 -ne $? ] && { echoerr "Error obtaining a default OAuth ID"; return 1; }
+            if [ 0 -ne $? ]; then
+                echoerr "Error obtaining a default OAuth ID"
+                return 1
+            fi
+        fi
     fi
 
     make_migrate_payload "$tfe_workspace" "$legacy_name" "$vcs_id" "$oauth_id"
