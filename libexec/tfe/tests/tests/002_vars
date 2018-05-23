@@ -1,0 +1,94 @@
+#!/bin/sh
+
+. ./utils
+
+# Workspace creation and deletion are confirmed to work by previous tests.
+# Create a workspace to use for these tests.
+ws_name="tfe-test-workspace-$(random_enough)"
+tfe workspace new -name "$TFE_ORG/$ws_name" >/dev/null 2>&1
+
+# After initial creation there should be no tf variables
+output="$(tfe pullvars -name "$TFE_ORG/$ws_name" 2>&1)"
+assert_equal "tfe_pullvars_empty_ret_0" 0 $?
+assert_equal "tfe_pullvars_empty" "" "$output"
+
+# After initial creation there should be no env variables
+output="$(tfe pullvars -name "$TFE_ORG/$ws_name" -env true 2>&1)"
+assert_equal "tfe_pullvars_empty_env_ret_0" 0 $?
+assert_equal "tfe_pullvars_empty_env" "" "$output"
+
+# Pushing up a tf variable should succeed and have outputted the creation info
+output="$(tfe pushvars -name "$TFE_ORG/$ws_name" -var 'var=foo' 2>&1)"
+assert_equal "tfe_pushvars_var_ret_0" 0 $?
+assert_contains "tfe_pushvars_var_output" "Creating var type:terraform hcl:false sensitive:false value:foo" "$output"
+
+# Pulling it should succeed and contain the name and value in tfvars format
+output="$(tfe pullvars -name "$TFE_ORG/$ws_name" -var 'var' 2>&1)"
+assert_equal "tfe_pullvars_var_ret_0" 0 $?
+assert_contains "tfe_pullvars_var_output" 'var = "foo"' "$output"
+
+# Pushing up a sensitive tf variable should succeed
+output="$(tfe pushvars -name "$TFE_ORG/$ws_name" -svar 'svar=bar' 2>&1)"
+assert_equal "tfe_pushvars_svar_ret_0" 0 $?
+assert_contains "tfe_pushvars_svar_output" "Creating svar type:terraform hcl:false sensitive:true value:REDACTED" "$output"
+
+# Pulling it should succeed and contain the name but the value should be empty
+output="$(tfe pullvars -name "$TFE_ORG/$ws_name" -var 'svar' 2>&1)"
+assert_equal "tfe_pullvars_var_ret_0" 0 $?
+assert_contains "tfe_pullvars_svar_output" 'svar = ""' "$output"
+
+# Pushing up an hcl tf variable should succeed
+output="$(tfe pushvars -name "$TFE_ORG/$ws_name" -hcl-var 'hvar=["one", "two"]' 2>&1)"
+assert_equal "tfe_pushvars_hvar_ret_0" 0 $?
+
+# Note: Care here has to be taken as the quotes and brackets need extra
+# escaping. We expect for the output in this case to contain brackets and
+# backslashes. The search term is fed into grep so things need to be properly
+# escaped going into it.
+# At any rate the output should look like:
+# Creating hvar type:terraform hcl:true sensitive:false value:[\"one\", \"two\"]
+assert_contains "tfe_pushvars_hclvar_output" 'Creating hvar type:terraform hcl:true sensitive:false value:\[\\"one\\", \\"two\\"\]' "$output"
+
+# Pulling it should succeed and contain the name and value in tfvars format, with the value in the same format as when it was pushed.
+output="$(tfe pullvars -name "$TFE_ORG/$ws_name" -var 'hvar' 2>&1)"
+assert_equal "tfe_pullvars_hclvar_ret_0" 0 $?
+assert_contains "tfe_pullvars_hclvar_output" 'hvar = \[\"one\", \"two\"\]' "$output"
+
+# Pushing up a sensitive hcl variable should succeed
+output="$(tfe pushvars -name "$TFE_ORG/$ws_name" -shcl-var 'shvar={one="one", two="two"}' 2>&1)"
+assert_equal "tfe_pushvars_shvar_ret_0" 0 $?
+assert_contains "tfe_pushvars_var_output" 'Creating shvar type:terraform hcl:true sensitive:true value:REDACTED' "$output"
+
+# Pulling it should succeed and contain the name but the value should be empty
+output="$(tfe pullvars -name "$TFE_ORG/$ws_name" -var 'shvar' 2>&1)"
+assert_equal "tfe_pullvars_shvar_ret_0" 0 $?
+assert_contains "tfe_pullvars_shvar_output" 'shvar = ""' "$output"
+
+# Pushing up an environment variable should succeed
+output="$(tfe pushvars -name "$TFE_ORG/$ws_name" -env-var 'evar=baz' 2>&1)"
+assert_equal "tfe_pushvars_evar_ret_0" 0 $?
+assert_contains "tfe_pushvars_var_output" "Creating evar type:env hcl:false sensitive:false value:baz" "$output"
+
+# Pulling it should succeed and contain the name and value in shell format
+output="$(tfe pullvars -name "$TFE_ORG/$ws_name" -env-var 'evar' 2>&1)"
+assert_equal "tfe_pullvars_evar_ret_0" 0 $?
+assert_contains "tfe_pullvars_evar_output" 'evar="baz"' "$output"
+
+# Pushing up a sensitive environment variable should succeed
+output="$(tfe pushvars -name "$TFE_ORG/$ws_name" -senv-var 'sevar=qux' 2>&1)"
+assert_equal "tfe_pushvars_sevar_ret_0" 0 $?
+assert_contains "tfe_pushvars_var_output" "Creating sevar type:env hcl:false sensitive:true value:REDACTED" "$output"
+
+# Pulling it should succeed and contain the name but the value should be empty
+output="$(tfe pullvars -name "$TFE_ORG/$ws_name" -env-var 'sevar' 2>&1)"
+assert_equal "tfe_pullvars_sevar_ret_0" 0 $?
+assert_contains "tfe_pullvars_sevar_output" 'sevar=' "$output"
+
+# TODO
+# Test pushing multiple vars at once
+# Test pushing tfvars files
+# Test pushing from a configuration
+# Test mixing and matching combinations for the right overrides
+
+tfe workspace delete -name "$TFE_ORG/$ws_name" >/dev/null 2>&1
+

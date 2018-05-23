@@ -1,0 +1,117 @@
+#!/bin/sh
+
+# Note that sourcing or defining echoerr, echodebug, and ${cmd_prefix}_help is
+# required before using execute_subcmd. Ready made versions of echoerr and
+# echodebug are available in echofuncs.
+
+execute_subcmd () {
+    # Get the function prefix
+    cmd_prefix="$1"
+    [ -n "$1" ] && shift
+
+    # Get the directory where the command should exist
+    cmd_dir="$1"
+    [ -n "$1" ] && shift
+
+    if [ -z "$cmd_dir" ]; then
+        echoerr "Error locating command."
+        return 1
+    fi
+
+    echodebug "[DEBUG] Command dir: $cmd_dir"
+
+    # Get the command to find and run
+    cmd="$1"
+    [ -n "$1" ] && shift
+
+    echodebug "[DEBUG] Command: $cmd"
+
+    # This is for when the script is run without any arguments at all.
+    if [ -z "$cmd" ]; then
+        ${cmd_prefix}_help
+        return 1
+    fi
+
+    # check for all variants of help
+    case "$cmd" in
+        help|-h|-help|--help)
+            if [ -n "$1"  ] && [ '-' != "$(echo x"$1" | cut -c 2)"  ]; then
+                # If the command is help and there is another subcommand following
+                # that, then try to give help about that following subcommand.
+                # e.g. cmd help subcmd -> cmd_subcmd_help
+                # e.g. cmd subcmd1 help subcmd2 -> cmd_subcmd2_help
+
+                # Note the x"$1" cludge is necessary to keep from passing a
+                # potential argument to echo, like echo -n.
+
+                if [ -f "$cmd_dir/$1" ]; then
+                    echodebug "[DEBUG] Loading command from $cmd_dir/$1 for help"
+                    . "$cmd_dir/$1"
+
+                    ${cmd_prefix}_${1}_help
+                else
+                    echoerr "Unable to provide help for command $1"
+                    echoerr
+                    ${cmd_prefix}_help
+                fi
+
+                return 0
+            else
+                # If the command is help and it is the last argument, give help
+                # on the current subcommand.
+                # e.g. cmd subcmd help
+                if [ -f "$cmd_dir/$cmd" ]; then
+                    echodebug "[DEBUG] Loading command from $cmd_dir/$cmd for help"
+                    . "$cmd_dir/$cmd"
+
+                    ${cmd_prefix}_${cmd}_help
+                else
+                    ${cmd_prefix}_help
+                fi
+                return 0
+            fi
+         ;;
+    esac
+
+    # Make sure there's a commands directory
+    if [ ! -d "$cmd_dir" ]; then
+        echoerr "Error obtaining commands. Check:"
+        echoerr "$cmd_dir"
+        return 1
+    fi
+
+    # Ensure the command exists
+    if [ ! -f "$cmd_dir/$cmd" ]; then
+        echoerr "Command '$cmd' not found. See 'tfe help' for usage."
+        return 1
+    fi
+
+    # Handle a special case of help dyslexia, e.g.:
+    #   script subcommand help
+    if [ 1 -eq $# ]; then
+        case "$1" in
+            help|-h|-help|--help)
+                echodebug "[DEBUG] Help swapped in argument list"
+
+                # See if the cmd is actually a command that the user probably
+                # wants help information for.
+                if [ -f "$cmd_dir/$cmd" ]; then
+                    . "$cmd_dir/$cmd"
+                    ${cmd_prefix}_${cmd}_help
+                else
+                    echoerr "Unable to provide help for command $cmd"
+                    echoerr
+                    ${cmd_prefix}_help
+                fi
+
+                return 0
+            ;;
+        esac
+    fi
+
+    # Dispatch the command with all of the following arguments to the appropriate,
+    # sourced function
+    echodebug "[DEBUG] Loading command from $cmd_dir/$cmd"
+    . "$cmd_dir/$cmd"
+    ${cmd_prefix}_${cmd} "$@"
+}

@@ -1,0 +1,57 @@
+#!/bin/sh
+
+. ./utils
+
+# tfe by itself should return 1 and contain certain text
+output="$(tfe 2>&1)"
+assert_equal "tfe_ret_1" 1 $?
+assert_contains "tfe_has_synopsis" "SYNOPSIS" "$output"
+assert_contains "tfe_has_description" "DESCRIPTION" "$output"
+assert_contains "tfe_has_synopsis" "tfe COMMAND \[OPTIONS\]" "$output"
+assert_contains "tfe_has_help_describe" " help" "$(echo "$output" | awk 'NR>6')"
+
+# tfe help should return 0 and contain the same default help output
+output="$(tfe help 2>&1)"
+assert_equal "tfe_help_ret_0" 0 $?
+assert_contains "tfe_help_has_help_synopsis" "tfe help COMMAND" "$output"
+
+# tfe help help should return 0 and contain the tfe help synopsis
+output="$(tfe help help 2>&1)"
+assert_equal "tfe_help_help_ret_0" 0 $?
+assert_contains "tfe_help_has_help_synopsis" "tfe help COMMAND" "$output"
+
+# tfe -h should return 0 and contain the same default help output
+output="$(tfe -h 2>&1)"
+assert_equal "tfe__h_ret_0" 0 $?
+assert_contains "tfe__h_has_help_synopsis" "tfe -h COMMAND" "$output"
+
+# tfe -help should return 0 and contain the same default help output
+output="$(tfe -help 2>&1)"
+assert_equal "tfe__help_ret_0" 0 $?
+assert_contains "tfe__help_has_help_synopsis" "tfe -help COMMAND" "$output"
+
+# tfe --help should return 0 and contain the same default help output
+output="$(tfe --help 2>&1)"
+assert_equal "tfe___help_ret_0" 0 $?
+assert_contains "tfe___help_has_help_synopsis" "tfe --help COMMAND" "$output"
+
+# tfe help pushconfig should return 0 and contain the tfe pushconfig synopsis
+pushconfig_output="$(tfe help pushconfig 2>&1)"
+assert_equal "tfe_help_pushconfig_ret_0" 0 $?
+assert_contains "tfe_help_pushconfig_has_synopsis" "tfe pushconfig -name" "$pushconfig_output"
+
+# tfe pushconfig help should return 0 and contain the same text as tfe help pushconfig
+pushconfig_output="$(tfe pushconfig help 2>&1)"
+assert_equal "tfe_pushconfig_help_ret_0" 0 $?
+assert_contains "tfe_pushconfig_help_same_output" "$pushconfig_output" "$output"
+
+# tfe workspace -h new should return 0 and contain create's help
+new_output="$(tfe workspace -h new 2>&1)"
+assert_equal "tfe_workspace__h_new_ret_0" 0 $?
+assert_contains "tfe_workspace__h_has_synopsis" "tfe workspace new -name" "$new_output"
+
+# tfe workspace new --help should return 0 and contain the same text as tfe workspace -h new
+output="$(tfe workspace new --help 2>&1)"
+assert_equal "tfe_workspace_new___help_ret_0" 0 $?
+assert_contains "tfe_workspace_new___help_same_output" "$new_output" "$output"
+

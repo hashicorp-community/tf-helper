@@ -186,7 +186,7 @@ tfe_pushconfig () (
         return 1
     fi
 
-    if tar --version | grep GNU; then
+    if tar --version | grep GNU >/dev/null 2>&1; then
         tarcmd=gnutar
     else
         tarcmd=bsdtar
@@ -202,13 +202,23 @@ tfe_pushconfig () (
         fi
     fi
 
+    # Check for required standard options
+    if ! check_required; then
+        return 1
+    fi
+
     # Parse options
 
     while [ -n "$1" ]; do
+        # If this is a common option it has already been parsed. Skip it and
+        # its value.
+        if is_common_opt "$1"; then
+            shift
+            shift
+            continue
+        fi
+
         case "$1" in
-            help|-h|-help|--help)
-                usage
-                ;;
             -upload-modules)
                 case "$2" in
                     true)
@@ -261,7 +271,7 @@ tfe_pushconfig () (
     done
 
     # Check for additional required commands.
-    if [ -z "$(command -v git)" ]; then
+    if [ "$vcs" = true ] && [ -z "$(command -v git)" ]; then
         echoerr "The git command is required for VCS detection"
         return 1
     fi
@@ -338,15 +348,12 @@ tfe_pushconfig () (
 
     echodebug "[DEBUG] URL: $url"
 
-    upload_url_resp="$(tfe_api_call -d "$config_ver_payload" $url)"
-    if [ 0 -ne $? ]; then
+    echodebug "[DEBUG] API request for config upload:"
+    if ! upload_url_resp="$(tfe_api_call -d "$config_ver_payload" $url)"; then
         echoerr "Error creating config version"
         cleanup "$config_payload" "$tarlist"
         return 1
     fi
-
-    echodebug "[DEBUG] Upload URL response:"
-    echodebug "$upload_url_resp"
 
     config_id="$(printf "%s" "$upload_url_resp" | jq -r '.data.id')"
     if [ 0 -ne $? ]; then
@@ -383,11 +390,9 @@ tfe_pushconfig () (
 
         echodebug "[DEBUG] Polling for run ID. Attempt $try"
 
+        echodebug "[DEBUG] API request to check run:"
         url=$tfe_address/api/v2/workspaces/$workspace_id/runs
         run_check_resp="$(tfe_api_call $url)"
-
-        echodebug "[DEBUG] Run check response:"
-        echodebug "$run_check_resp"
 
         run_id="$(printf "%s" "$run_check_resp" | jq -r '.data[] | select(.relationships."configuration-version".data.id == "'$config_id'") | .id')"
 
@@ -428,23 +433,18 @@ tfe_pushconfig () (
                 sleep $poll_run
             fi
 
+            echodebug "[DEBUG] API request to poll run:"
             url=$tfe_address/api/v2/workspaces/$workspace_id/runs
-            poll_run_resp=$(tfe_api_call $url)
-
-            echodebug "[DEBUG] Poll run response:"
-            echodebug "$poll_run_resp"
+            poll_run_resp="$(tfe_api_call $url)"
 
             run_status="$(printf "%s" "$poll_run_resp" | jq -r '.data[] | select(.id == "'$run_id'") | .attributes.status')"
             [ 0 -ne $? ] && continue
 
             echo "$run_status"
 
-            echodebug "[DEBUG] Requesting workspace info for $tfe_org/$tfe_workspace"
+            echodebug "[DEBUG] API Request for workspace info $tfe_org/$tfe_workspace"
             url="$tfe_address/api/v2/organizations/$tfe_org/workspaces/$tfe_workspace"
             workspace_info_resp="$(tfe_api_call "$url")"
-
-            echodebug "[DEBUG] Workspace info response:"
-            echodebug "$workspace_info_resp"
 
             workspace_locked="$(printf "%s" "$workspace_info_resp" | jq -r '.data.attributes.locked')"
 

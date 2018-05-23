@@ -1,0 +1,29 @@
+#!/bin/sh
+
+. ./utils
+
+ws_name="tfe-test-workspace-$(random_enough)"
+
+# List workspaces should succeed and return 0
+tfe workspace list -tfe-org "$TFE_ORG" >/dev/null 2>&1
+assert_equal "tfe_ws_list_ret_0" 0 $?
+
+# create a new workspace without any options
+output="$(tfe workspace new -name "$TFE_ORG/$ws_name" 2>&1)"
+assert_equal "tfe_ws_new_noop_ret_0" 0 $?
+assert_contains "tfe_ws_new_noop_has_created" "Created" "$output"
+
+# List workspaces should now contain the new workspace
+output="$(tfe workspace list -tfe-org "$TFE_ORG" 2>&1)"
+assert_equal "tfe_ws_list_new_ret_0" 0 $?
+assert_contains "tfe_ws_list_contains_new" "$ws_name" "$output"
+
+# Deleting the workspace should succeed and return 0
+tfe workspace delete -name "$TFE_ORG/$ws_name" >/dev/null 2>&1
+assert_equal "tfe_ws_delete_ret_0" 0 $?
+
+# List workspaces should now not contain the new/deleted workspace
+output="$(tfe workspace list -tfe-org "$TFE_ORG" 2>&1)"
+assert_equal "tfe_ws_list_deleted_ret_0" 0 $?
+assert_contains_not "tfe_ws_list_deleted_no_contains_new" "$ws_name" "$output"
+

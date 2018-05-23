@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Print messages to stderr. Use printf to ensure the message is verbatim.
+# E.g. do not interpret \n in JSON.
+echoerr () { printf "%s\n" "$@" 1>&2; }
+
+# Print debug messages if the TF_LOG environment variable is set.
+echodebug () { [ -n "$TF_LOG" ] && echoerr "$@"; return 0; }

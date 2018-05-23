@@ -1,0 +1,56 @@
+#!/bin/sh
+
+. ./utils
+
+if [ -z "$TFE_ORG" ]; then
+    echoerr "TFE_ORG must be set to run tests"
+    exit 1
+else
+    export TFE_ORG="$TFE_ORG"
+fi
+
+tfe_dir="$(cd ../../../bin && pwd -P)"
+export PATH="$tfe_dir:$PATH"
+
+if [ -n "$1" ]; then
+    shells="$1"
+elif [ -n "$TFE_TEST_ALL" ]; then
+    # posh seems broken for sourcing files when run as
+    # posh ./tests/test_name
+    # When run interatively it fails to have the right return code for
+    # at least listing workspaces.
+
+    # Heirloom bourne shell produces the wrong exit code when executed as
+    # heirloom-sh ./tests/test_name
+    # It does seem to work interactively so I'll only test it every once in
+    # a while
+
+    # Might want to test with /bin/sh also if your /bin/sh is not named
+    # anything else below.
+    shells="bash dash ksh zsh mksh yash pdksh busybox ash"
+else
+    shells="/bin/sh"
+fi
+
+for shell in $shells; do
+    # Verify the shell is present
+    if [ -z "$(command -v $shell)" ]; then
+        echoerr "Skipping tests with $shell - not found"
+        continue
+    fi
+
+    echoerr "Testing with $shell"
+    tfe_tests="$(find . -type f ! -name 'testrunner' ! -name utils ! -path '*/.*' | sort)"
+    for tfe_test in $tfe_tests; do
+        # busybox is special because it has to be called as `busybox sh`
+        if [ "$shell" = busybox ]; then
+            shell="busybox sh"
+        fi
+
+        if ! $shell "$tfe_test"; then
+            exit 1
+        fi
+    done
+    echoerr "Completed $shell tests"
+    echoerr
+done

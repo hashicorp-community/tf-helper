@@ -114,10 +114,15 @@ tfe_migrate () (
     # Parse options
 
     while [ -n "$1" ]; do
+        # If this is a common option it has already been parsed. Skip it and
+        # its value.
+        if is_common_opt "$1"; then
+            shift
+            shift
+            continue
+        fi
+
         case "$1" in
-            help|-h|-help|--help)
-                usage
-                ;;
             -legacy-name)
                 legacy_name=$(assign_arg "$1" "$2")
                 ;;
@@ -136,6 +141,11 @@ tfe_migrate () (
         [ -n "$1" ] && shift
     done
 
+    # Check for required standard options
+    if ! check_required; then
+        return 1
+    fi
+
     # Must have a legacy name
     if [ -z "$legacy_name" ]; then
         echoerr 'Legacy environment name is required.'
@@ -151,9 +161,9 @@ tfe_migrate () (
                 set -e
                 echodebug "[DEBUG] Requesting OAuth tokens for $tfe_org"
 
+                echodebug "[DEBUG] OAuth list response:"
                 url="$tfe_address/api/v2/organizations/$tfe_org/oauth-tokens"
                 oauth_list_resp="$(tfe_api_call "$url")"
-                echodebug "[DEBUG] OAuth list response:"
                 echodebug "$oauth_list_resp"
 
                 oauth_ids="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .id')"
@@ -182,17 +192,14 @@ tfe_migrate () (
     echodebug "[DEBUG] Migration payload:"
     echodebug "$(cat $payload)"
 
+    echodebug "[DEBUG] API request for legacy migration:"
     url="$tfe_address/api/v2/organizations/$tfe_org/workspaces"
-    migrate_resp="$(tfe_api_call -d @"$payload" "$url")"
-    if [ 0 -ne $? ]; then
+    if ! migrate_resp="$(tfe_api_call -d @"$payload" "$url")"; then
         echoerr "Error migrating legacy environment"
         return 1
     fi
 
     cleanup "$payload"
-
-    echodebug "[DEBUG] Legacy migration response:"
-    echodebug "$migrate_resp"
 
     echo "Migration complete: $legacy_name -> $tfe_org/$tfe_workspace"
 )

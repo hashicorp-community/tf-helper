@@ -20,30 +20,54 @@
 ##
 ## -------------------------------------------------------------------
 
+# List all of the commands and their descriptions in the help
+list_cmd_descriptions () (
+    cd "$cmd_dir"
+
+    for cmd in *; do
+        if [ -d $cmd ]; then
+            continue
+        fi
+
+        . "$cmd_dir/$cmd"
+        printf " %-12s%s\n" "$cmd" "$(tfe_${cmd}_description)"
+    done
+    echo
+)
+
 tfe_help_description () (
     echo "Get help on tfe commands"
 )
 
 tfe_help_help () (
-cat << 'EOF'
+    if [ -z "$cmd" ]; then
+
+        cat << EOF
 SYNOPSIS
- tfe help COMMAND
+ tfe COMMAND [OPTIONS]
+
+DESCRIPTION
+ Perform operations in Terraform Enterprise using the API. Command is one of
+ the following:
+
+$(list_cmd_descriptions)
+
+EOF
+
+    else
+
+        cat << EOF
+SYNOPSIS
+ tfe $cmd COMMAND [OPTIONS]
 
 DESCRIPTION
  Get help on a command, where command is one of the following:
 
+$(list_cmd_descriptions)
+
 EOF
 
-    # List all of the commands and their descriptions in the help
-    (
-    cd "$tfe_cmd_dir"
-
-    for cmd in *; do
-        . "$tfe_cmd_dir/$cmd"
-        printf " %-12s%s\n" "$cmd" "$(tfe_${cmd}_description)"
-    done
-    echo
-    )
+    fi
 )
 
 tfe_help () (
@@ -54,11 +78,11 @@ tfe_help () (
     else
         # Ran 'tfe help <cmd>'
         cmd=$1
-        if [ ! -f "$tfe_cmd_dir/$cmd" ]; then
+        if [ ! -f "$cmd_dir/$cmd" ]; then
             echoerr "Command $cmd not found. Cannot provide help information."
             return 1
         else
-            . "$tfe_cmd_dir/$cmd"
+            . "$cmd_dir/$cmd"
             tfe_${cmd}_help
             return $?
         fi

@@ -73,14 +73,23 @@ tfe_pullvars () (
     # Whether to list all env vars instead of tf vars
     env=false
 
+    # Check for required standard options
+    if ! check_required; then
+        return 1
+    fi
+
     # Parse options
 
     while [ -n "$1" ]; do
+        # If this is a common option it has already been parsed. Skip it and
+        # its value.
+        if is_common_opt "$1"; then
+            shift
+            shift
+            continue
+        fi
+
         case "$1" in
-            help|-h|-help|--help)
-                tfe_pullvars_help
-                return 1
-                ;;
             -var)
                 # -var can be specified multiple times
                 new_var="$(assign_arg "$1" "$2")"
@@ -127,20 +136,18 @@ tfe_pullvars () (
     echodebug "$url"
 
     # API call to get all of the variables
-    var_get_resp="$(tfe_api_call $url)"
-    if [ 0 -ne $? ]; then
+    echodebug "[DEBUG] API request for variable list:"
+    if ! var_get_resp="$(tfe_api_call $url)"; then
         echoerr "Error listing variables"
         return 1
     fi
-
-    echodebug "[DEBUG] Variable list response:"
-    echodebug "$var_get_resp"
 
     vars_retval=0
     tfevar=
 
     if [ -n "$vars" ]; then
-        for v in $vars; do
+        # Removoe the end-of-list marker added by append when using vars
+        for v in ${vars%.}; do
             # Get this tf var out of the variable list with jq
             tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
                 | select(.attributes.category == "terraform")
@@ -163,7 +170,8 @@ tfe_pullvars () (
     fi
 
     if [ -n "$env_vars" ]; then
-        for v in $env_vars; do
+        # Removoe the end-of-list marker added by append when using env_vars
+        for v in ${env_vars%.}; do
             # Get this env var out of the variable list with jq
             tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
                 | select(.attributes.category == "env")

@@ -1,0 +1,64 @@
+#!/bin/sh
+
+# All output should go to stderr so that nothing is buffered
+echoerr () { printf "%s\n" "$@" 1>&2; }
+
+random_enough () {
+    awk -v s="$(/bin/sh -c 'echo $$')" '
+        BEGIN{
+            srand(s)
+            r=rand() rand()
+            gsub(/0\./,"",r)
+            print r
+        }'
+}
+
+# Format test results and handle exiting
+_handle_test () {
+    printf "$1 ... "
+    if [ 0 -eq "$2" ]; then
+        echoerr "passed"
+    else
+        echoerr "failed"
+        echoerr "$3"
+
+        # can't exit from here so instead kill our process
+        kill -PIPE $$
+    fi
+}
+
+# Compare an expected value to a given value
+# $1 test name
+# $2 expected value
+# $3 value
+assert_equal () {
+    test "$2" = "$3"
+    _handle_test \
+        $1 \
+        $? \
+        "expected $3 to be $2"
+}
+
+# Ensure a given text contains a term
+# $1 test name
+# $2 search term
+# $3 text to search
+assert_contains () {
+    echo "$3" | grep "$2" 2>&1 >/dev/null
+    _handle_test \
+        $1 \
+        $? \
+        "$(printf "term '%s' not found in:\n\n%s\n" "$2" "$3")"
+}
+
+# Ensure a given text is not present in a term
+# $1 test name
+# $2 search term
+# $3 text to search
+assert_contains_not () {
+    ! echo "$3" | grep "$2" 2>&1 >/dev/null
+    _handle_test \
+        $1 \
+        $? \
+        "$(printf "term '%s' was found in:\n\n%s\n" "$2" "$3")"
+}

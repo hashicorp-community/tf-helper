@@ -28,8 +28,10 @@
 # bets are off for any other variables used in this script before subcommands
 # are executed.
 #
+# tfe_prefix
+# tfe_lib_dir
+# tfe_libexec_dir
 # tfe_cmd_dir
-# tfe_payload_dir
 # tfe_tar_verbose
 # tfe_curl_silent
 # tfe_address
@@ -41,19 +43,20 @@
 ## Utility function declarations
 ##
 
-# Print messages to stderr. Use printf to ensure the message is verbatim.
-# E.g. do not interpret \n in JSON.
-echoerr () { printf "%s\n" "$@" 1>&2; }
+# Return (print) "$1\n$2\n." if $1 is not empty, "$2\n." if $1 is empty.
+# These "lists" always have an end-of-list marker, ".", if they are not empty.
+# This is to help track empty list values that would otherwise be \n
+# special characters that will get stripped by command substitution.
 
-# Print debug messages if the TF_LOG environment variable is set.
-echodebug () { [ -n "$TF_LOG" ] && echoerr "$@"; return 0; }
-
-# Return (print) $1\n$2 if $1 is not empty. Usage:
+# Usage:
 #   my_str_list="$(append "$my_str_list" "line")"
-# This will facilitate a later iteration:
-#   echo "$my_str_list" | while read line; do <operations with "$line">; done
+# This will facilitate a later iteration, such as:
+#   printf "%s" "${my_str_list%.}" | while read line; do <operations with "$line">; done
+# Note that the list variable should have the end-of-list marker, ".",
+# removed when used.
 append () {
-    printf "%s\n" "$( [ -n "$1" ] && printf "%s\n" "$1"; printf "%s\n" "$2" )"
+    [ -n "$1" ] && printf "%s" "${1%.}"
+    printf "%s\n." "$2"
 }
 
 # Remove specified files
@@ -79,6 +82,20 @@ cat << EOF
                       formatted as "<ORGANIZATION>/<WORKSPACE>". If unspecified,
                       uses the TFE_ORG and TFE_WORKSPACE environment variables.
 
+ -tfe-org <ORGANIZATION>
+                      The name of the Terraform Enterprise organization. If
+                      unspecified, uses the TFE_ORG environment variable.
+                      The -tfe-org and -tfe-workspace can be used as an
+                      alternative to specifying -name. The option specified
+                      last is the effective value used.
+
+ -tfe-workspace <WORKSPACE>
+                      The name of the Terraform Enterprise workspace. If
+                      unspecified, uses the TFE_WORKSPACE environment
+                      variable. The -tfe-org and -tfe-workspace can be used
+                      as an alternative to specifying -name. The option
+                      specified last is the effective value used.
+
  -tfe-address <URL>   The address of your Terraform Enterprise instance.
                       Defaults to the SaaS hostname at https://app.terraform.io
 
@@ -103,10 +120,25 @@ assign_arg () {
 
 # Common options to curl. Fail on HTTP error codes.
 tfe_api_call () {
-    curl -f $tfe_curl_silent \
-         --header "Authorization: Bearer $tfe_token" \
-         --header "Content-Type: application/vnd.api+json" \
-         $@
+    if resp="$(curl -f $tfe_curl_silent \
+                 --header "Authorization: Bearer $tfe_token" \
+                 --header "Content-Type: application/vnd.api+json" \
+                 $@)"; then
+        echodebug "API request succeeded. Response:"
+        echodebug "$resp"
+
+        printf "%s" "$resp"
+        next_page="$(printf "%s" "$resp" | jq -r '.meta.pagination."next-page"')"
+        if [ "$next_page" != null ]; then
+            next_link="$(printf "%s" "$resp" | jq -r '.links.next')"
+            tfe_api_call "$next_link"
+        fi
+    else
+        echodebug "API request failed. Response:"
+        echodebug "$resp"
+
+        return 1
+    fi
 }
 
 # Check the version of terraform in use. Commands can use this
@@ -138,18 +170,74 @@ tf_version_required () {
     fi
 }
 
+check_required () {
+    if [ 0 -eq $# ]; then
+        check_for="tfe_org tfe_workspace tfe_token tfe_address"
+    else
+        check_for="$*"
+    fi
+
+    missing=0
+    for i in $check_for; do
+        case "$i" in
+            tfe_org)
+                if [ -z "$tfe_org" ]; then
+                    missing=1
+                    echoerr 'TFE organization required.'
+                    echoerr 'Set with $TFE_ORG or use -name'
+                    echoerr
+                fi
+            ;;
+            tfe_workspace)
+                if [ -z "$tfe_workspace" ]; then
+                    missing=1
+                    echoerr 'TFE workspace required.'
+                    echoerr 'Set with $TFE_WORKSPACE or use -name'
+                    echoerr
+                fi
+            ;;
+            tfe_token)
+                if [ -z "$tfe_token" ]; then
+                    missing=1
+                    echoerr 'TFE API token required.'
+                    echoerr 'Set with $TFE_TOKEN, -token, or $ATLAS_TOKEN'
+                    echoerr
+                fi
+            ;;
+            tfe_address)
+                # This really shouldn't happen. Someone would have to
+                # explicitly pass in an empty string to the command line
+                # argument.
+                if [ -z "$tfe_address" ]; then
+                    missing=1
+                    echoerr 'TFE address required.'
+                    echoerr 'Set with -tfe-address or $TFE_URL'
+                    echoerr
+                fi
+            ;;
+        esac
+    done
+    return $missing
+}
+
+is_common_opt () {
+    for common_opt in -name -tfe-address -tfe-org -tfe-workspace -token; do
+        if [ "$1" = "$common_opt" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 ##
 ## Program begins here
 ##
-
-echodebug "[DEBUG] $PWD"
-echodebug "[DEBUG] $0 $*"
 
 # Check for commands that must be present to function
 
 for required_cmd in jq curl readlink; do
     if [ -z "$(command -v $required_cmd)" ]; then
-        echoerr "The $required_cmd command must be installed"
+        echo "The $required_cmd command must be installed" 1>&2
         exit 1
     fi
 done
@@ -161,6 +249,71 @@ fi
 
 # Strip the trailing / from TMPDIR if there is one
 TMPDIR="$(echo "$TMPDIR" | sed 's#/$##')"
+
+# Need to determine the script location and prefix to the needed lib directory.
+# The prefix should be the directory that contains the bin and lib directories.
+# i.e. /users/username/gitclones/tfe-cli (contains lib/tfe/)
+# or   /usr (contains bin/tfe and lib/tfe/)
+
+# Note that this is not POSIX but portable to many systems with nearly any
+# kind of implementation of readlink. We already require jq and curl, so
+# requiring readline is not that big of a deal.
+
+# Get the command used to start this script
+target=$0
+
+# If executing via a series of symlinks, resolve them all the way back to the
+# script itself. Some danger here of infinitely cycling.
+while [ -h "$target" ]; do
+    link=$(readlink "$target")
+    if [ "$(echo "$link" | cut -c -1)" = "/" ]; then
+        # link path is absolute, just need to follow it
+        target="$link"
+    else
+        # link path is relative, need to relatively follow it
+        target="${target%/*}"
+        target="$target/$link"
+    fi
+done
+
+# Now target should be like the following, where 'script' is not a symlink:
+# /some/path/to/the/actual/script
+
+# Get the script name by removing everything up to the last /
+bin_name="${target##*/}"
+
+# Get the script path, go there, and resolve the full path of symlinks with pwd
+tfe_prefix=$(cd ${target%/$bin_name} && pwd -P)
+
+# Remove /bin and /sbin from the prefix if there is one (i.e. /usr/bin)
+tfe_prefix=${tfe_prefix%/bin}
+tfe_prefix=${tfe_prefix%/sbin}
+
+# tfe_prefix should now be to something like /usr or
+# /path/to/gitclone/tfe-cli
+
+# Set some additional convenience variables
+tfe_lib_dir="$tfe_prefix/lib/tfe"
+tfe_cmd_dir="$tfe_lib_dir/commands"
+tfe_libexec_dir="$tfe_prefix/libexec/tfe"
+tfe_payload_dir="$tfe_prefix/share/tfe/commands"
+
+# Load required functions
+if [ ! -f "$tfe_lib_dir/echofuncs" ]; then
+    echo "Unable to load required functions from:" 1>&2
+    echo "$tfe_lib_dir/echofuncs" 1>&2
+fi
+
+# Provides echoerr and echodebug
+. "$tfe_lib_dir/echofuncs"
+
+if [ ! -f "$tfe_lib_dir/subcmd" ]; then
+    echoerr "Unable to load required functions from:"
+    echoerr "$tfe_lib_dir/subcmd"
+fi
+
+# Provides execute_subcmd
+. "$tfe_lib_dir/subcmd"
 
 if [ -n "$TF_LOG" ]; then
     # Debugging. Print command errors and make them verbose
@@ -184,185 +337,116 @@ tfe_org="$TFE_ORG"
 tfe_workspace="$TFE_WORKSPACE"
 
 # Prefer TFE_TOKEN, fall back to ATLAS_TOKEN.
-# Keep going if it's not set - can be set by -token
 tfe_token="$TFE_TOKEN"
 if [ -z "$tfe_token" ]; then
     tfe_token="$ATLAS_TOKEN"
 fi
 
-# Need to determine the script location and prefix to the needed lib directory.
-# The prefix should be the directory that contains the bin and lib directories.
-# i.e. /users/username/gitclones/terraform-enterprise-push (contains lib/tfe/)
-#      /usr (contains bin/tfe and lib/tfe/)
-
-# Note that this is not POSIX but portable to many systems with nearly any
-# kind of implementation of readlink. We already require jq and curl, so
-# requiring readline is not that big of a deal.
-
-# Get the command used to start this script
-target=$0
-
-# If executing via a series of symlinks, resolve them all the way back to the
-# script itself. Some danger here of infinitely cycling.
-while [ -h "$target" ]; do
-    link=$(readlink "$target")
-    if [ "$(echo "$link" | cut -c -1)" = "/" ]; then
-        # link path is absolute, just need to follow it
-        target="$link"
-    else
-        # link path is relative, need to relatively follow it
-        target="${target%/*}"
-        target="${target}/${link}"
-    fi
-done
-
-# Now target should be like the following, where 'script' is not a symlink:
-# /some/path/to/the/actual/script
-
-# Get the script name by removing everything up to the last /
-bin_name="${target##*/}"
-
-# Get the script path, go there, and resolve the full path of symlinks with pwd
-tfe_prefix=$(cd ${target%/$bin_name} && pwd -P)
-
-# Remove /bin and /sbin from the prefix if there is one (i.e. /usr/bin)
-tfe_prefix=${tfe_prefix%/bin}
-tfe_prefix=${tfe_prefix%/sbin}
-
-# tfe_prefix should now be to something like /usr or
-# /path/to/gitclone/terraform-enterprise-push
-
-# Set some additional convenience variables
-tfe_cmd_dir="${tfe_prefix}/lib/tfe/commands"
-tfe_payload_dir="${tfe_prefix}/share/tfe/commands"
+echodebug "[DEBUG] $PWD"
+echodebug "[DEBUG] $0 $*"
 
 # Make sure there's a commands directory
-if [ ! -d "${tfe_cmd_dir}" ]; then
-    echoerr "Error obtaining commands. Check:"
-    echoerr "${tfe_cmd_dir}"
+if [ ! -d "$tfe_cmd_dir" ]; then
+    echoerr "Error obtaining commands from:"
+    echoerr "$tfe_cmd_dir"
     exit 1
 fi
 
-# The help command is handled as a special case to cope with incorrect
-# invocations.
-
-# Make sure we can load help. If not, that's a red flag.
-if [ -f "${tfe_cmd_dir}/help" ] ; then
-    . "${tfe_cmd_dir}/help"
+# Make sure we can load help so it is always available.
+# If not, that's a red flag.
+if [ -f "$tfe_cmd_dir/help" ] ; then
+    . "$tfe_cmd_dir/help"
 else
-    error_msg "Could not load essential commands. Please check your paths."
+    echoerr "Unable to load help command from:"
+    echoerr "$tfe_cmd_dir/help"
     exit 1
-fi
-
-# No command was supplied. Try to error out helpfully.
-if [ 0 -eq $# ]; then
-    tfe_help
-    exit 1
-fi
-
-# At least one argument given. If is help, run help with any arguments supplied.
-# Exit with help's return value.
-if [ "help" = $1 ]; then
-    [ -n "$1" ] && shift
-    tfe_help $@
-    exit $?
 fi
 
 # Now, if we haven't exited:
 #   First argument is a command
 #   Additional arguments are parameters to the command to be run
 
-# Pop the command
-cmd="$1"
-[ -n "$1" ] && shift
-
-# Ensure the command exists
-if [ ! -f "$tfe_cmd_dir/$cmd" ]; then
-    echoerr "Command '$cmd' not found. See 'tfe help' for usage."
-    exit 1
-fi
-
-# Handle a special case of help dyslexia, e.g.:
-#   tfe pushconfig help
-if [ 1 -eq $# ] && [ "help" = "$1" ]; then
-    # See if the cmd is actually a command that the user probably
-    # wants help information for.
-    if [ -f "$tfe_cmd_dir/$1" ]; then
-        . "$tfe_cmd_dir/$cmd"
-        tfe_${cmd}_help
-        exit 0
-    fi
-fi
-
 # Comb through options for name, token, and address while building
 # a list of other arguments to go to the subcommand
 
-subcmd_args=
+# The only "safe" operations to perform on the provided list of arguments in $@
+# is to iterate over them or remove args from the beginning using shift. All
+# other kinds of operations tend to strip away the proper quoting for arguments
+# provided with spaces, so we're unable to actually _remove_ the common options
+# from $@.
 
-while [ -n "$1" ]; do
-    case "$1" in
+# When a common option is found as an argument, the following argument in the
+# next iteration contains the value.
+
+assign=
+for arg in "$@"; do
+    case "$assign" in
         -tfe-address)
-            tfe_address=$(assign_arg "$1" "$2")
-            [ -n "$1" ] && shift
-            [ -n "$1" ] && shift
+            tfe_address="$arg"
+            assign=
+            continue
             ;;
         -name)
-            tfe_name=$(assign_arg "$1" "$2")
-            [ -n "$1" ] && shift
-            [ -n "$1" ] && shift
+            tfe_name="$arg"
+
+            if ! echo "$tfe_name" | grep / >/dev/null 2>&1; then
+                echoerr "Format for name should be <ORGANIZATION>/<WORKSPACE>"
+                echoerr "Received: $tfe_name"
+                exit 1
+            fi
+
+            # Separate the org and workspace in name
+            tfe_org="${tfe_name%/*}"
+            tfe_workspace="${tfe_name#*/}"
+
+            if [ -z "$tfe_org" ]; then
+                echoerr "Format for name should be <ORGANIZATION>/<WORKSPACE>"
+                echoerr "Given name resulted in empty org: $tfe_name"
+                exit 1
+            fi
+
+            if [ -z "$tfe_workspace" ]; then
+                echoerr "Format for name should be <ORGANIZATION>/<WORKSPACE>"
+                echoerr "Given name resulted in empty workspace: $tfe_name"
+                exit 1
+            fi
+            assign=
+            continue
+            ;;
+        -tfe-org)
+            tfe_org="$arg"
+            assign=
+            continue
+            ;;
+        -tfe-workspace)
+            tfe_workspace="$arg"
+            assign=
+            continue
             ;;
         -token)
-            tfe_token=$(assign_arg "$1" "$2")
-            [ -n "$1" ] && shift
-            [ -n "$1" ] && shift
-            ;;
-        *)
-            subcmd_args="$subcmd_args $1"
-            [ -n "$1" ] && shift
+            tfe_token="$arg"
+            assign=
+            continue
             ;;
     esac
+
+    if is_common_opt "$arg"; then
+        assign="$arg"
+    fi
 done
 
-# Check for required values
+echodebug "[DEBUG] tfe_address: $tfe_address"
+echodebug "[DEBUG] tfe_org: $tfe_org"
+echodebug "[DEBUG] tfe_workspace: $tfe_workspace"
 
-# Did we get org and workspace from the environment?
-if [ -z "$tfe_org" ] && [ -z "$tfe_workspace" ]; then
-    # No. Did we get it from -name?
-    if [ -z "$tfe_name" ]; then
-        # No.
-        echoerr 'Org and workspace required.'
-        echoerr 'Set with $TFE_ORG and $TFE_WORKSPACE or use -name'
-        exit 1
-    else
-        # Separate the org and workspace in name
-        tfe_org="${tfe_name%/*}"
-        tfe_workspace="${tfe_name#*/}"
-    fi
+if [ -n "$tfe_token" ]; then
+    echodebug "[DEBUG] tfe_token: (not empty)"
+else
+    echodebug "[DEBUG] tfe_token: (empty)"
 fi
 
-# Org and workspace could still be possibly unset if they're malformed
-if [ -z "$tfe_org" ] || [ -z "$tfe_workspace" ]; then
-    echoerr 'Org and workspace required.'
-    echoerr 'Set with $TFE_ORG and $TFE_WORKSPACE or use -name'
-    exit 1
-fi
-
-if [ -z "$tfe_token" ]; then
-    echoerr 'Set the API token with $TFE_TOKEN, -token, or $ATLAS_TOKEN'
-    exit 1
-fi
-
-# This really shouldn't happen. Someone would have to explicitly pass in
-# an empty string to the command line argument.
-if [ -z "$tfe_address" ]; then
-    echoerr 'TFE address was not set'
-    exit 1
-fi
-
-# Dispatch the command with all of the following arguments to the appropriate,
-# sourced function
-. "$tfe_cmd_dir/$cmd"
-tfe_$cmd $subcmd_args
+# Run the subcommand
+execute_subcmd "$bin_name" "$tfe_cmd_dir" "$@"
 
 # Exit with the exit code returned by the command
 exit $?

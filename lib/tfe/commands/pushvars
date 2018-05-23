@@ -43,33 +43,33 @@ DESCRIPTION
 OPTIONS
 $(tfe_usage_args)
 
-  -dry-run <BOOLEAN>   Show what would be done without changing any variables
-                       in the workspace. Defaults to false.
+ -dry-run <BOOLEAN>   Show what would be done without changing any variables
+                      in the workspace. Defaults to false.
 
-  -var 'name=val'      Set a Terraform variable with a basic string value.
+ -var 'name=val'      Set a Terraform variable with a basic string value.
 
-  -svar 'name=val'     Set a sensitive Terraform variable with a basic string
-                       value.
+ -svar 'name=val'     Set a sensitive Terraform variable with a basic string
+                      value.
 
-  -hcl-var 'name=val'  Set a Terraform variable with an HCL value.
+ -hcl-var 'name=val'  Set a Terraform variable with an HCL value.
 
-  -shcl-var 'name=val' Set a sensitive Terraform variable with an HCL value.
+ -shcl-var 'name=val' Set a sensitive Terraform variable with an HCL value.
 
-  -env-var 'name=val'  Set an environment variable.
+ -env-var 'name=val'  Set an environment variable.
 
-  -senv-var 'name=val' Set a sensitive environment variable.
+ -senv-var 'name=val' Set a sensitive environment variable.
 
-  -var-file <FILE>     Load Terraform variables from a tfvars file. Files can
-                       only set non-sensitive variables.
+ -var-file <FILE>     Load Terraform variables from a tfvars file. Files can
+                      only set non-sensitive variables.
 
-  -overwrite <NAME>    Overwrite an existing value if the <NAME> variable is
-                       already set in Terraform Enterprise. You must enable this
-                       for every variable you want to overwrite. Can be
-                       set multiple times.
+ -overwrite <NAME>    Overwrite an existing value if the <NAME> variable is
+                      already set in Terraform Enterprise. You must enable this
+                      for every variable you want to overwrite. Can be
+                      set multiple times.
 
  -hide-sensitive <BOOLEAN>
-                       Whether to hide sensitive values in output. Defaults to
-                       true.
+                      Whether to hide sensitive values in output. Defaults to
+                      true.
 NOTES
  All -var style args (except -var-file) can be set multiple times to operate
  on multiple variables with one command.
@@ -197,15 +197,12 @@ process_vars () {
                     continue
                 fi
 
-                var_create_resp="$(tfe_api_call -d @"$payload" "$url")"
-                if [ 0 -ne $? ]; then
+                echodebug "[DEBUG] API request for variable create:"
+                if ! var_create_resp="$(tfe_api_call -d @"$payload" "$url")"; then
                     echoerr "Error creating variable $v"
                 fi
 
                 cleanup "$payload"
-
-                echodebug "[DEBUG] Variable create response:"
-                echodebug "$var_create_resp"
             fi
         else
             # This existing variable should only be overwritten if it was
@@ -228,15 +225,12 @@ process_vars () {
                         continue
                     fi
 
-                    var_update_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"
-                    if [ 0 -ne $? ]; then
+                    echodebug "[DEBUG] API request for variable update:"
+                    if ! var_update_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"; then
                         echoerr "Error updating variable $v"
                     fi
 
                     cleanup "$payload"
-
-                    echodebug "[DEBUG] Variable update response:"
-                    echodebug "$var_update_resp"
                 fi
             fi
         fi
@@ -270,13 +264,23 @@ tfe_pushvars () (
     defaulthclvars=
     defaulthclvars_values=
 
+    # Check for required standard options
+    if ! check_required; then
+        return 1
+    fi
+
     # Parse options
 
     while [ -n "$1" ]; do
+        # If this is a common option it has already been parsed. Skip it and
+        # its value.
+        if is_common_opt "$1"; then
+            shift
+            shift
+            continue
+        fi
+
         case "$1" in
-            help|-h|-help|--help)
-                usage
-                ;;
             -dry-run)
                 case "$2" in
                     true)
@@ -382,14 +386,11 @@ tfe_pushvars () (
     echodebug "[DEBUG] API list variables URL:"
     echodebug "$url"
 
-    var_get_resp="$(tfe_api_call $url)"
-    if [ 0 -ne $? ]; then
+    echodebug "[DEBUG] API request for variable list:"
+    if ! var_get_resp="$(tfe_api_call $url)"; then
         echoerr "Error listing variables"
         return 1
     fi
-
-    echodebug "[DEBUG] Variable list response:"
-    echodebug "$var_get_resp"
 
     # If a config directory was given, then variables with defaults in
     # the configuration need to be discovered.
@@ -664,6 +665,12 @@ tfe_pushvars () (
                     in_value = 0
                 }
             }' "$(basename "$var_file")")"
+
+            echodebug "[DEBUG] Temporary directory contents:"
+            echodebug "$(ls)"
+
+            echodebug "[DEBUG] Temporary file contents:"
+            echodebug "$(cat *)"
     fi
 
     echodebug "[DEBUG] All variables:"
@@ -677,13 +684,15 @@ tfe_pushvars () (
     if [ -n "$all_vars" ]; then
         for var in $all_vars; do
             if [ -z "$var_file_arg" ]; then
-                val_lines="$(echo "var.$var" | terraform console 2>/dev/null)"
+                val_lines="$(echo "var.$var" | terraform console 2>&3)"
             else
-                val_lines="$(echo "var.$var" | terraform console $var_file_arg 2>/dev/null)"
+                val_lines="$(echo "var.$var" | terraform sconsole "$var_file_arg" 2>&3)"
             fi
 
             if [ 0 -ne $? ]; then
                 echodebug "Unable to retrieve value for potential variable $var"
+                echodebug "Stdout of terraform console was:"
+                echodebug "$val_lines"
                 continue
             fi
             val="$(escape_value "$val_lines")"
@@ -704,13 +713,16 @@ tfe_pushvars () (
     # Send each list of the different types of variables through to be created
     # or updated, along with the properties that that list should abide by.
 
-    #            variable list,    value list,              type,     hcl,  sensitive
-    process_vars "$defaultvars"    "$defaultvars_values"    terraform false false
-    process_vars "$defaulthclvars" "$defaulthclvars_values" terraform true  false
-    process_vars "$vars"           "$vars_values"           terraform false false
-    process_vars "$hclvars"        "$hclvars_values"        terraform true  false
-    process_vars "$svars"          "$svars_values"          terraform false true
-    process_vars "$shclvars"       "$shclvars_values"       terraform true  true
-    process_vars "$envvars"        "$envvars_values"        env       false false
-    process_vars "$senvvars"       "$senvvars_values"       env       false true
+    # Note that the lists are sent with the end-of-list marker removed, which
+    # was added by the append function.
+
+    #            variable list,        value list,                  type,     hcl,  sensitive
+    process_vars "${defaultvars%.}"    "${defaultvars_values%.}"    terraform false false
+    process_vars "${defaulthclvars%.}" "${defaulthclvars_values%.}" terraform true  false
+    process_vars "${vars%.}"           "${vars_values%.}"           terraform false false
+    process_vars "${hclvars%.}"        "${hclvars_values%.}"        terraform true  false
+    process_vars "${svars%.}"          "${svars_values%.}"          terraform false true
+    process_vars "${shclvars%.}"       "${shclvars_values%.}"       terraform true  true
+    process_vars "${envvars%.}"        "${envvars_values%.}"        env       false false
+    process_vars "${senvvars%.}"       "${senvvars_values%.}"       env       false true
 )

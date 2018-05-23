@@ -1,0 +1,267 @@
+#!/bin/sh
+
+## -------------------------------------------------------------------
+##
+## Copyright (c) 2018 HashiCorp. All Rights Reserved.
+##
+## This file is provided to you under the Mozilla Public License
+## Version 2.0 (the "License"); you may not use this file
+## except in compliance with the License.  You may obtain
+## a copy of the License at
+##
+##   https://www.mozilla.org/en-US/MPL/2.0/
+##
+## Unless required by applicable law or agreed to in writing,
+## software distributed under the License is distributed on an
+## "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+## KIND, either express or implied.  See the License for the
+## specific language governing permissions and limitations
+## under the License.
+##
+## -------------------------------------------------------------------
+
+tfe_new_description () (
+    echo "Create a new Terraform Enterprise workspace"
+)
+
+tfe_new_help () (
+# Be sure to include the common options with tfe_usage_args
+cat << EOF
+SYNOPSIS
+ tfe workspace new -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
+
+DESCRIPTION
+ Create a new Terraform Enterprise workspace.
+
+OPTIONS
+$(tfe_usage_args)
+
+ -auto-apply <BOOLEAN>
+                      Specifies if, upon a successful plan, the workspace
+                      should automatically run an apply. Defaults to false.
+
+ -terraform-version <X.Y.Z>
+                      The version of Terraform that the workspace should
+                      use to perform runs. Defaults to the latest Terraform
+                      release at the time of workspace creation.
+
+ -working-dir <DIRECTORY>
+                      The directory relative to the root of the VCS
+                      repository where the 'terraform' command should
+                      be run. Defaults to the root of the VCS repository.
+
+ -vcs-id <ID>         The name of the VCS repository ID. Typically in a
+                      format similar to "<VCS_ORG_NAME>/<VCS_REPO>".
+
+ -vcs-branch <BRANCH> The name of the VCS branch to use. Defaults to
+                      being unspecified so that defalt branch is used.
+
+ -vcs-submodules <BOOLEAN>
+                      If true, when the configuration is ingressed from the
+                      VCS service VCS submodules will be retrieved as well.
+                      Defaults to false.
+
+ -oauth-id <ID>       The OAuth ID, obtained from the Terraform Enterprise
+                      API, which corresponds to the VCS ID provided. Defaults
+                      to the OAuth ID of the configured client if there is
+                      only one.
+
+NOTES
+ The curl and jq commands are required.
+
+ If more than one OAuth client is configured use the OAuth Tokens API
+ to list the clients and their IDs. Provide the appropriate ID from the
+ list to the -oauth-id option.
+
+ https://www.terraform.io/docs/enterprise/api/oauth-tokens.html
+
+EOF
+)
+
+##
+## Helper functions
+##
+
+make_new_workspace_payload () {
+
+# $1 new workspace name
+# $2 auto-apply
+# $3 TF version
+# $4 working dir
+# $5 oauth token ID
+# $6 VCS branch
+# $7 vcs submodules
+# $8 VCS repo ID (e.g. "github_org/github_repo")
+
+if [ -n "$6" ]; then
+    default_branch=false
+else
+    default_branch=true
+fi
+
+cat > "$payload" <<EOF
+{
+  "data": {
+    "type": "workspaces",
+    "attributes": {
+EOF
+
+if [ -n "$5" ] && [ -n "$8" ]; then
+cat >> "$payload" <<EOF
+      "vcs-repo": {
+        "identifier": "$8",
+        "oauth-token-id": "$5",
+        "ingress-submodules": $7,
+        "branch": "$6",
+        "default-branch": $default_branch
+      },
+EOF
+fi
+
+if [ -n "$3" ]; then
+cat >> "$payload" <<EOF
+      "terraform-version": "$3",
+EOF
+fi
+
+cat >> "$payload" <<EOF
+      "working-directory": "$4",
+      "auto-apply": $2,
+      "name": "$1"
+    }
+  }
+}
+EOF
+
+echodebug "[DEBUG] Payload contents:"
+cat $payload 1>&3
+
+}
+
+tfe_new () (
+    payload="$TMPDIR/tfe-migrate-payload-$(date +%s)"
+    auto_apply=false
+    tf_version=
+    working_dir=
+    vcs_id=
+    vcs_branch=
+    vcs_submodules=false
+    oauth_id=
+
+    # Ensure all of tfe_org, etc, are set
+    if ! check_required all; then
+        return 1
+    fi
+
+    # Parse options
+
+    while [ -n "$1" ]; do
+        # If this is a common option it has already been parsed. Skip it and
+        # its value.
+        if is_common_opt "$1"; then
+            shift
+            shift
+            continue
+        fi
+
+        case "$1" in
+            -auto-apply)
+                case "$2" in
+                    true)
+                        auto_apply=true
+                        ;;
+                    false)
+                        auto_apply=false
+                        ;;
+                    *)
+                        echoerr "-auto-apply should be true or false"
+                        return 1
+                        ;;
+                esac
+                ;;
+            -terraform-version)
+                tf_version=$(assign_arg "$1" "$2")
+                ;;
+            -working-dir)
+                working_dir=$(assign_arg "$1" "$2")
+                ;;
+            -vcs-id)
+                vcs_id=$(assign_arg "$1" "$2")
+                ;;
+            -vcs-branch)
+                vcs_branch=$(assign_arg "$1" "$2")
+                ;;
+            -vcs-submodules)
+                vcs_submodules=$(assign_arg "$1" "$2")
+                ;;
+            -oauth-id)
+                oauth_id=$(assign_arg "$1" "$2")
+                ;;
+            *)
+                echoerr "Unknown option: $1"
+                return 1
+                ;;
+        esac
+        [ -n "$1" ] && shift
+        [ -n "$1" ] && shift
+    done
+
+    # Need oauth if vcs was specified
+    if [ -n "$vcs_id" ]; then
+        # If no oauth id was given, then see if there is only one and use
+        # that one
+        if [ -z "$oauth_id" ]; then
+            oauth_id="$( (
+                set -e
+                echodebug "[DEBUG] API request for OAuth tokens for $tfe_org"
+
+                url="$tfe_address/api/v2/organizations/$tfe_org/oauth-tokens"
+                oauth_list_resp="$(tfe_api_call "$url")"
+
+                oauth_ids="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .id')"
+                echodebug "[DEBUG] OAuth IDs:"
+                echodebug "$oauth_ids"
+
+                test -n "$oauth_ids"
+                test 1 -eq "$(echo $oauth_ids | wc -l)"
+
+                echo "$oauth_ids"
+            ) 2>&3 )"
+
+            if [ 0 -ne $? ]; then
+                echoerr "Error obtaining a default OAuth ID"
+                return 1
+            fi
+        fi
+    fi
+
+    # $1 new workspace name
+    # $2 auto-apply
+    # $3 TF version
+    # $4 working dir
+    # $5 oauth token ID
+    # $6 VCS branch
+    # $7 vcs submodules
+    # $8 VCS repo ID (e.g. "github_org/github_repo")
+    make_new_workspace_payload "$tfe_workspace" "$auto_apply" "$tf_version" \
+                               "$working_dir" "$oauth_id" "$vcs_branch" \
+                               "$vcs_submodules" "$vcs_id"
+    if [ 0 -ne $? ]; then
+        echoerr "Error generating payload file for migration"
+        return 1
+    fi
+
+    echodebug "[DEBUG] Migration payload:"
+    echodebug "$(cat $payload)"
+
+    echodebug "[DEBUG] API request for new workspace:"
+    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces"
+    if ! new_resp="$(tfe_api_call -d @"$payload" "$url")"; then
+        echoerr "Error creating workspace $tfe_org/$tfe_workspace"
+        return 1
+    fi
+
+    cleanup "$payload"
+
+    echo "Created new workspace $tfe_org/$tfe_workspace"
+)
