@@ -686,7 +686,7 @@ tfe_pushvars () (
             if [ -z "$var_file_arg" ]; then
                 val_lines="$(echo "var.$var" | terraform console 2>&3)"
             else
-                val_lines="$(echo "var.$var" | terraform sconsole "$var_file_arg" 2>&3)"
+                val_lines="$(echo "var.$var" | terraform console "$var_file_arg" 2>&3)"
             fi
 
             if [ 0 -ne $? ]; then
