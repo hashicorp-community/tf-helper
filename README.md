@@ -27,16 +27,16 @@ following:
 - Add the `bin` directory to your `PATH` environment variable. For example:
 
   ```
-  git clone git@github.com:hashicorp/terraform-enterprise-push.git
-  cd terraform-enterprise-push/bin
+  git clone git@github.com:hashicorp/tfe-cli.git
+  cd tfe-cli/bin
   echo "export PATH=$PWD:\$PATH" >> ~/.bash_profile
   ```
 - Symlink the `bin/tfe` executable into a directory that's already included in
   your `PATH`. For example:
 
   ```
-  git clone git@github.com:hashicorp/terraform-enterprise-push.git
-  cd terraform-enterprise-push/bin
+  git clone git@github.com:hashicorp/tfe-cli.git
+  cd tfe-cli/bin
   ln -s $PWD/tfe /usr/local/bin/tfe
   ```
 - Run the `tfe` command with its full path. (For example:
