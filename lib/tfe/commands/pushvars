@@ -622,14 +622,18 @@ tfe_pushvars () (
                 # remove the potential variable name from $0 so a search
                 # for "=" can continue on this line as well as subsequent lines
                 sub(name, "")
+
+                # remove whitespace so that the next character either is or is
+                # not "="
+                sub(/^[ \t\r\n\v\f]+/, "")
             }
-            in_var == 1 && /^[ \t\r\n\v\f]+[^=]/ {
+            in_var == 1 && /^[^=]/ {
                 # have a potential variable name but the next thing seen
                 # is not "=", so this is not a variable name.
                 in_var = 0
                 next
             }
-            in_var == 1 && /^[ \t\r\n\v\f]*=/ {
+            in_var == 1 && /^=/ {
                 # have a variable name and the next thing seen is =
                 in_value = 1
             }
