@@ -46,7 +46,7 @@ We recommend keeping these scripts up to date by regularly running `git pull`.
 
 ## Actions
 
-This repository includes three subcommands:
+This repository includes the following subcommands:
 
 - `tfe pushconfig` — Upload a Terraform configuration to a workspace and begin
   a run.
@@ -54,6 +54,7 @@ This repository includes three subcommands:
 - `tfe pullvars` — Get variables from a Terraform Enterprise workspace and write
   them to stdout.
 - `tfe migrate` — Migrate a legacy TFE environment to a new TFE workspace
+- `tfe workspace` — Create, show, and delete workspaces
 
 There's also a `tfe help` subcommand to list syntax and options for each
 subcommand.
