@@ -67,6 +67,13 @@ $(tfe_usage_args)
                       for every variable you want to overwrite. Can be
                       set multiple times.
 
+  -overwrite-all <BOOLEAN>
+                      Overwrite the existing value of every variable being
+                      operated on if that variable is already set in Terraform
+                      Enterprise. Defaults to false. Use with extreme caution.
+                      To perform the overwrites, -dry-run must be explicitly
+                      set to false, otherwise a dry run will be performed.
+
  -hide-sensitive <BOOLEAN>
                       Whether to hide sensitive values in output. Defaults to
                       true.
@@ -83,11 +90,6 @@ NOTES
  Terraform configuration.
 
 EOF
-
-# TODO options
-#  -overwrite-all false Overwrite all variables with the variable values found
-#                       in the configuration. Defaults to false. Use with
-#                       extreme caution when operating with a config directory.
 )
 
 ##
@@ -206,8 +208,8 @@ process_vars () {
             fi
         else
             # This existing variable should only be overwritten if it was
-            # specified with -overwrite NAME
-            if echo "$overwrites" | grep -E "^$v$" >/dev/null 2>&1; then
+            # specified with -overwrite NAME or if -overwrite-all is true.
+            if [ "$overwrite_all" = true ] || echo "$overwrites" | grep -E "^$v$" >/dev/null 2>&1; then
                 if [ "$hide_sensitive" = true ] && [ "$5" = true ]; then
                     output_val=REDACTED
                 else
@@ -240,11 +242,12 @@ process_vars () {
 
 tfe_pushvars () (
     payload="$TMPDIR/tfe-push-vars-payload-$(date +%s)"
-    dry_run=false
+    dry_run=0 # this helps to determine if the value was explicitly given
     config_dir=
     var_file=
     var_file_arg=
     overwrites=
+    overwrite_all=false
     hide_sensitive=true
 
     vars=
@@ -299,8 +302,20 @@ tfe_pushvars () (
                 new_overwrite="$(assign_arg "$1" "$2")"
                 overwrites="$(append "$overwrites" "$new_overwrite")"
                 ;;
-            #-overwrite-all)
-            #    ;;
+            -overwrite-all)
+                case "$2" in
+                    true)
+                        overwrite_all=need_dry_run_false
+                        ;;
+                    false)
+                        overwrite_all=false
+                        ;;
+                    *)
+                        echoerr "-overwrite-all should be true or false"
+                        return 1
+                        ;;
+                esac
+                ;;
             -var)
                 new_var_arg="$(assign_arg "$1" "$2")"
                 new_var_name=${new_var_arg%%=*}
@@ -375,6 +390,20 @@ tfe_pushvars () (
         [ -n "$1" ] && shift
         [ -n "$1" ] && shift
     done
+
+    if [ "$overwrite_all" = "need_dry_run_false" ]; then
+        if [ "$dry_run" = false ]; then
+            overwrite_all=true
+        else
+            # If -dry-run was explicitly set to true don't complain
+            if [ "$dry_run" != true ]; then
+              echoerr "Option -overwrite-all requires -dry-run to be explicitly"
+              echoerr "specified as false. Running with -dry-run true to preview operations."
+            fi
+            overwrite_all=true
+            dry_run=true
+        fi
+    fi
 
     if [ -n "$config_dir" ] || [ -n "$var_file" ]; then
         tf_version_required 0 11 6
