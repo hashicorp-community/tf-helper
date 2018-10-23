@@ -99,9 +99,10 @@ EOF
 # Replace quotes and newlines with escape characters to prepare the
 # value for insertion into JSON.
 escape_value () {
-    echo "$1" | awk '
+    printf '%s' "$1" | awk '
     {
         gsub(/"/,"\\\"")
+        gsub(/\\n/,"\\\\n")
     }
     NR == 1 {
         value_line = $0
