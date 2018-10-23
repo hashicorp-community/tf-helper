@@ -332,14 +332,14 @@ tfe_pushvars () (
             -env-var)
                 new_var_arg="$(assign_arg "$1" "$2")"
                 new_var_name=${new_var_arg%%=*}
-                new_var_value=${new_var_arg#*=}
+                new_var_value="$(escape_value "${new_var_arg#*=}")"
                 envvars="$(append "$envvars" "$new_var_name")"
                 envvars_values="$(append "$envvars_values" "$new_var_value")"
                 ;;
             -senv-var)
                 new_var_arg="$(assign_arg "$1" "$2")"
                 new_var_name=${new_var_arg%%=*}
-                new_var_value=${new_var_arg#*=}
+                new_var_value="$(escape_value "${new_var_arg#*=}")"
                 senvvars="$(append "$senvvars" "$new_var_name")"
                 senvvars_values="$(append "$senvvars_values" "$new_var_value")"
                 ;;
