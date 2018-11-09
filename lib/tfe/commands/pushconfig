@@ -29,7 +29,7 @@ list_files () {
 }
 
 list_modules () {
-    find -L .terraform/modules -type f |  grep -E -v '^\.$|\.git'
+    find -L .terraform/modules -type f >/dev/null 2>&1 |  grep -E -v '^\.$|\.git'
 }
 
 list_hardlinked () {
@@ -41,11 +41,11 @@ list_not_hardlinked () {
 }
 
 list_hardlinked_modules () {
-    find -L .terraform/modules -type f -links +1 |  grep -E -v '^\.$|\.git'
+    find -L .terraform/modules -type f -links +1 >/dev/null 2>&1 |  grep -E -v '^\.$|\.git'
 }
 
 list_not_hardlinked_modules () {
-    find -L .terraform/modules -type f -links 1 |  grep -E -v '^\.$|\.git'
+    find -L .terraform/modules -type f -links 1 >/dev/null |  grep -E -v '^\.$|\.git'
 }
 
 # Use GNU tar to archive the current directory
@@ -136,6 +136,34 @@ bsdtar () {
     fi
 }
 
+make_run_payload () {
+cat > "$run_payload" <<EOF
+{
+  "data": {
+    "attributes": {
+      "is-destroy":false,
+      "message": "$1"
+    },
+    "type":"runs",
+    "relationships": {
+      "workspace": {
+        "data": {
+          "type": "workspaces",
+          "id": "$2"
+        }
+      },
+      "configuration-version": {
+        "data": {
+          "type": "configuration-versions",
+          "id": "$3"
+        }
+      }
+    }
+  }
+}
+EOF
+}
+
 tfe_pushconfig_description () (
     echo "Upload a Terraform config to a TFE workspace and begin a run"
 )
@@ -165,6 +193,9 @@ $(tfe_usage_args)
                       committed to your VCS, if detected. Currently supports
                       git repositories.
 
+ -message <MESSAGE>   An optional message to associate with the run. Defaults
+                      to "Queued via tfe-cli".
+
  -poll <SECONDS>      Number of seconds to wait between polling the submitted
                       run for a non-active status. Defaults to 0 (no polling).
 
@@ -177,6 +208,7 @@ EOF
 tfe_pushconfig () (
     upload_modules=true
     vcs=true
+    message="Queued via tfe-cli"
     config_dir=.
     poll_run=0
 
@@ -247,6 +279,9 @@ tfe_pushconfig () (
                         ;;
                 esac
                 ;;
+            -message)
+                message="$(assign_arg "$1" "$2")"
+                ;;
             -poll)
                 if [ "$2" -eq "$2" ] >/dev/null 2>&1; then
                     poll_run=$(assign_arg "$1" "$2")
@@ -301,35 +336,36 @@ tfe_pushconfig () (
     # Creates a tar.gz of the VCS or directory with the configuration
 
     echodebug "[DEBUG] Creating file for upload"
+    run_payload="$TMPDIR/run-$(date +%s).json"
     config_payload="$TMPDIR/content-$(date +%s).tar.gz"
     tarlist="$TMPDIR/tarlist-$(date +%s)"
 
-    if ! (
-        set -e
+    echodebug "[DEBUG] Entering dir $config_dir"
+    if ! cd "$config_dir"; then
+        echoerr "Unable to change to configuration directory $config_dir"
+        return 1
+    fi
 
-        echodebug "[DEBUG] Entering dir $config_dir"
-        cd "$config_dir"
-
-        if [ "$vcs" = true ]; then
-            # VCS detection was requested so it must actually be present
-            if ! git status 2>&1 >/dev/null; then
-                echoerr "VCS not present in $config_dir"
-                echoerr "Disable VCS detection with -vcs false"
-                return 1
-            fi
-            echodebug "[DEBUG] tar: Uploading vcs tracked files"
-            echodebug "[DEBUG] excluding any plugins"
-        else
-            echodebug "[DEBUG] tar: Uploading all of $PWD"
-            echodebug "[DEBUG] excluding VCS files and any plugins"
+    if [ "$vcs" = true ]; then
+        # VCS detection was requested so it must actually be present
+        if ! git status >/dev/null 2>&1; then
+            echoerr "VCS not present in $config_dir"
+            echoerr "Disable VCS detection with -vcs false"
+            return 1
         fi
+        echodebug "[DEBUG] tar: Uploading vcs tracked files"
+        echodebug "[DEBUG] excluding any plugins"
+    else
+        echodebug "[DEBUG] tar: Uploading all of $PWD"
+        echodebug "[DEBUG] excluding VCS files and any plugins"
+    fi
 
-        # If there are modules we might want to upload them.
-        has_modules="$([ -d .terraform/modules ] && echo true || echo false)"
-        echodebug "[DEBUG] Has .terraform/modules: $has_modules"
+    # If there are modules we might want to upload them.
+    has_modules="$([ -d .terraform/modules ] && echo true || echo false)"
+    echodebug "[DEBUG] Has .terraform/modules: $has_modules"
 
-        $tarcmd "$config_payload" $vcs $upload_modules
-    ) 2>&3; then
+    $tarcmd "$config_payload" $vcs $upload_modules
+    if [ $? != 0 ]; then
         echoerr "Error creating config archive payload"
         return 1
     fi
@@ -339,7 +375,7 @@ tfe_pushconfig () (
     echodebug "[DEBUG] Creating a new config version for $tfe_workspace"
 
     # The JSON Payload used to create the new configuration version
-    config_ver_payload='{"data":{"type":"configuration-version"}}'
+    config_ver_payload='{"data":{"type":"configuration-versions","attributes":{"auto-queue-runs":false}}}'
 
     echodebug "[DEBUG] Creating config version in workspace $workspace_id"
 
@@ -380,28 +416,18 @@ tfe_pushconfig () (
         return 1
     fi
 
-    cleanup "$config_payload" "$tarlist"
+    make_run_payload "$message" "$workspace_id" "$config_id"
 
-    # Get the run ID using the config ID obtained earlier.
-    # Try to get it 10 times with a 1s sleep between tries.
-    try=0
-    while [ $try -lt 10 ] && [ -z "$run_id" ]; do
-        try=$(( try + 1 ))
+    url=$tfe_address/api/v2/runs
+    run_create_resp="$(tfe_api_call -d @"$run_payload" $url)"
+    echodebug "[DEBUG] Run create response:"
+    echodebug "$run_create_resp"
 
-        echodebug "[DEBUG] Polling for run ID. Attempt $try"
+    run_id="$(printf "%s" "$run_create_resp" | jq -r '.data.id')"
 
-        echodebug "[DEBUG] API request to check run:"
-        url=$tfe_address/api/v2/workspaces/$workspace_id/runs
-        run_check_resp="$(tfe_api_call $url)"
+    cleanup "$config_payload" "$tarlist" "$run_payload"
 
-        run_id="$(printf "%s" "$run_check_resp" | jq -r '.data[] | select(.relationships."configuration-version".data.id == "'$config_id'") | .id')"
-
-        echodebug "[DEBUG] Run ID: $run_id"
-
-        if [ -z "$run_id" ]; then
-            sleep 1
-        fi
-    done
+    echodebug "[DEBUG] Run ID: $run_id"
 
     if [ -z "$run_id" ]; then
         echoerr "Error obtaining run ID"
