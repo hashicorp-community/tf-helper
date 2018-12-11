@@ -141,21 +141,29 @@ cat > "$run_payload" <<EOF
 {
   "data": {
     "attributes": {
-      "is-destroy":false,
-      "message": "$1"
+      "is-destroy":$1,
+      "message": "$2"
     },
     "type":"runs",
     "relationships": {
-      "workspace": {
-        "data": {
-          "type": "workspaces",
-          "id": "$2"
-        }
-      },
+EOF
+
+if [ "$1" = false ]; then
+cat >> "$run_payload" <<EOF
       "configuration-version": {
         "data": {
           "type": "configuration-versions",
           "id": "$3"
+        }
+      },
+EOF
+fi
+
+cat >> "$run_payload" <<EOF
+      "workspace": {
+        "data": {
+          "type": "workspaces",
+          "id": "$4"
         }
       }
     }
@@ -196,6 +204,8 @@ $(tfe_usage_args)
  -message <MESSAGE>   An optional message to associate with the run. Defaults
                       to "Queued via tfe-cli".
 
+ -destroy <BOOLEAN>   Queue a destroy plan. Defaults to false.
+
  -poll <SECONDS>      Number of seconds to wait between polling the submitted
                       run for a non-active status. Defaults to 0 (no polling).
 
@@ -210,7 +220,12 @@ tfe_pushconfig () (
     vcs=true
     message="Queued via tfe-cli"
     config_dir=.
+    config_id=
     poll_run=0
+    destroy=false
+    run_payload="$TMPDIR/run-$(date +%s).json"
+    config_payload="$TMPDIR/content-$(date +%s).tar.gz"
+    tarlist="$TMPDIR/tarlist-$(date +%s)"
 
     # Check for additional required commands.
     if [ -z "$(command -v tar)" ]; then
@@ -282,6 +297,20 @@ tfe_pushconfig () (
             -message)
                 message="$(assign_arg "$1" "$2")"
                 ;;
+            -destroy)
+                case "$2" in
+                    true)
+                        destroy=true
+                        ;;
+                    false)
+                        destroy=false
+                        ;;
+                    *)
+                        echoerr "-destroy should be true or false"
+                        return 1
+                        ;;
+                esac
+                ;;
             -poll)
                 if [ "$2" -eq "$2" ] >/dev/null 2>&1; then
                     poll_run=$(assign_arg "$1" "$2")
@@ -305,12 +334,6 @@ tfe_pushconfig () (
         [ -n "$1" ] && shift
     done
 
-    # Check for additional required commands.
-    if [ "$vcs" = true ] && [ -z "$(command -v git)" ]; then
-        echoerr "The git command is required for VCS detection"
-        return 1
-    fi
-
     # Gets the workspace ID given the organization name and workspace name
     workspace_id="$( (
         set -e
@@ -333,99 +356,112 @@ tfe_pushconfig () (
         return 1
     fi
 
-    # Creates a tar.gz of the VCS or directory with the configuration
-
-    echodebug "[DEBUG] Creating file for upload"
-    run_payload="$TMPDIR/run-$(date +%s).json"
-    config_payload="$TMPDIR/content-$(date +%s).tar.gz"
-    tarlist="$TMPDIR/tarlist-$(date +%s)"
-
-    echodebug "[DEBUG] Entering dir $config_dir"
-    if ! cd "$config_dir"; then
-        echoerr "Unable to change to configuration directory $config_dir"
-        return 1
-    fi
-
-    if [ "$vcs" = true ]; then
-        # VCS detection was requested so it must actually be present
-        if ! git status >/dev/null 2>&1; then
-            echoerr "VCS not present in $config_dir"
-            echoerr "Disable VCS detection with -vcs false"
+    if [ "$destroy" = false ]; then
+        # Check for additional required commands.
+        if [ "$vcs" = true ] && [ -z "$(command -v git)" ]; then
+            echoerr "The git command is required for VCS detection"
             return 1
         fi
-        echodebug "[DEBUG] tar: Uploading vcs tracked files"
-        echodebug "[DEBUG] excluding any plugins"
-    else
-        echodebug "[DEBUG] tar: Uploading all of $PWD"
-        echodebug "[DEBUG] excluding VCS files and any plugins"
-    fi
 
-    # If there are modules we might want to upload them.
-    has_modules="$([ -d .terraform/modules ] && echo true || echo false)"
-    echodebug "[DEBUG] Has .terraform/modules: $has_modules"
+        # Creates a tar.gz of the VCS or directory with the configuration
 
-    $tarcmd "$config_payload" $vcs $upload_modules
-    if [ $? != 0 ]; then
-        echoerr "Error creating config archive payload"
-        return 1
-    fi
+        echodebug "[DEBUG] Creating file for upload"
 
-    echo "Uploading Terraform config..."
+        echodebug "[DEBUG] Entering dir $config_dir"
+        if ! cd "$config_dir"; then
+            echoerr "Unable to change to configuration directory $config_dir"
+            return 1
+        fi
 
-    echodebug "[DEBUG] Creating a new config version for $tfe_workspace"
+        if [ "$vcs" = true ]; then
+            # VCS detection was requested so it must actually be present
+            if ! git status >/dev/null 2>&1; then
+                echoerr "VCS not present in $config_dir"
+                echoerr "Disable VCS detection with -vcs false"
+                return 1
+            fi
+            echodebug "[DEBUG] tar: Uploading vcs tracked files"
+            echodebug "[DEBUG] excluding any plugins"
+        else
+            echodebug "[DEBUG] tar: Uploading all of $PWD"
+            echodebug "[DEBUG] excluding VCS files and any plugins"
+        fi
 
-    # The JSON Payload used to create the new configuration version
-    config_ver_payload='{"data":{"type":"configuration-versions","attributes":{"auto-queue-runs":false}}}'
+        # If there are modules we might want to upload them.
+        has_modules="$([ -d .terraform/modules ] && echo true || echo false)"
+        echodebug "[DEBUG] Has .terraform/modules: $has_modules"
 
-    echodebug "[DEBUG] Creating config version in workspace $workspace_id"
+        $tarcmd "$config_payload" $vcs $upload_modules
+        if [ $? != 0 ]; then
+            echoerr "Error creating config archive payload"
+            return 1
+        fi
 
-    # Creates the configuration version and extractes the upload-url
-    url=$tfe_address/api/v2/workspaces/$workspace_id/configuration-versions
+        echo "Uploading Terraform config..."
 
-    echodebug "[DEBUG] URL: $url"
+        echodebug "[DEBUG] Creating a new config version for $tfe_workspace"
 
-    echodebug "[DEBUG] API request for config upload:"
-    if ! upload_url_resp="$(tfe_api_call -d "$config_ver_payload" $url)"; then
-        echoerr "Error creating config version"
+        # The JSON Payload used to create the new configuration version
+        config_ver_payload='{"data":{"type":"configuration-versions","attributes":{"auto-queue-runs":false}}}'
+
+        echodebug "[DEBUG] Creating config version in workspace $workspace_id"
+
+        # Creates the configuration version and extractes the upload-url
+        url=$tfe_address/api/v2/workspaces/$workspace_id/configuration-versions
+
+        echodebug "[DEBUG] URL: $url"
+
+        echodebug "[DEBUG] API request for config upload:"
+        if ! upload_url_resp="$(tfe_api_call -d "$config_ver_payload" $url)"; then
+            echoerr "Error creating config version"
+            cleanup "$config_payload" "$tarlist"
+            return 1
+        fi
+
+        config_id="$(printf "%s" "$upload_url_resp" | jq -r '.data.id')"
+        if [ 0 -ne $? ]; then
+            echoerr "Error parsing API response for config ID"
+            cleanup "$config_payload" "$tarlist"
+            return 1
+        fi
+        echodebug "[DEBUG] Config ID: $config_id"
+
+        # Perform the upload of the config archive to the upload URL
+        if ! (
+            set -e
+            url="$(printf "%s" "$upload_url_resp" | jq -r '.data.attributes."upload-url"')"
+            echodebug "[DEBUG] Upload URL: $url"
+            echodebug "[DEBUG] Uploading content to upload URL"
+
+            upload_config_resp="$(curl -f $tfe_curl_silent -X PUT --data-binary "@$config_payload" ${url})"
+
+            echodebug "[DEBUG] Upload config response:"
+            echodebug "$upload_config_resp"
+        ) 2>&3; then
+            echoerr "Error uploading config archive"
+            cleanup "$config_payload" "$tarlist"
+            return 1
+        fi
         cleanup "$config_payload" "$tarlist"
-        return 1
     fi
 
-    config_id="$(printf "%s" "$upload_url_resp" | jq -r '.data.id')"
-    if [ 0 -ne $? ]; then
-        echoerr "Error parsing API response for config ID"
-        cleanup "$config_payload" "$tarlist"
-        return 1
-    fi
-    echodebug "[DEBUG] Config ID: $config_id"
-
-    # Perform the upload of the config archive to the upload URL
-    if ! (
-        set -e
-        url="$(printf "%s" "$upload_url_resp" | jq -r '.data.attributes."upload-url"')"
-        echodebug "[DEBUG] Upload URL: $url"
-        echodebug "[DEBUG] Uploading content to upload URL"
-
-        upload_config_resp="$(curl -f $tfe_curl_silent -X PUT --data-binary "@$config_payload" ${url})"
-
-        echodebug "[DEBUG] Upload config response:"
-        echodebug "$upload_config_resp"
-    ) 2>&3; then
-        echoerr "Error uploading config archive"
-        cleanup "$config_payload" "$tarlist"
-        return 1
-    fi
-
-    make_run_payload "$message" "$workspace_id" "$config_id"
+    make_run_payload "$destroy" "$message" "$config_id" "$workspace_id"
 
     url=$tfe_address/api/v2/runs
-    run_create_resp="$(tfe_api_call -d @"$run_payload" $url)"
+    if ! run_create_resp="$(tfe_api_call -d @"$run_payload" $url)"; then
+        echoerr "Error creating run"
+        if [ "$destroy" = true ]; then
+            echoerr "Note: -destroy requires CONFIRM_DESTROY=1 in the workspace"
+        fi
+        cleanup "$run_payload"
+        return 1
+    fi
     echodebug "[DEBUG] Run create response:"
     echodebug "$run_create_resp"
 
     run_id="$(printf "%s" "$run_create_resp" | jq -r '.data.id')"
 
-    cleanup "$config_payload" "$tarlist" "$run_payload"
+    cleanup "$run_payload"
 
     echodebug "[DEBUG] Run ID: $run_id"
 
