@@ -148,7 +148,7 @@ cat > "$run_payload" <<EOF
     "relationships": {
 EOF
 
-if [ "$1" = false ]; then
+if [ "$1" = false ] && [ -n "$3" ]; then
 cat >> "$run_payload" <<EOF
       "configuration-version": {
         "data": {
@@ -206,6 +206,10 @@ $(tfe_usage_args)
 
  -destroy <BOOLEAN>   Queue a destroy plan. Defaults to false.
 
+ -current-config <BOOLEAN>
+                      Do not push a local configuration. Instead, queue a
+                      plan with the latest configuration supplied.
+
  -poll <SECONDS>      Number of seconds to wait between polling the submitted
                       run for a non-active status. Defaults to 0 (no polling).
 
@@ -223,6 +227,7 @@ tfe_pushconfig () (
     config_id=
     poll_run=0
     destroy=false
+    current_config=false
     run_payload="$TMPDIR/run-$(date +%s).json"
     config_payload="$TMPDIR/content-$(date +%s).tar.gz"
     tarlist="$TMPDIR/tarlist-$(date +%s)"
@@ -311,6 +316,20 @@ tfe_pushconfig () (
                         ;;
                 esac
                 ;;
+            -current-config)
+                case "$2" in
+                    true)
+                        current_config=true
+                        ;;
+                    false)
+                        current_config=false
+                        ;;
+                    *)
+                        echoerr "-destroy should be true or false"
+                        return 1
+                        ;;
+                esac
+                ;;
             -poll)
                 if [ "$2" -eq "$2" ] >/dev/null 2>&1; then
                     poll_run=$(assign_arg "$1" "$2")
@@ -334,6 +353,11 @@ tfe_pushconfig () (
         [ -n "$1" ] && shift
     done
 
+    if [ "$destroy" = true ] && [ "$current_config" = true ]; then
+        echoerr "Options -destroy and -current-config conflict"
+        return 1
+    fi
+
     # Gets the workspace ID given the organization name and workspace name
     workspace_id="$( (
         set -e
@@ -356,7 +380,7 @@ tfe_pushconfig () (
         return 1
     fi
 
-    if [ "$destroy" = false ]; then
+    if [ "$destroy" = false ] && [ "$current_config" = false ]; then
         # Check for additional required commands.
         if [ "$vcs" = true ] && [ -z "$(command -v git)" ]; then
             echoerr "The git command is required for VCS detection"
