@@ -4,6 +4,24 @@
 # required before using execute_subcmd. Ready made versions of echoerr and
 # echodebug are available in echofuncs.
 
+check_cmd () {
+    # Ensure the command exists
+    if [ -f "$cmd_dir/$1" ]; then
+        return 0
+    fi
+
+    # Check for aliases
+    if [ -f "$cmd_dir/.aliases" ]; then
+        _cmd="$(awk -v c="$1" '$1 == c {print $2}' "$cmd_dir/.aliases")"
+        if [ -f "$cmd_dir/$_cmd" ]; then
+            cmd="$_cmd"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
 execute_subcmd () {
     # Get the function prefix
     cmd_prefix="$1"
@@ -36,6 +54,9 @@ execute_subcmd () {
     case "$cmd" in
         help|-h|-help|--help)
             if [ -n "$1"  ] && [ '-' != "$(echo x"$1" | cut -c 2)"  ]; then
+                cmd="$1"
+                [ -n "$1" ] && shift
+
                 # If the command is help and there is another subcommand following
                 # that, then try to give help about that following subcommand.
                 # e.g. cmd help subcmd -> cmd_subcmd_help
@@ -44,23 +65,24 @@ execute_subcmd () {
                 # Note the x"$1" cludge is necessary to keep from passing a
                 # potential argument to echo, like echo -n.
 
-                if [ -f "$cmd_dir/$1" ]; then
-                    echodebug "[DEBUG] Loading command from $cmd_dir/$1 for help"
-                    . "$cmd_dir/$1"
-
-                    ${cmd_prefix}_${1}_help
-                else
-                    echoerr "Unable to provide help for command $1"
+                if ! check_cmd "$cmd"; then
+                    echoerr "Unable to provide help for command $arg1"
                     echoerr
                     ${cmd_prefix}_help
+                    return 1
                 fi
+
+                echodebug "[DEBUG] Loading command from $cmd_dir/$cmd for help"
+                . "$cmd_dir/$cmd"
+
+                ${cmd_prefix}_${cmd}_help
 
                 return 0
             else
                 # If the command is help and it is the last argument, give help
                 # on the current subcommand.
                 # e.g. cmd subcmd help
-                if [ -f "$cmd_dir/$cmd" ]; then
+                if check_cmd "$cmd"; then
                     echodebug "[DEBUG] Loading command from $cmd_dir/$cmd for help"
                     . "$cmd_dir/$cmd"
 
@@ -80,8 +102,7 @@ execute_subcmd () {
         return 1
     fi
 
-    # Ensure the command exists
-    if [ ! -f "$cmd_dir/$cmd" ]; then
+    if ! check_cmd "$cmd"; then
         echoerr "Command '$cmd' not found. See 'tfe help' for usage."
         return 1
     fi
