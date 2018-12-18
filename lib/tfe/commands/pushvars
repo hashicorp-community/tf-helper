@@ -358,18 +358,7 @@ tfe_pushvars () (
 
         case "$1" in
             -dry-run)
-                case "$2" in
-                    true)
-                        dry_run=true
-                        ;;
-                    false)
-                        dry_run=false
-                        ;;
-                    *)
-                        echoerr "-dry-run should be true or false"
-                        return 1
-                        ;;
-                esac
+                dry_run="$(assign_bool "$1" "$2")"
                 ;;
             -delete)
                 new_delete="$(assign_arg "$1" "$2")"
@@ -388,18 +377,10 @@ tfe_pushvars () (
                 envvar_overwrites="$(append "$envvar_overwrites" "$new_overwrite")"
                 ;;
             -overwrite-all)
-                case "$2" in
-                    true)
-                        overwrite_all=need_dry_run_false
-                        ;;
-                    false)
-                        overwrite_all=false
-                        ;;
-                    *)
-                        echoerr "-overwrite-all should be true or false"
-                        return 1
-                        ;;
-                esac
+                overwrite_all="$(assign_bool "$1" "$2")"
+                if [ "$overwrite_all" = "true" ]; then
+                    overwrite_all=need_dry_run_false
+                fi
                 ;;
             -var)
                 new_var_arg="$(assign_arg "$1" "$2")"
@@ -448,18 +429,7 @@ tfe_pushvars () (
                 var_file_arg="-var-file=$var_file"
                 ;;
             -hide-sensitive)
-                case "$2" in
-                    true)
-                        hide_sensitive=true
-                        ;;
-                    false)
-                        hide_sensitive=false
-                        ;;
-                    *)
-                        echoerr "-hide-sensitive should be true or false"
-                        return 1
-                        ;;
-                esac
+                hide_sensitive="$(assign_bool "$1" "$2")"
                 ;;
             *)
                 # Shouldn't get here until the last option, the optional

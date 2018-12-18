@@ -166,18 +166,7 @@ tfe_new () (
 
         case "$1" in
             -auto-apply)
-                case "$2" in
-                    true)
-                        auto_apply=true
-                        ;;
-                    false)
-                        auto_apply=false
-                        ;;
-                    *)
-                        echoerr "-auto-apply should be true or false"
-                        return 1
-                        ;;
-                esac
+                auto_apply="$(assign_bool "$1" "$2")"
                 ;;
             -terraform-version)
                 tf_version=$(assign_arg "$1" "$2")

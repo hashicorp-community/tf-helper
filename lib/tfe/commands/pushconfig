@@ -272,63 +272,19 @@ tfe_pushconfig () (
 
         case "$1" in
             -upload-modules)
-                case "$2" in
-                    true)
-                        upload_modules=true
-                        ;;
-                    false)
-                        upload_modules=false
-                        ;;
-                    *)
-                        echoerr "-upload-modules should be true or false"
-                        return 1
-                        ;;
-                esac
+                upload_modules="$(assign_bool "$1" "$2")"
                 ;;
             -vcs)
-                case "$2" in
-                    true)
-                        vcs=true
-                        ;;
-                    false)
-                        vcs=false
-                        ;;
-                    *)
-                        echoerr "-vcs should be true or false"
-                        return 1
-                        ;;
-                esac
+                vcs="$(assign_bool "$1" "$2")"
                 ;;
             -message)
                 message="$(assign_arg "$1" "$2")"
                 ;;
             -destroy)
-                case "$2" in
-                    true)
-                        destroy=true
-                        ;;
-                    false)
-                        destroy=false
-                        ;;
-                    *)
-                        echoerr "-destroy should be true or false"
-                        return 1
-                        ;;
-                esac
+                destroy="$(assign_bool "$1" "$2")"
                 ;;
             -current-config)
-                case "$2" in
-                    true)
-                        current_config=true
-                        ;;
-                    false)
-                        current_config=false
-                        ;;
-                    *)
-                        echoerr "-destroy should be true or false"
-                        return 1
-                        ;;
-                esac
+                current_config="$(assign_bool "$1" "$2")"
                 ;;
             -poll)
                 if [ "$2" -eq "$2" ] >/dev/null 2>&1; then

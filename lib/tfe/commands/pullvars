@@ -101,18 +101,7 @@ tfe_pullvars () (
                 env_vars="$(append "$env_vars" "$new_var")"
                 ;;
             -env)
-                case "$2" in
-                    true)
-                        env=true
-                        ;;
-                    false)
-                        env=false
-                        ;;
-                    *)
-                        echoerr "-env should be true or false"
-                        return 1
-                        ;;
-                esac
+                env="$(assign_bool "$1" "$2")"
                 ;;
             *)
                 echoerr "Unknown option $1"

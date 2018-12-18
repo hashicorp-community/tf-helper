@@ -118,6 +118,18 @@ assign_arg () {
     fi
 }
 
+assign_bool () {
+    case "$2" in
+        true|false)
+            echo $2
+            ;;
+        *)
+            echoerr "$1 should be true or false"
+            kill -PIPE $$
+            ;;
+    esac
+}
+
 # Common options to curl. Fail on HTTP error codes.
 tfe_api_call () {
     echodebug "[DEBUG] curl args: $@"
