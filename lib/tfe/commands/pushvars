@@ -62,10 +62,22 @@ $(tfe_usage_args)
  -var-file <FILE>     Load Terraform variables from a tfvars file. Files can
                       only set non-sensitive variables.
 
- -overwrite <NAME>    Overwrite an existing value if the <NAME> variable is
-                      already set in Terraform Enterprise. You must enable this
-                      for every variable you want to overwrite. Can be
-                      set multiple times.
+ -delete <NAME>       Delete an existing Terraform variable. Can be set
+                      multiple times.
+
+ -delete-env <NAME>   Delete an existing environment variable. Can be set
+                      multiple times.
+
+ -overwrite <NAME>    Overwrite an existing value if the <NAME> Terraform
+                      variable is already set in Terraform Enterprise. You
+                      must enable this for every variable you want to
+                      overwrite. Can be set multiple times.
+
+ -overwrite-env <NAME>
+                      Overwrite an existing value if the <NAME> environment
+                      variable is already set in Terraform Enterprise. You
+                      must enable this for every variable you want to
+                      overwrite. Can be set multiple times.
 
   -overwrite-all <BOOLEAN>
                       Overwrite the existing value of every variable being
@@ -163,8 +175,8 @@ EOF
 # $1 variables list
 # $2 corresponding variable values list
 # $3 variables type (terraform or env)
-# $4 if the variables are hcl (true) or not (false)
-# $5 if the variables are sensitive (true) or not (false)
+# $4 hcl true or false, or delete if processing a delete list
+# $5 sensitive true or false, or empty if processing a delete list
 process_vars () {
     # Bail out if the list is empty
     if [ -z "$1" ]; then
@@ -176,6 +188,23 @@ process_vars () {
     # updated.
     i=1
     for v in $1; do
+        echodebug "[DEBUG] $(printf "Processing %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5")"
+        # Don't bother creating or updating if it's just going to be
+        # deleted later.
+        if [ "$4" != "delete" ]; then
+            if [ "$3" = "terraform" ]; then
+                if echo "$deletes" | grep -E "^$v$" >/dev/null 2>&1; then
+                    echodebug "[DEBUG] skipping $v due to later delete"
+                    continue
+                fi
+            else
+                if echo "$env_deletes" | grep -E "^$v$" >/dev/null 2>&1; then
+                    echodebug "[DEBUG] skipping $v due to later delete"
+                    continue
+                fi
+            fi
+        fi
+
         var_id="$(printf "%s" "$var_get_resp" | \
                      jq -r --arg var "$v" --arg type "$3" '.data[]
             | select(.attributes.category == $type)
@@ -183,6 +212,13 @@ process_vars () {
             | .id')"
         val="$(printf "%s" "$2" | awk -v i=$i 'NR==i{print;exit}')"
         if [ -z "$var_id" ]; then
+            echodebug "[DEBUG] $v not in variable listing"
+
+            if [ "$4" = "delete" ]; then
+                echoerr "Variable $v specified for deletion but doesn't exist"
+                continue
+            fi
+
             if [ "$hide_sensitive" = true ] && [ "$5" = true ]; then
                 output_val=REDACTED
             else
@@ -208,32 +244,65 @@ process_vars () {
                 cleanup "$payload"
             fi
         else
-            # This existing variable should only be overwritten if it was
-            # specified with -overwrite NAME or if -overwrite-all is true.
-            if [ "$overwrite_all" = true ] || echo "$overwrites" | grep -E "^$v$" >/dev/null 2>&1; then
-                if [ "$hide_sensitive" = true ] && [ "$5" = true ]; then
-                    output_val=REDACTED
-                else
-                    output_val="$val"
-                fi
+            if [ "$4" = "delete" ]; then
+                h="$(printf "%s" "$var_get_resp" | \
+                             jq -r --arg var "$v" --arg type "$3" '.data[]
+                    | select(.attributes.category == $type)
+                    | select(.attributes.key == $var)
+                    | .hcl')"
 
-                printf "Updating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5" "$output_val"
+                s="$(printf "%s" "$var_get_resp" | \
+                             jq -r --arg var "$v" --arg type "$3" '.data[]
+                    | select(.attributes.category == $type)
+                    | select(.attributes.key == $var)
+                    | .sensitive')"
+
+                output_val="$(printf "%s" "$var_get_resp" | \
+                             jq -r --arg var "$v" --arg type "$3" '.data[]
+                    | select(.attributes.category == $type)
+                    | select(.attributes.key == $var)
+                    | .value')"
+
+                printf "Deleting %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$h" "$s" "$output_val"
 
                 if [ "$dry_run" != true ]; then
                     url="$tfe_address/api/v2/vars/$var_id"
-                    make_var_update_payload "$var_id" "$v" "$val" "$3" "$4" "$5"
-                    if [ 0 -ne $? ]; then
-                        echoerr "Error generating payload file for $v"
-                        i=$(($i + 1))
-                        continue
+                    if ! tfe_api_call --request DELETE "$url"; then
+                        echoerr "Error deleting variable $v"
+                    fi
+                fi
+            else
+                # This existing variable should only be overwritten if it was
+                # specified in the correct overwrite list or if -overwrite-all
+                # is true.
+                if [ "$overwrite_all" = true ] ||
+                   ( [ "$3" = "terraform" ] && echo "$overwrites" | grep -E "^$v$" >/dev/null 2>&1 ) ||
+                   ( [ "$3" = "env" ] && echo "$envvar_overwrites" | grep -E "^$v$" >/dev/null 2>&1 ); then
+
+                    if [ "$hide_sensitive" = true ] && [ "$5" = true ]; then
+                        output_val=REDACTED
+                    else
+                        output_val="$val"
                     fi
 
-                    echodebug "[DEBUG] API request for variable update:"
-                    if ! var_update_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"; then
-                        echoerr "Error updating variable $v"
-                    fi
+                    printf "Updating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5" "$output_val"
 
-                    cleanup "$payload"
+                    if [ "$dry_run" != true ]; then
+                        url="$tfe_address/api/v2/vars/$var_id"
+                        make_var_update_payload "$var_id" "$v" "$val" "$3" "$4" "$5"
+                        if [ 0 -ne $? ]; then
+                            echoerr "Error generating payload file for $v"
+                            i=$(($i + 1))
+                            continue
+                        fi
+
+                        echodebug "[DEBUG] API request for variable update:"
+                        if ! var_update_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"; then
+                            echoerr "Error updating variable $v"
+                        fi
+
+                        cleanup "$payload"
+                    fi
                 fi
             fi
         fi
@@ -247,7 +316,10 @@ tfe_pushvars () (
     config_dir=
     var_file=
     var_file_arg=
+    deletes=
+    envvar_deletes=
     overwrites=
+    envvar_overwrites=
     overwrite_all=false
     hide_sensitive=true
 
@@ -299,9 +371,21 @@ tfe_pushvars () (
                         ;;
                 esac
                 ;;
+            -delete)
+                new_delete="$(assign_arg "$1" "$2")"
+                deletes="$(append "$deletes" "$new_delete")"
+                ;;
+            -delete-env)
+                new_delete="$(assign_arg "$1" "$2")"
+                env_deletes="$(append "$env_deletes" "$new_delete")"
+                ;;
             -overwrite)
                 new_overwrite="$(assign_arg "$1" "$2")"
                 overwrites="$(append "$overwrites" "$new_overwrite")"
+                ;;
+            -overwrite-env)
+                new_overwrite="$(assign_arg "$1" "$2")"
+                envvar_overwrites="$(append "$envvar_overwrites" "$new_overwrite")"
                 ;;
             -overwrite-all)
                 case "$2" in
@@ -750,7 +834,7 @@ tfe_pushvars () (
     # Note that the lists are sent with the end-of-list marker removed, which
     # was added by the append function.
 
-    #            variable list,        value list,                  type,     hcl,  sensitive
+    #            variable list         value list                   type      hcl   sensitive
     process_vars "${defaultvars%.}"    "${defaultvars_values%.}"    terraform false false
     process_vars "${defaulthclvars%.}" "${defaulthclvars_values%.}" terraform true  false
     process_vars "${vars%.}"           "${vars_values%.}"           terraform false false
@@ -759,4 +843,6 @@ tfe_pushvars () (
     process_vars "${shclvars%.}"       "${shclvars_values%.}"       terraform true  true
     process_vars "${envvars%.}"        "${envvars_values%.}"        env       false false
     process_vars "${senvvars%.}"       "${senvvars_values%.}"       env       false true
+    process_vars "${deletes%.}"        "${deletes%.}"               terraform delete
+    process_vars "${env_deletes%.}"    "${env_deletes%.}"           env       delete
 )

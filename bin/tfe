@@ -120,21 +120,24 @@ assign_arg () {
 
 # Common options to curl. Fail on HTTP error codes.
 tfe_api_call () {
+    echodebug "[DEBUG] curl args: $@"
     if resp="$(curl -f $tfe_curl_silent \
                  --header "Authorization: Bearer $tfe_token" \
                  --header "Content-Type: application/vnd.api+json" \
                  $@)"; then
-        echodebug "API request succeeded. Response:"
+        echodebug "[DEBUG] API request succeeded with exit code $?. Response:"
         echodebug "$resp"
 
         printf "%s" "$resp"
         next_page="$(printf "%s" "$resp" | jq -r '.meta.pagination."next-page"')"
-        if [ "$next_page" != null ]; then
+        if [ -n "$next_page" ] && [ "$next_page" != null ]; then
+            echodebug "[DEBUG] Next page: $next_page"
             next_link="$(printf "%s" "$resp" | jq -r '.links.next')"
+            echodebug "[DEBUG] Next link: $next_link"
             tfe_api_call "$next_link"
         fi
     else
-        echodebug "API request failed. Response:"
+        echodebug "[DEBUG] API request failed with exit code $?. Response:"
         echodebug "$resp"
 
         return 1
