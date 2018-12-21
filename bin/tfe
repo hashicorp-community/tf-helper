@@ -119,13 +119,31 @@ assign_arg () {
 }
 
 assign_bool () {
+    if [ ! "$2" ]; then
+        echo 1
+        if [ $# -eq 1 ]; then
+            return 0
+        else
+            return 1
+        fi
+    fi
+
     case "$2" in
-        true|false)
-            echo $2
+        -*)
+            echo 1
+            return 0
+            ;;
+        true|1)
+            echo 1
+            return 1
+            ;;
+        false|0)
+            echo
+            return 1
             ;;
         *)
-            echoerr "$1 should be true or false"
-            kill -PIPE $$
+            echo "$1 should be true or false. Got $2" 1>&2
+            return 1
             ;;
     esac
 }

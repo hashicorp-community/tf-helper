@@ -189,6 +189,7 @@ process_vars () {
     i=1
     for v in $1; do
         echodebug "[DEBUG] $(printf "Processing %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5")"
+
         # Don't bother creating or updating if it's just going to be
         # deleted later.
         if [ "$4" != "delete" ]; then
@@ -219,7 +220,7 @@ process_vars () {
                 continue
             fi
 
-            if [ "$hide_sensitive" = true ] && [ "$5" = true ]; then
+            if [ $hide_sensitive ] && [ "$5" = true ]; then
                 output_val=REDACTED
             else
                 output_val="$val"
@@ -227,10 +228,9 @@ process_vars () {
 
             printf "Creating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5" "$output_val"
 
-            if [ "$dry_run" != true ]; then
+            if [ ! $dry_run ]; then
                 url="$tfe_address/api/v2/vars"
-                make_var_create_payload "$v" "$val" $3 "$4" "$5"
-                if [ 0 -ne $? ]; then
+                if ! make_var_create_payload "$v" "$val" $3 "$4" "$5"; then
                     echoerr "Error generating payload file for $v"
                     i=$(($i + 1))
                     continue
@@ -249,23 +249,23 @@ process_vars () {
                              jq -r --arg var "$v" --arg type "$3" '.data[]
                     | select(.attributes.category == $type)
                     | select(.attributes.key == $var)
-                    | .hcl')"
+                    | .attributes.hcl')"
 
                 s="$(printf "%s" "$var_get_resp" | \
                              jq -r --arg var "$v" --arg type "$3" '.data[]
                     | select(.attributes.category == $type)
                     | select(.attributes.key == $var)
-                    | .sensitive')"
+                    | .attributes.sensitive')"
 
-                output_val="$(printf "%s" "$var_get_resp" | \
+                o="$(printf "%s" "$var_get_resp" | \
                              jq -r --arg var "$v" --arg type "$3" '.data[]
                     | select(.attributes.category == $type)
                     | select(.attributes.key == $var)
-                    | .value')"
+                    | .attributes.value')"
 
-                printf "Deleting %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$h" "$s" "$output_val"
+                printf "Deleting %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$h" "$s" "$o"
 
-                if [ "$dry_run" != true ]; then
+                if [ ! $dry_run ]; then
                     url="$tfe_address/api/v2/vars/$var_id"
                     if ! tfe_api_call --request DELETE "$url"; then
                         echoerr "Error deleting variable $v"
@@ -275,11 +275,11 @@ process_vars () {
                 # This existing variable should only be overwritten if it was
                 # specified in the correct overwrite list or if -overwrite-all
                 # is true.
-                if [ "$overwrite_all" = true ] ||
+                if [ $overwrite_all ] ||
                    ( [ "$3" = "terraform" ] && echo "$overwrites" | grep -E "^$v$" >/dev/null 2>&1 ) ||
                    ( [ "$3" = "env" ] && echo "$envvar_overwrites" | grep -E "^$v$" >/dev/null 2>&1 ); then
 
-                    if [ "$hide_sensitive" = true ] && [ "$5" = true ]; then
+                    if [ $hide_sensitive ] && [ "$5" = true ]; then
                         output_val=REDACTED
                     else
                         output_val="$val"
@@ -287,10 +287,9 @@ process_vars () {
 
                     printf "Updating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5" "$output_val"
 
-                    if [ "$dry_run" != true ]; then
+                    if [ ! $dry_run ]; then
                         url="$tfe_address/api/v2/vars/$var_id"
-                        make_var_update_payload "$var_id" "$v" "$val" "$3" "$4" "$5"
-                        if [ 0 -ne $? ]; then
+                        if ! make_var_update_payload "$var_id" "$v" "$val" "$3" "$4" "$5"; then
                             echoerr "Error generating payload file for $v"
                             i=$(($i + 1))
                             continue
@@ -312,7 +311,8 @@ process_vars () {
 
 tfe_pushvars () (
     payload="$TMPDIR/tfe-push-vars-payload-$(date +%s)"
-    dry_run=0 # this helps to determine if the value was explicitly given
+    dry_run=
+    dry_run_set=
     config_dir=
     var_file=
     var_file_arg=
@@ -320,8 +320,8 @@ tfe_pushvars () (
     envvar_deletes=
     overwrites=
     envvar_overwrites=
-    overwrite_all=false
-    hide_sensitive=true
+    overwrite_all=
+    hide_sensitive=1
 
     vars=
     vars_values=
@@ -348,6 +348,8 @@ tfe_pushvars () (
     # Parse options
 
     while [ -n "$1" ]; do
+        should_shift=1
+
         # If this is a common option it has already been parsed. Skip it and
         # its value.
         if is_common_opt "$1"; then
@@ -359,6 +361,8 @@ tfe_pushvars () (
         case "$1" in
             -dry-run)
                 dry_run="$(assign_bool "$1" "$2")"
+                should_shift=${?#0}
+                dry_run_set=1
                 ;;
             -delete)
                 new_delete="$(assign_arg "$1" "$2")"
@@ -378,9 +382,7 @@ tfe_pushvars () (
                 ;;
             -overwrite-all)
                 overwrite_all="$(assign_bool "$1" "$2")"
-                if [ "$overwrite_all" = "true" ]; then
-                    overwrite_all=need_dry_run_false
-                fi
+                should_shift=${?#0}
                 ;;
             -var)
                 new_var_arg="$(assign_arg "$1" "$2")"
@@ -430,6 +432,7 @@ tfe_pushvars () (
                 ;;
             -hide-sensitive)
                 hide_sensitive="$(assign_bool "$1" "$2")"
+                should_shift=${?#0}
                 ;;
             *)
                 # Shouldn't get here until the last option, the optional
@@ -442,22 +445,18 @@ tfe_pushvars () (
                 config_dir="$1"
                 ;;
         esac
+        # Shift the parameter
         [ -n "$1" ] && shift
-        [ -n "$1" ] && shift
+
+        # Shift the argument. There may not be one if the parameter was a flag.
+        [ $should_shift ] && [ -n "$1" ] && shift
     done
 
-    if [ "$overwrite_all" = "need_dry_run_false" ]; then
-        if [ "$dry_run" = false ]; then
-            overwrite_all=true
-        else
-            # If -dry-run was explicitly set to true don't complain
-            if [ "$dry_run" != true ]; then
-              echoerr "Option -overwrite-all requires -dry-run to be explicitly"
-              echoerr "specified as false. Running with -dry-run true to preview operations."
-            fi
-            overwrite_all=true
-            dry_run=true
-        fi
+    if [ $overwrite_all ] && [ ! $dry_run_set ] && [ ! $dry_run]; then
+        echoerr "Option -overwrite-all requires -dry-run to be explicitly"
+        echoerr "specified as false. Running with -dry-run true to preview operations."
+        overwrite_all=1
+        dry_run=1
     fi
 
     if [ -n "$config_dir" ] || [ -n "$var_file" ]; then
@@ -618,8 +617,7 @@ tfe_pushvars () (
         # temporary config with just variable names in it for use with
         # the terraform console command.
         tfvar_dir="$TMPDIR/tfe-push-vars-$(date +%s)"
-        mkdir "$tfvar_dir"
-        if [ 0 -ne $? ]; then
+        if ! mkdir "$tfvar_dir"; then
             echoerr "Error creating temporary directory for tfvars."
             return 1
         fi
@@ -627,14 +625,12 @@ tfe_pushvars () (
         echodebug "[DEBUG] Temporary tfvars dir:"
         echodebug "$tfvar_dir"
 
-        cp "$var_file" "$tfvar_dir"
-        if [ 0 -ne $? ]; then
+        if ! cp "$var_file" "$tfvar_dir"; then
             echoerr "Error copying variable file to temporary path."
             return 1
         fi
 
-        cd "$tfvar_dir"
-        if [ 0 -ne $? ]; then
+        if ! cd "$tfvar_dir"; then
             echoerr "Error entering variable file temporary path."
             return 1
         fi

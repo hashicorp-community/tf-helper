@@ -71,7 +71,7 @@ tfe_pullvars () (
     env_vars=
 
     # Whether to list all env vars instead of tf vars
-    env=false
+    env=
 
     # Check for required standard options
     if ! check_required; then
@@ -81,6 +81,8 @@ tfe_pullvars () (
     # Parse options
 
     while [ -n "$1" ]; do
+        should_shift=1
+
         # If this is a common option it has already been parsed. Skip it and
         # its value.
         if is_common_opt "$1"; then
@@ -102,18 +104,23 @@ tfe_pullvars () (
                 ;;
             -env)
                 env="$(assign_bool "$1" "$2")"
+                should_shift=${?#0}
                 ;;
             *)
                 echoerr "Unknown option $1"
                 return 1
                 ;;
         esac
+
+        # Shift the parameter
         [ -n "$1" ] && shift
-        [ -n "$1" ] && shift
+
+        # Shift the argument. There may not be one if the parameter was a flag.
+        [ $should_shift ] && [ -n "$1" ] && shift
     done
 
     # Handle conflicting options
-    if [ "$env" = true ] && ( [ -n "$vars" ] || [ -n "$env_vars" ] ); then
+    if [ $env ] && ( [ -n "$vars" ] || [ -n "$env_vars" ] ); then
         echoerr "-env true cannot be specified along with -var and/or -env-var"
         return 1
     fi
@@ -238,7 +245,7 @@ tfe_pullvars () (
     fi
 
     # All env vars were requested
-    if [ "$env" = true ]; then
+    if [ $env ]; then
         if [ -n "$sensitive_env_vars" ]; then
             echo "$sensitive_env_vars"
         fi

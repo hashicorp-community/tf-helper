@@ -145,7 +145,7 @@ tfe_new () (
     working_dir=
     vcs_id=
     vcs_branch=
-    vcs_submodules=false
+    vcs_submodules=
     oauth_id=
 
     # Ensure all of tfe_org, etc, are set
@@ -156,6 +156,8 @@ tfe_new () (
     # Parse options
 
     while [ -n "$1" ]; do
+        should_shift=1
+
         # If this is a common option it has already been parsed. Skip it and
         # its value.
         if is_common_opt "$1"; then
@@ -167,6 +169,15 @@ tfe_new () (
         case "$1" in
             -auto-apply)
                 auto_apply="$(assign_bool "$1" "$2")"
+                should_shift=${?#0}
+
+                # Need auto_apply to be either 'true' or 'false' so
+                # it can be passed directly into the payload
+                if [ $auto_apply ]; then
+                    auto_apply=true
+                else
+                    auto_apply=false
+                fi
                 ;;
             -terraform-version)
                 tf_version=$(assign_arg "$1" "$2")
@@ -191,8 +202,12 @@ tfe_new () (
                 return 1
                 ;;
         esac
+
+        # Shift the parameter
         [ -n "$1" ] && shift
-        [ -n "$1" ] && shift
+
+        # Shift the argument. There may not be one if the parameter was a flag.
+        [ $should_shift ] && [ -n "$1" ] && shift
     done
 
     # Need oauth if vcs was specified

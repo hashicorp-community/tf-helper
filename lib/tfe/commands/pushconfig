@@ -52,13 +52,13 @@ list_not_hardlinked_modules () {
 gnutar () {
     echodebug "[DEBUG] Using GNU tar"
 
-    if [ true = $vcs ]; then
+    if [ $vcs ]; then
         list_vcs > "$tarlist"
     else
         list_files > "$tarlist"
     fi
 
-    if [ true = $upload_modules ]; then
+    if [ $upload_modules ]; then
         list_modules >> "$tarlist"
     fi
 
@@ -76,7 +76,7 @@ bsdtar () {
     hardlinks="$(list_hardlinked | sort)"
     echo "$hardlinks" > "$hardlinklist"
 
-    if [ true = $vcs ]; then
+    if [ $vcs ]; then
         list_vcs | sort > "$vcslist"
         hardlinks="$(comm -12 "$vcslist" "$hardlinklist")"
     fi
@@ -85,13 +85,13 @@ bsdtar () {
         # If there are no hardlinks then the job is easy and
         # the same as GNU tar without --hard-dereference
         echodebug "[DEBUG] No hardlinks to manually resolve"
-        if [ true = $vcs ]; then
+        if [ $vcs ]; then
             list_vcs > "$tarlist"
         else
             list_files > "$tarlist"
         fi
 
-        if [ true = $upload_modules ]; then
+        if [ $upload_modules ]; then
             list_modules >> "$tarlist"
         fi
 
@@ -102,7 +102,7 @@ bsdtar () {
         # to the archive one by one
         echodebug "[DEBUG] Resolving hardlinks manually"
 
-        if [ true = $vcs ]; then
+        if [ $vcs ]; then
             # Tracked hardlinks are in the hard link list already.
             # Need tracked non-hardlinks to tar.
             comm -23 "$vcslist" "$hardlinklist" > "$tarlist"
@@ -115,7 +115,7 @@ bsdtar () {
             list_not_hardlinked > "$tarlist"
         fi
 
-        if [ true = $upload_modules ]; then
+        if [ $upload_modules ]; then
             list_hardlinked_modules >> "$hardlinklist"
             list_not_hardlinked_modules >> "$tarlist"
         fi
@@ -141,14 +141,16 @@ cat > "$run_payload" <<EOF
 {
   "data": {
     "attributes": {
-      "is-destroy":$1,
+      "is-destroy": ${1:-false},
       "message": "$2"
     },
     "type":"runs",
     "relationships": {
 EOF
 
-if [ "$1" = false ] && [ -n "$3" ]; then
+echodebug "[DEBUG] parameters: $1 $3"
+
+if [ ! $1 ] && [ -n "$3" ]; then
 cat >> "$run_payload" <<EOF
       "configuration-version": {
         "data": {
@@ -220,14 +222,14 @@ EOF
 )
 
 tfe_pushconfig () (
-    upload_modules=true
-    vcs=true
+    upload_modules=1
+    vcs=1
     message="Queued via tfe-cli"
     config_dir=.
     config_id=
     poll_run=0
-    destroy=false
-    current_config=false
+    destroy=
+    current_config=
     run_payload="$TMPDIR/run-$(date +%s).json"
     config_payload="$TMPDIR/content-$(date +%s).tar.gz"
     tarlist="$TMPDIR/tarlist-$(date +%s)"
@@ -262,6 +264,8 @@ tfe_pushconfig () (
     # Parse options
 
     while [ -n "$1" ]; do
+        should_shift=1
+
         # If this is a common option it has already been parsed. Skip it and
         # its value.
         if is_common_opt "$1"; then
@@ -273,18 +277,22 @@ tfe_pushconfig () (
         case "$1" in
             -upload-modules)
                 upload_modules="$(assign_bool "$1" "$2")"
+                should_shift=${?#0}
                 ;;
             -vcs)
                 vcs="$(assign_bool "$1" "$2")"
+                should_shift=${?#0}
                 ;;
             -message)
                 message="$(assign_arg "$1" "$2")"
                 ;;
             -destroy)
                 destroy="$(assign_bool "$1" "$2")"
+                should_shift=${?#0}
                 ;;
             -current-config)
                 current_config="$(assign_bool "$1" "$2")"
+                should_shift=${?#0}
                 ;;
             -poll)
                 if [ "$2" -eq "$2" ] >/dev/null 2>&1; then
@@ -305,11 +313,15 @@ tfe_pushconfig () (
                 config_dir=$1
                 ;;
         esac
+
+        # Shift the parameter
         [ -n "$1" ] && shift
-        [ -n "$1" ] && shift
+
+        # Shift the argument. There may not be one if the parameter was a flag.
+        [ $should_shift ] && [ -n "$1" ] && shift
     done
 
-    if [ "$destroy" = true ] && [ "$current_config" = true ]; then
+    if [ $destroy ] && [ $current_config ]; then
         echoerr "Options -destroy and -current-config conflict"
         return 1
     fi
@@ -336,9 +348,9 @@ tfe_pushconfig () (
         return 1
     fi
 
-    if [ "$destroy" = false ] && [ "$current_config" = false ]; then
+    if [ ! $destroy ] && [ ! $current_config ]; then
         # Check for additional required commands.
-        if [ "$vcs" = true ] && [ -z "$(command -v git)" ]; then
+        if [ $vcs ] && [ -z "$(command -v git)" ]; then
             echoerr "The git command is required for VCS detection"
             return 1
         fi
@@ -353,7 +365,7 @@ tfe_pushconfig () (
             return 1
         fi
 
-        if [ "$vcs" = true ]; then
+        if [ $vcs ]; then
             # VCS detection was requested so it must actually be present
             if ! git status >/dev/null 2>&1; then
                 echoerr "VCS not present in $config_dir"
@@ -368,10 +380,10 @@ tfe_pushconfig () (
         fi
 
         # If there are modules we might want to upload them.
-        has_modules="$([ -d .terraform/modules ] && echo true || echo false)"
+        has_modules="$([ -d .terraform/modules ] && echo 1 || echo )"
         echodebug "[DEBUG] Has .terraform/modules: $has_modules"
 
-        $tarcmd "$config_payload" $vcs $upload_modules
+        $tarcmd "$config_payload"
         if [ $? != 0 ]; then
             echoerr "Error creating config archive payload"
             return 1
@@ -398,8 +410,7 @@ tfe_pushconfig () (
             return 1
         fi
 
-        config_id="$(printf "%s" "$upload_url_resp" | jq -r '.data.id')"
-        if [ 0 -ne $? ]; then
+        if ! config_id="$(printf "%s" "$upload_url_resp" | jq -r '.data.id')"; then
             echoerr "Error parsing API response for config ID"
             cleanup "$config_payload" "$tarlist"
             return 1
@@ -426,11 +437,13 @@ tfe_pushconfig () (
     fi
 
     make_run_payload "$destroy" "$message" "$config_id" "$workspace_id"
+    echodebug "[DEBUG] Run payload contents:"
+    echodebug "$(cat "$run_payload")"
 
     url=$tfe_address/api/v2/runs
     if ! run_create_resp="$(tfe_api_call -d @"$run_payload" $url)"; then
         echoerr "Error creating run"
-        if [ "$destroy" = true ]; then
+        if [ $destroy ]; then
             echoerr "Note: -destroy requires CONFIRM_DESTROY=1 in the workspace"
         fi
         cleanup "$run_payload"
@@ -450,7 +463,11 @@ tfe_pushconfig () (
         return 1
     fi
 
-    echo "Run $run_id submitted with config $config_id on $tfe_org/$tfe_workspace"
+    printf "Run $run_id submitted to $tfe_org/$tfe_workspace"
+    if [ -n "$config_id" ]; then
+        printf " using config $config_id"
+    fi
+    printf "\n"
 
     if [ 0 -eq "$poll_run" ]; then
         return 0
