@@ -59,6 +59,7 @@ tfe_show () (
         "name              = " + .data.attributes.name,
         "id                = " + .data.id,
         "auto-apply        = " + (.data.attributes."auto-apply"|tostring),
+        "queue-all-runs    = " + (.data.attributes."queue-all-runs"|tostring),
         "locked            = " + (.data.attributes.locked|tostring),
         "created-at        = " + .data.attributes."created-at",
         "working-directory = " + .data.attributes."working-directory",

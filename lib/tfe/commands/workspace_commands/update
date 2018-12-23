@@ -20,18 +20,18 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_new_description () (
-    echo "Create a new Terraform Enterprise workspace"
+tfe_update_description () (
+    echo "Modify a Terraform Enterprise workspace"
 )
 
-tfe_new_help () (
+tfe_update_help () (
 # Be sure to include the common options with tfe_usage_args
 cat << EOF
 SYNOPSIS
- tfe workspace new -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
+ tfe workspace update -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
 
 DESCRIPTION
- Create a new Terraform Enterprise workspace.
+ Modify a Terraform Enterprise workspace.
 
 OPTIONS
 $(tfe_usage_args)
@@ -61,25 +61,15 @@ $(tfe_usage_args)
                       VCS service VCS submodules will be retrieved as well.
                       Defaults to false.
 
- -oauth-id <ID>       The OAuth ID, obtained from the Terraform Enterprise
-                      API, which corresponds to the VCS ID provided. Defaults
-                      to the OAuth ID of the configured client if there is
-                      only one.
+ -oauth-id <ID>       The OAuth ID to be used with the VCS integration.
 
  -queue-all-runs <BOOLEAN>
                       If true, runs will be queued immediately after
                       workspace creation. If false, runs will not queue until
                       a run is manually queued first. Defaults to false.
 
-
 NOTES
  The curl and jq commands are required.
-
- If more than one OAuth client is configured use the OAuth Tokens API
- to list the clients and their IDs. Provide the appropriate ID from the
- list to the -oauth-id option.
-
- https://www.terraform.io/docs/enterprise/api/oauth-tokens.html
 
 EOF
 )
@@ -88,65 +78,24 @@ EOF
 ## Helper functions
 ##
 
-make_new_workspace_payload () {
-
-# $1 new workspace name
-# $2 auto-apply
-# $3 TF version
-# $4 working dir
-# $5 oauth token ID
-# $6 VCS branch
-# $7 vcs submodules
-# $8 VCS repo ID (e.g. "github_org/github_repo")
-# $9 queue-all-runs
-
-if [ -n "$6" ]; then
-    default_branch=false
-else
-    default_branch=true
-fi
-
-cat > "$payload" <<EOF
+make_update_workspace_payload () {
+cat > "$payload" << EOF
 {
-  "data": {
-    "type": "workspaces",
+  "data" : {
     "attributes": {
-EOF
-
-if [ -n "$5" ] && [ -n "$8" ]; then
-cat >> "$payload" <<EOF
-      "vcs-repo": {
-        "identifier": "$8",
-        "oauth-token-id": "$5",
-        "ingress-submodules": $7,
-        "branch": "$6",
-        "default-branch": $default_branch
-      },
-EOF
-fi
-
-if [ -n "$3" ]; then
-cat >> "$payload" <<EOF
-      "terraform-version": "$3",
-EOF
-fi
-
-cat >> "$payload" <<EOF
-      "working-directory": "$4",
-      "auto-apply": $2,
-      "queue-all-runs": $9,
-      "name": "$1"
-    }
+      $1
+    },
+    "type": "workspaces"
   }
 }
 EOF
 
 echodebug "[DEBUG] Payload contents:"
-cat "$payload" 1>&3
+cat $payload 1>&3
 }
 
-tfe_new () (
-    payload="$TMPDIR/tfe-new-payload-$(date +%s)"
+tfe_update () (
+    payload="$TMPDIR/tfe-migrate-payload-$(date +%s)"
     auto_apply=false
     queue_all_runs=false
     tf_version=
@@ -155,6 +104,9 @@ tfe_new () (
     vcs_branch=
     vcs_submodules=
     oauth_id=
+
+    vcs_obj=
+    attr_obj=
 
     # Ensure all of tfe_org, etc, are set
     if ! check_required all; then
@@ -186,6 +138,9 @@ tfe_new () (
                 else
                     auto_apply=false
                 fi
+
+                [ "$attr_obj" ] && attr_obj="$attr_obj,"
+                attr_obj="$attr_obj \"auto-apply\": \"$auto_apply\""
                 ;;
             -queue-all-runs)
                 queue_all_runs="$(assign_bool "$1" "$2")"
@@ -196,24 +151,52 @@ tfe_new () (
                 else
                     queue_all_runs=false
                 fi
+
+                [ "$attr_obj" ] && attr_obj="$attr_obj,"
+                attr_obj="$attr_obj \"queue-all-runs\": \"$queue_all_runs\""
                 ;;
             -terraform-version)
                 tf_version=$(assign_arg "$1" "$2")
+                [ "$attr_obj" ] && attr_obj="$attr_obj,"
+                attr_obj="$attr_obj \"terraform-version\": \"$tf_version\""
                 ;;
             -working-dir)
                 working_dir=$(assign_arg "$1" "$2")
+
+                # A hyphen means 'set the workspace back to ""' (root of repo)
+                if [ "$working_dir" = "-" ]; then
+                    working_dir=
+                fi
+
+                [ "$attr_obj" ] && attr_obj="$attr_obj,"
+                attr_obj="$attr_obj \"working-directory\": \"$working_dir\""
                 ;;
             -vcs-id)
                 vcs_id=$(assign_arg "$1" "$2")
+                [ "$vcs_obj" ] && vcs_obj="$vcs_obj,"
+                vcs_obj="$vcs_obj \"identifier\": \"$vcs_id\""
                 ;;
             -vcs-branch)
                 vcs_branch=$(assign_arg "$1" "$2")
+                [ "$vcs_obj" ] && vcs_obj="$vcs_obj,"
+                vcs_obj="$vcs_obj \"branch\": \"$vcs_branch\""
                 ;;
             -vcs-submodules)
-                vcs_submodules=$(assign_arg "$1" "$2")
+                vcs_submodules=$(assign_bool "$1" "$2")
+
+                if [ $auto_apply ]; then
+                    vcs_submodules=true
+                else
+                    vcs_submodules=false
+                fi
+
+                [ "$vcs_obj" ] && vcs_obj="$vcs_obj,"
+                vcs_obj="$vcs_obj \"ingress-submodules\": \"$vcs_submodules\""
                 ;;
             -oauth-id)
                 oauth_id=$(assign_arg "$1" "$2")
+                [ "$vcs_obj" ] && vcs_obj="$vcs_obj,"
+                vcs_obj="$vcs_obj \"oauth-token-id\": \"$oauth_id\""
                 ;;
             *)
                 echoerr "Unknown option: $1"
@@ -228,60 +211,25 @@ tfe_new () (
         [ $should_shift ] && [ -n "$1" ] && shift
     done
 
-    # Need oauth if vcs was specified
-    if [ -n "$vcs_id" ]; then
-        # If no oauth id was given, then see if there is only one and use
-        # that one
-        if [ -z "$oauth_id" ]; then
-            oauth_id="$( (
-                set -e
-                echodebug "[DEBUG] API request for OAuth tokens for $tfe_org"
-
-                url="$tfe_address/api/v2/organizations/$tfe_org/oauth-tokens"
-                oauth_list_resp="$(tfe_api_call "$url")"
-
-                oauth_ids="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .id')"
-                echodebug "[DEBUG] OAuth IDs:"
-                echodebug "$oauth_ids"
-
-                test -n "$oauth_ids"
-                test 1 -eq "$(echo $oauth_ids | wc -l)"
-
-                echo "$oauth_ids"
-            ) 2>&3 )"
-
-            if [ 0 -ne $? ]; then
-                echoerr "Error obtaining a default OAuth ID"
-                return 1
-            fi
-        fi
+    if [ "$vcs_obj" ]; then
+        [ "$attr_obj" ] && attr_obj="$attr_obj,"
+        attr_obj="$attr_obj \"vcs-repo\" {$vcs_obj}"
     fi
 
-    # $1 new workspace name
-    # $2 auto-apply
-    # $3 TF version
-    # $4 working dir
-    # $5 oauth token ID
-    # $6 VCS branch
-    # $7 VCS submodules
-    # $8 VCS repo ID (e.g. "github_org/github_repo")
-    # $9 queue-all-runs
-    make_new_workspace_payload "$tfe_workspace" "$auto_apply" "$tf_version" \
-                               "$working_dir" "$oauth_id" "$vcs_branch" \
-                               "$vcs_submodules" "$vcs_id" "$queue_all_runs"
+    make_update_workspace_payload "$attr_obj"
     if [ 0 -ne $? ]; then
-        echoerr "Error generating payload file for workspace creation"
+        echoerr "Error generating payload file for workspace update"
         return 1
     fi
 
-    echodebug "[DEBUG] API request for new workspace:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces"
-    if ! new_resp="$(tfe_api_call -d @"$payload" "$url")"; then
-        echoerr "Error creating workspace $tfe_org/$tfe_workspace"
+    echodebug "[DEBUG] API request to update workspace:"
+    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces/$tfe_workspace"
+    if ! update_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"; then
+        echoerr "Error updating workspace $tfe_org/$tfe_workspace"
         return 1
     fi
 
     cleanup "$payload"
 
-    echo "Created new workspace $tfe_org/$tfe_workspace"
+    echo "Modified workspace $tfe_org/$tfe_workspace"
 )

@@ -105,19 +105,27 @@ cat << EOF
 EOF
 }
 
-# Take two arguments; if the 2nd is empty then die
+# Given a parameter and a value determine if the value is valid.
 assign_arg () {
-    if [ -z "$2" ] || [ "${2#-}" != "$2" ]; then
+    # Value must not be empty and must not start with '-' (e.g. there
+    # was no value, just another parameter), but allow values to be
+    # a single '-', as we use this to indicate the special case of
+    # unsetting something.
+    if ( [ -z "$2" ] || [ "${2#-}" != "$2" ] ) &&
+       [ "$2" != "-" ]; then
         echoerr "Parameter $1 is missing a value"
         # exit here will not terminate the script. Using PIPE
-        # to kill the current process will not produce a kill
+        # to kill the process group will not produce a kill
         # message
-        kill -PIPE $$
+        kill -s PIPE 0
     else
         echo $2
     fi
 }
 
+# Given a parameter and, potentially, a value determine if the two
+# constitute a valid bool. If no value was given, the parameter was
+# used like a flag (-flag) instead of providing a value (-flag false).
 assign_bool () {
     if [ ! "$2" ]; then
         echo 1
@@ -143,7 +151,7 @@ assign_bool () {
             ;;
         *)
             echo "$1 should be true or false. Got $2" 1>&2
-            return 1
+            kill -PIPE 0
             ;;
     esac
 }
