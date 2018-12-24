@@ -103,7 +103,7 @@ execute_subcmd () {
     fi
 
     if ! check_cmd "$cmd"; then
-        echoerr "Command '$cmd' not found. See 'tfe help' for usage."
+        echoerr "Command '$cmd' not found. See '$cmd_prefix help' for usage."
         return 1
     fi
 
@@ -133,6 +133,7 @@ execute_subcmd () {
     # Dispatch the command with all of the following arguments to the appropriate,
     # sourced function
     echodebug "[DEBUG] Loading command from $cmd_dir/$cmd"
+
     . "$cmd_dir/$cmd"
     ${cmd_prefix}_${cmd} "$@"
 }
