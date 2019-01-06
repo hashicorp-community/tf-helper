@@ -231,5 +231,5 @@ tfe_update () (
 
     cleanup "$payload"
 
-    echo "Modified workspace $tfe_org/$tfe_workspace"
+    echo "Updated workspace $tfe_org/$tfe_workspace"
 )

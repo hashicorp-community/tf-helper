@@ -27,3 +27,30 @@ output="$(tfe workspace list -tfe-org "$TFE_ORG" 2>&1)"
 assert_equal "tfe_ws_list_deleted_ret_0" 0 $?
 assert_contains_not "tfe_ws_list_deleted_no_contains_new" "$ws_name" "$output"
 
+
+ws_name="tfe-test-workspace-$(random_enough)"
+
+# create a new workspace with all non-vcs options
+output="$(tfe workspace new -name "$TFE_ORG/$ws_name" -auto-apply -terraform-version 0.10.8 -working-dir foo -queue-all-runs true 2>&1)"
+assert_equal "tfe_ws_new_op_ret_0" 0 $?
+assert_contains "tfe_ws_new_op_has_created" "Created" "$output"
+
+# List workspaces should now contain the new workspace
+output="$(tfe workspace list -tfe-org "$TFE_ORG" 2>&1)"
+assert_equal "tfe_ws_list_new_op_ret_0" 0 $?
+assert_contains "tfe_ws_list_contains_new_op" "$ws_name" "$output"
+
+# Update the workspace
+output="$(tfe workspace update -name "$TFE_ORG/$ws_name" -auto-apply false -terraform-version 0.11.11 -working-dir - -queue-all-runs 0 2>&1)"
+assert_equal "tfe_ws_update_ret_0" 0 $?
+assert_contains "tfe_ws_update_has_updated" "Updated" "$output"
+
+# Deleting the workspace should succeed and return 0
+tfe workspace delete -name "$TFE_ORG/$ws_name" >/dev/null 2>&1
+assert_equal "tfe_ws_delete_ret_0" 0 $?
+
+# List workspaces should now not contain the new/deleted workspace
+output="$(tfe workspace list -tfe-org "$TFE_ORG" 2>&1)"
+assert_equal "tfe_ws_list_deleted_updated_ret_0" 0 $?
+assert_contains_not "tfe_ws_list_deleted_updated_no_contains_new" "$ws_name" "$output"
+
