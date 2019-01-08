@@ -580,7 +580,7 @@ tfe_pushvars () (
                 # strip everything up to = and whitespace to make
                 # detection of unquoted true/false easier when = and
                 # true/false are on the same line.
-                sub(/[^=]*[ \t\r\n\v\f]*/, "")
+                sub(/[^=]*[ \t\r\n\v\f]*=[ \t\r\n\v\f]*/, "")
             }
             in_var == 1 && in_default == 1 && in_value == 1 && /["{<\[tf]/ {
                 # inside the RHS and found something that looks like a value.
@@ -751,7 +751,7 @@ tfe_pushvars () (
                 # strip everything up to = and whitespace to make
                 # detection of unquoted true/false easier when = and
                 # true/false are on the same line.
-                sub(/[^=]*[ \t\r\n\v\f]*/, "")
+                sub(/[^=]*[ \t\r\n\v\f]*=[ \t\r\n\v\f]*/, "")
             }
             in_var == 1 && in_value == 1 && /["{<\[tf]/ {
                 # see if we are entering a map or heredoc so we can skip those
@@ -822,6 +822,12 @@ tfe_pushvars () (
     # values, then determine if they are HCL or not.
 
     if [ -n "$all_vars" ]; then
+        if [ -n "$config_dir" ] && [ ! -d .terraform ]; then
+            echoerr "WARNING: Terraform configuration appears uninitialized!"
+            echoerr "When specifying a config directory run terraform init."
+            echoerr "Variables may be skipped or passed unintended values."
+        fi
+
         for var in $all_vars; do
             if [ -z "$var_file_arg" ]; then
                 val_lines="$(echo "var.$var" | terraform console 2>&3)"
