@@ -22,8 +22,8 @@ _handle_test () {
         echoerr "failed"
         echoerr "$3"
 
-        # can't exit from here so instead kill our process
-        kill -PIPE $$
+        # can't exit from here so instead kill our process group
+        kill -PIPE 0
     fi
 }
 
@@ -37,6 +37,18 @@ assert_equal () {
         $1 \
         $? \
         "expected $3 to be $2"
+}
+
+# Ensure the contents of two files are the same
+# $1 test name
+# $2 file a
+# $3 file b
+assert_files_equal () {
+    cmp -s "$2" "$3"
+    _handle_test \
+        $1 \
+        $? \
+        "$(printf "files differ\n\n%s\n%s\n\n%s\n%s\n" "$2" "$(cat "$2")" $3 "$(cat "$3")")"
 }
 
 # Ensure a given text contains a term

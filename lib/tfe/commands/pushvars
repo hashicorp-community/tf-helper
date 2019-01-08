@@ -576,12 +576,17 @@ tfe_pushvars () (
             in_default == 1 && /=/{
                 # entering the RHS of default =
                 in_value = 1
+
+                # strip everything up to = and whitespace to make
+                # detection of unquoted true/false easier when = and
+                # true/false are on the same line.
+                sub(/[^=]*[ \t\r\n\v\f]*/, "")
             }
-            in_var == 1 && in_default == 1 && in_value == 1 && /["{<\[]/ {
+            in_var == 1 && in_default == 1 && in_value == 1 && /["{<\[tf]/ {
                 # inside the RHS and found something that looks like a value.
                 # determine the variable type (hcl, non-hcl).
                 # match all the things that are not Terraform variable values
-                m = match($0, /[^"{<\[]*/)
+                m = match($0, /[^"{<\[tf]*/)
                 if(m != 0) {
                     # Get the first character after all of the things that are not
                     # Terraform variable values
@@ -593,15 +598,41 @@ tfe_pushvars () (
                         if(match($0, /}/) == 0){
                             in_map = 1
                         }
-                    } else {
-                        if(value_char == "<") {
-                            # entering a heredoc. valid anchors should be directly
-                            # next to the brackets
-                            in_heredoc = 1
-                            match($0, /<<[-_a-zA-Z0-9]+/)
-                            heredoc_id = substr($0, RSTART+2, RLENGTH-2)
+                    }
+                    if(value_char == "<") {
+                        # entering a heredoc. valid anchors should be directly
+                        # next to the brackets
+                        in_heredoc = 1
+                        match($0, /<<[-_a-zA-Z0-9]+/)
+                        heredoc_id = substr($0, RSTART+2, RLENGTH-2)
+                    }
+                    if(value_char == "t") {
+                        # Check to ensure the value is unquoted true
+                        true_chars = substr($0, RLENGTH + 1, 4)
+                        if(true_chars != "true") {
+                            # If not then start the search over
+                            in_var = 0
+                            in_value = 0
+                            in_var_block = 0
+                            in_default = 0
+                            in_default_block = 0
+                            next
                         }
                     }
+                    if(value_char == "f") {
+                        # Check to ensure the value is false
+                        false_chars = substr($0, RLENGTH + 1, 5)
+                        if(false_chars != "false") {
+                            # If not then start the search over
+                            in_var = 0
+                            in_value = 0
+                            in_var_block = 0
+                            in_default = 0
+                            in_default_block = 0
+                            next
+                        }
+                    }
+
                     # not in a map, so this is a variable name
                     print name
                     in_var = 0
@@ -716,12 +747,17 @@ tfe_pushvars () (
             in_var == 1 && /^=/ {
                 # have a variable name and the next thing seen is =
                 in_value = 1
+
+                # strip everything up to = and whitespace to make
+                # detection of unquoted true/false easier when = and
+                # true/false are on the same line.
+                sub(/[^=]*[ \t\r\n\v\f]*/, "")
             }
-            in_var == 1 && in_value == 1 && /["{<\[]/ {
+            in_var == 1 && in_value == 1 && /["{<\[tf]/ {
                 # see if we are entering a map or heredoc so we can skip those
                 # sections.
                 # match all the things that are not Terraform variable values.
-                m = match($0, /[^"{<\[]*/)
+                m = match($0, /[^"{<\[tf]*/)
                 if(m != 0) {
                     # Get the first character after all of the things that are not
                     # Terraform variable values
@@ -733,15 +769,35 @@ tfe_pushvars () (
                         if(match($0, /}/) == 0){
                             in_map = 1
                         }
-                    } else {
-                        if(value_char == "<") {
-                            # entering a heredoc. valid anchors should be directly
-                            # next to the brackets
-                            in_heredoc = 1
-                            match($0, /<<[-_a-zA-Z0-9]+/)
-                            heredoc_id = substr($0, RSTART+2, RLENGTH-2)
+                    }
+                    if(value_char == "<") {
+                        # entering a heredoc. valid anchors should be directly
+                        # next to the brackets
+                        in_heredoc = 1
+                        match($0, /<<[-_a-zA-Z0-9]+/)
+                        heredoc_id = substr($0, RSTART+2, RLENGTH-2)
+                    }
+                    if(value_char == "t") {
+                        # Check to ensure the value is unquoted true
+                        true_chars = substr($0, RLENGTH + 1, 4)
+                        if(true_chars != "true") {
+                            # If not then start the search over
+                            in_var = 0
+                            in_value = 0
+                            next
                         }
                     }
+                    if(value_char == "f") {
+                        # Check to ensure the value is false
+                        false_chars = substr($0, RLENGTH + 1, 5)
+                        if(false_chars != "false") {
+                            # If not then start the search over
+                            in_var = 0
+                            in_value = 0
+                            next
+                        }
+                    }
+
                     # not in a map, so this is a variable name
                     print name
                     printf "variable \"%s\" {}\n", name >> "vars.tf"

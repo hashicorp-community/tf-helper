@@ -1,20 +1,43 @@
 #!/bin/sh
 
-. ./utils
-
-if [ -z "$TFE_ORG" ]; then
-    echoerr "TFE_ORG must be set to run tests"
-    exit 1
+if [ -f ./utils ]; then
+    . ./utils
 else
-    export TFE_ORG="$TFE_ORG"
+    echo "Not found: ./utils. Run testrunner from libexec/tfe/tests" 1>&2
+    exit 1
 fi
 
-tfe_dir="$(cd ../../../bin && pwd -P)"
-export PATH="$tfe_dir:$PATH"
+if [ -f ../../../bin/tfe ]; then
+    tfe_dir="$(cd ../../../bin && pwd -P)"
+    export PATH="$tfe_dir:$PATH"
+else
+    echoerr "Path to tfe not found. Run testrunner from libexec/tfe/tests"
+    exit 1
+fi
 
+if [ -n "$TFE_ORG" ]; then
+    # TFE_ORG may be set but not exported
+    export TFE_ORG
+else
+    echoerr "TFE_ORG must be set to run tests"
+    exit 1
+fi
+
+# A particular test file was requested
 if [ -n "$1" ]; then
-    shells="$1"
-elif [ -n "$TFE_TEST_ALL" ]; then
+    # We'll cd into the tests directory, so we only want the test file name.
+    tfe_tests="$(basename $1)"
+
+    if [ ! -f "./tests/$tfe_tests" ]; then
+        echoerr "Specific test requested but not found:"
+        echoerr "$tfe_tests"
+        exit 1
+    fi
+fi
+
+if [ -n "$TFE_TEST_SHELL" ]; then
+    shells="$TFE_TEST_SHELL"
+elif [ -n "$TFE_TEST_ALL_SHELLS" ]; then
     # posh seems broken for sourcing files when run as
     # posh ./tests/test_name
     # When run interatively it fails to have the right return code for
@@ -29,9 +52,11 @@ elif [ -n "$TFE_TEST_ALL" ]; then
     # anything else below.
     shells="bash dash ksh zsh mksh yash pdksh busybox ash"
 else
+    # If nothing specific is requested, run tests with whatever /bin/sh is.
     shells="/bin/sh"
 fi
 
+cd ./tests
 for shell in $shells; do
     # Verify the shell is present
     if [ -z "$(command -v $shell)" ]; then
@@ -40,7 +65,10 @@ for shell in $shells; do
     fi
 
     echoerr "Testing with $shell"
-    tfe_tests="$(find . -type f ! -name 'testrunner' ! -name utils ! -path '*/.*' | sort)"
+    if [ -z "$tfe_tests" ]; then
+        tfe_tests="$(find . -type f -name '[0-9][0-9]*_test*' ! -path '*/.*' | sort)"
+    fi
+
     for tfe_test in $tfe_tests; do
         # busybox is special because it has to be called as `busybox sh`
         if [ "$shell" = busybox ]; then
@@ -54,3 +82,4 @@ for shell in $shells; do
     echoerr "Completed $shell tests"
     echoerr
 done
+cd ..

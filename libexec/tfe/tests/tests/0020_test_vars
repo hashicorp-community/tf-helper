@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ./utils
+. ../utils
 
 # Workspace creation and deletion are confirmed to work by previous tests.
 # Create a workspace to use for these tests.

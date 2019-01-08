@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ./utils
+. ../utils
 
 ws_name="tfe-test-workspace-$(random_enough)"
 

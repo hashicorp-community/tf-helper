@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ./utils
+. ../utils
 
 # tfe by itself should return 1 and contain certain text
 output="$(tfe 2>&1)"
