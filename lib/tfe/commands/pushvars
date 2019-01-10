@@ -108,25 +108,6 @@ EOF
 ## Helper functions
 ##
 
-# Replace quotes and newlines with escape characters to prepare the
-# value for insertion into JSON.
-escape_value () {
-    printf '%s' "$1" | awk '
-    {
-        gsub(/"/,"\\\"")
-        gsub(/\\n/,"\\\\n")
-    }
-    NR == 1 {
-        value_line = $0
-    }
-    NR != 1 {
-        value_line = value_line "\\n" $0
-    }
-    END {
-        printf "%s", value_line
-    }'
-}
-
 make_var_create_payload () {
 cat > "$payload" <<EOF
 {
