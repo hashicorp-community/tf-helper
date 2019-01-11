@@ -28,7 +28,7 @@ tfe_delete_help () (
 # Be sure to include the common options with tfe_usage_args
 cat << EOF
 SYNOPSIS
- tfe ssh delete -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
+ tfe ssh delete -tfe-org <ORGANIZATION> [OPTIONS]
 
 DESCRIPTION
  Delete a Terraform Enterprise SSH key
@@ -46,7 +46,6 @@ NOTES
  SSH keys are defined at the organization level. An organization must be
  specified with the -name argument, the -tfe-org argument, or the TFE_ORG
  environment variable. A workspace does not need to be specified.
-
 EOF
 )
 

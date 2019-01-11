@@ -21,14 +21,14 @@
 ## -------------------------------------------------------------------
 
 tfe_show_description () (
-    echo "Show Terraform Enterprise ssh details"
+    echo "Show the name and ID of an SSH key in Terraform Enterprise"
 )
 
 tfe_show_help () (
 # Be sure to include the common options with tfe_usage_args
 cat << EOF
 SYNOPSIS
- tfe ssh show -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
+ tfe ssh show -tfe-org <ORGANIZATION> [OPTIONS]
 
 DESCRIPTION
  Show Terraform Enterprise SSH key details.
