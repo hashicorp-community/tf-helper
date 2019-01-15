@@ -100,12 +100,6 @@ make_new_workspace_payload () {
 # $8 VCS repo ID (e.g. "github_org/github_repo")
 # $9 queue-all-runs
 
-if [ -n "$6" ]; then
-    default_branch=false
-else
-    default_branch=true
-fi
-
 cat > "$payload" <<EOF
 {
   "data": {
@@ -119,8 +113,7 @@ cat >> "$payload" <<EOF
         "identifier": "$8",
         "oauth-token-id": "$5",
         "ingress-submodules": $7,
-        "branch": "$6",
-        "default-branch": $default_branch
+        "branch": "$6"
       },
 EOF
 fi
@@ -153,7 +146,7 @@ tfe_new () (
     working_dir=
     vcs_id=
     vcs_branch=
-    vcs_submodules=
+    vcs_submodules=false
     oauth_id=
 
     # Ensure all of tfe_org, etc, are set
@@ -233,25 +226,76 @@ tfe_new () (
         # If no oauth id was given, then see if there is only one and use
         # that one
         if [ -z "$oauth_id" ]; then
-            oauth_id="$( (
-                set -e
-                echodebug "[DEBUG] API request for OAuth tokens for $tfe_org"
+            echodebug "[DEBUG] API request for OAuth tokens for $tfe_org"
 
-                url="$tfe_address/api/v2/organizations/$tfe_org/oauth-tokens"
-                oauth_list_resp="$(tfe_api_call "$url")"
+            url="$tfe_address/api/v2/organizations/$tfe_org/oauth-tokens"
+            oauth_list_resp="$(tfe_api_call "$url")"
 
-                oauth_ids="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .id')"
-                echodebug "[DEBUG] OAuth IDs:"
-                echodebug "$oauth_ids"
+            oauth_id="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .id')"
+            echodebug "[DEBUG] OAuth IDs:"
+            echodebug "$oauth_id"
 
-                test -n "$oauth_ids"
-                test 1 -eq "$(echo $oauth_ids | wc -l)"
+            if [ 1 -ne "$(echo "$oauth_id" | wc -l)" ] || [ -z "$oauth_id" ]; then
+                echoerr "Error obtaining a default OAuth ID. Choices are:"
 
-                echo "$oauth_ids"
-            ) 2>&3 )"
+                oauth_clients="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .relationships."oauth-client".data.id')"
 
-            if [ 0 -ne $? ]; then
-                echoerr "Error obtaining a default OAuth ID"
+                echodebug "[DEBUG] OAuth client list:"
+                echodebug "$oauth_clients"
+
+                # Given
+                # ot-1
+                # ot-2
+                # ot-3
+                # oc-1
+                # oc-2
+                # oc-3
+                # Create
+                # ot-1 oc-1
+                # ot-2 oc-2
+                # ot-3 oc-3
+                tokens_clients="$(printf '%s\n%s' "$oauth_id" "$oauth_clients" | awk '
+                    /^ot/ {
+                        ot[i++]=$0
+                    }
+                    /^oc/ {
+                        print ot[j++], $0
+                    }')"
+
+                echodebug "[DEBUG] Tokens and clients:"
+                echodebug "$tokens_clients"
+
+                echo "$tokens_clients" | while read -r ot_oc; do
+                    ot="$(echo "$ot_oc" | cut -d ' ' -f 1)"
+                    oc="$(echo "$ot_oc" | cut -d ' ' -f 2)"
+
+                    url="$tfe_address/api/v2/oauth-clients/$oc"
+                    oauth_client_resp="$(tfe_api_call "$url")"
+
+                    printf '%s' "$oauth_list_resp" | \
+                        jq -r --arg ID "$ot" '
+                            .data []
+                            | select(.id == $ID)
+                            | "id               = " + .id,
+                              "created-at       = " + .attributes."created-at",
+                              "user             = " + .attributes."service-provider-user"'
+
+                    printf '%s' "$oauth_client_resp" | jq -r '
+                        "oauth-client     = " + .data.id,
+                        "created-at       = " + .data.attributes."created-at",
+                        "callback-url     = " + .data.attributes."callback-url",
+                        "connect-path     = " + .data.attributes."connect-path",
+                        "service-provider = " + .data.attributes."service-provider",
+                        "display-name     = " + .data.attributes."service-provider-display-name",
+                        "http-url         = " + .data.attributes."http-url",
+                        "api-url          = " + .data.attributes."api-url",
+                        "key              = " + .data.attributes.key,
+                        "secret           = " + (.data.attributes.secret|tostring),
+                        "rsa-public-key   = " + (.data.attributes."rsa-public-key"|tostring)'
+
+                    echo
+                done
+
                 return 1
             fi
         fi
