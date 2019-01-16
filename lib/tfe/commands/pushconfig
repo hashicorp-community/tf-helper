@@ -25,27 +25,27 @@ list_vcs () {
 }
 
 list_files () {
-    find -L . -type f | grep -E -v '^\.$|.git|.terraform'
+    find -L . -type f 2>/dev/null | grep -E -v '^\.$|.git|.terraform'
 }
 
 list_modules () {
-    find -L .terraform/modules -type f >/dev/null 2>&1 |  grep -E -v '^\.$|\.git'
+    find -L .terraform/modules -type f 2>/dev/null |  grep -E -v '^\.$|\.git'
 }
 
 list_hardlinked () {
-    find -L . -type f -links +1 | grep -E -v '^\.$|.git|.terraform' | cut -c 3-
+    find -L . -type f -links +1 2>/dev/null | grep -E -v '^\.$|.git|.terraform' | cut -c 3-
 }
 
 list_not_hardlinked () {
-    find -L . -type f -links 1 | grep -E -v '^\.$|.git|.terraform' | cut -c 3-
+    find -L . -type f -links 1 2>/dev/null | grep -E -v '^\.$|.git|.terraform' | cut -c 3-
 }
 
 list_hardlinked_modules () {
-    find -L .terraform/modules -type f -links +1 >/dev/null 2>&1 |  grep -E -v '^\.$|\.git'
+    find -L .terraform/modules -type f -links +1 2>/dev/null |  grep -E -v '^\.$|\.git'
 }
 
 list_not_hardlinked_modules () {
-    find -L .terraform/modules -type f -links 1 >/dev/null |  grep -E -v '^\.$|\.git'
+    find -L .terraform/modules -type f -links 1 2>/dev/null |  grep -E -v '^\.$|\.git'
 }
 
 # Use GNU tar to archive the current directory
