@@ -79,7 +79,7 @@ $(tfe_usage_args)
                       must enable this for every variable you want to
                       overwrite. Can be set multiple times.
 
-  -overwrite-all <BOOLEAN>
+ -overwrite-all <BOOLEAN>
                       Overwrite the existing value of every variable being
                       operated on if that variable is already set in Terraform
                       Enterprise. Defaults to false. Use with extreme caution.
