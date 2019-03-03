@@ -1,0 +1,104 @@
+#!/bin/sh
+
+# Requires echoerr and echodebug
+
+# Add, remove, or modify given values in a shell config file at the given path.
+# Remove values by providing an empty value. If no file exists it will be
+# created.
+# update_sh_config FILEPATH VAR [VAR ...]
+# Where VAR is NAME=VALUE, NAME=, OR NAME
+update_sh_config () {
+    if [ -f "$1" ]; then
+        echodebug "[DEBUG] Modifying $1"
+    else
+        echodebug "[DEBUG] Creating $1"
+        if ! touch "$1"; then
+            echoerr "ERROR: Could not create $1"
+        fi
+    fi
+
+    config="$(awk '# Generate the config from arg input and existing file.
+
+        # Given a potential var=value line, separate them, set VARNAME
+        # and VARVALUE.
+        function splitvar(var) {
+            # Find = or the end
+            eq = index(var, "=")
+            if(eq == 0) {
+                eq = length(var + 1)
+            }
+
+            # Extract the name and value
+            VARNAME = substr(var, 1, eq - 1)
+            VARVALUE = substr(var, eq + 1)
+
+            # Enclose the value in quotes if not already
+            if(VARVALUE && VARVALUE !~ /^".*"$/) {
+                VARVALUE = "\"" VARVALUE "\""
+            }
+
+            # Error if VARNAME is not a valid shell variable name
+            if(VARNAME !~ varname_re) {
+                VARNAME=""
+                VARVALUE=""
+                return 1
+            }
+            return 0
+        }
+
+        BEGIN {
+            # Matches valid shell variable names
+            varname_re = "[A-Za-z_][A-Za-z0-9_]*"
+
+            # Arg1 is the config file. The rest are config entries to process,
+            # so make them into an array and remove them from the arg vector.
+            for(i=2; i<ARGC; i++) {
+                if(splitvar(ARGV[i]) == 0) {
+                    config[VARNAME] = VARVALUE
+                    ARGV[i] = ""
+                    vars++
+                }
+            }
+
+            # No variables were given to process.
+            if(!vars) {
+                exit 1
+            }
+
+            ARGC = 2
+        }
+
+        # Start processing the config file.
+
+        # This line is a variable we were given to modify.
+        $0 ~ "^" varname_re && splitvar($0) == 0 && config[VARNAME] {
+            # If no value was supplied, skip it, effectively removing it from
+            # the config file.
+            if(! config[VARNAME]) {
+                next
+            }
+
+            # There is a value, so write that and remove it from the array
+            # since it was processed.
+            print VARNAME "=" config[VARNAME]
+            delete config[VARNAME]
+            next
+        }
+
+        # Preserve unmodified lines as-is.
+        { print }
+
+        END {
+            # If there are still config entries that means we were given
+            # variables to process that were not already in the config file.
+            # Those should then be added at the end.
+            for(c in config) {
+                if(config[c]) {
+                    print c "=" config[c]
+                }
+            }
+        }
+    ' "$@")"
+
+    echo "$config" | tee "$1"
+}
