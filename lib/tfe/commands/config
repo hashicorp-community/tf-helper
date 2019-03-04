@@ -105,6 +105,7 @@ tfe_config () (
            [ "$tfe_token_via" = '$TFE_TOKEN'   ] ||
            [ "$tfe_token_via" = '-token'       ]; then
             make_tfe_curl_config "$tfe_curl_config" "$tfe_token"
+            echo "# Wrote $tfe_curl_config"
         fi
     else
         printf 'TFE_ORG="%s"\n' "$tfe_org"
