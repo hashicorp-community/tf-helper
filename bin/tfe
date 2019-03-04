@@ -407,8 +407,14 @@ else
     exec 3>/dev/null
 fi
 
+# Default files and TFE address
+readonly tfe_default_config="$HOME/.tfe-cli"
+readonly tfe_default_address="https://app.terraform.io"
+readonly tfe_default_curl_config="$HOME/.tfe-cli-curl"
+readonly tf_default_config="$HOME/.terraformrc"
+
 # Source the tfe-cli configuration file if present
-tfe_config=${TFE_CONFIG:-"$HOME/.tfe-cli"}
+tfe_config=${TFE_CONFIG:-"$tfe_default_config"}
 if [ -f "$tfe_config" ]; then
     echodebug "[DEBUG] Loading $tfe_config"
     . "$tfe_config"
@@ -417,7 +423,6 @@ else
 fi
 
 # Allow setting the URL to TFE with TFE_URL
-tfe_default_address="https://app.terraform.io"
 tfe_address=${TFE_URL:-"$tfe_default_address"}
 
 # Token discovery:
@@ -432,7 +437,7 @@ tfe_address=${TFE_URL:-"$tfe_default_address"}
 
 tfe_token_via=
 tfe_curl_token_arg=
-tfe_curl_config="${TFE_CURL_CONFIG:-"$HOME/.tfe-cli-curl"}"
+tfe_curl_config="${TFE_CURL_CONFIG:-"$tfe_default_curl_config"}"
 if [ -f "$tfe_curl_config" ]; then
     # Setting this to the config location just so this variable has a value
     tfe_token="$tfe_curl_config"
