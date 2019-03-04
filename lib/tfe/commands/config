@@ -104,7 +104,7 @@ tfe_config () (
         if [ "$tfe_token_via" = '$ATLAS_TOKEN' ] ||
            [ "$tfe_token_via" = '$TFE_TOKEN'   ] ||
            [ "$tfe_token_via" = '-token'       ]; then
-            make_tfe_curl_config
+            make_tfe_curl_config "$tfe_curl_config" "$tfe_token"
         fi
     else
         printf 'TFE_ORG="%s"\n' "$tfe_org"
