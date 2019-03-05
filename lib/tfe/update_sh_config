@@ -14,10 +14,11 @@ update_sh_config () {
         echodebug "[DEBUG] Creating $1"
         if ! touch "$1"; then
             echoerr "ERROR: Could not create $1"
+            return 1
         fi
     fi
 
-    config="$(awk '# Generate the config from arg input and existing file.
+    if ! config="$(awk '# Generate the config from arg input and existing file.
 
         # Given a potential var=value line, separate them, set VARNAME
         # and VARVALUE.
@@ -98,7 +99,15 @@ update_sh_config () {
                 }
             }
         }
-    ' "$@")"
+    ' "$@")"; then
+        echoerr "Error processing configuration"
+        echoerr "$config"
+        return 1
+    fi
 
-    echo "$config" | tee "$1"
+    if ! echo "$config" | tee "$1"; then
+        echoerr "Error writing configuration to file $1"
+        echoerr "$config"
+        return 1
+    fi
 }
