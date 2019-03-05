@@ -75,6 +75,30 @@ cleanup () {
     fi
 }
 
+# Write a given token value to a curl config file at the given path.
+# $1 file path
+# $2 token
+make_tfe_curl_config () {
+    if ! echo > "$1"; then
+        echoerr "Error: cannot write to curl config file:"
+        echoerr "$1"
+        return 1
+    fi
+
+    if ! chmod 600 "$1"; then
+        echoerr "WARNING: unable to set permissions on curl config file:"
+        echoerr "chmod 600 $1"
+    fi
+
+    if ! echo "--header \"Authorization: Bearer $2\"" > "$1"; then
+        echoerr "Error: cannot generate curl config file:"
+        echoerr "$1"
+        return 1
+    fi
+
+    echodebug "[DEBUG] Created $1"
+}
+
 # Usage description for options common to all subcommands
 tfe_usage_args () {
 cat << EOF
@@ -180,7 +204,7 @@ assign_bool () {
 tfe_api_call () {
     echodebug "[DEBUG] curl args: $@"
     if resp="$(curl -f $tfe_curl_silent \
-                 --header "Authorization: Bearer $tfe_token" \
+                 $tfe_curl_token_arg \
                  --header "Content-Type: application/vnd.api+json" \
                  $@)"; then
         echodebug "[DEBUG] API request succeeded with exit code $?. Response:"
@@ -295,7 +319,6 @@ is_common_opt () {
 ##
 
 # Check for commands that must be present to function
-
 for required_cmd in jq curl readlink; do
     if [ -z "$(command -v $required_cmd)" ]; then
         echo "The $required_cmd command must be installed" 1>&2
@@ -359,22 +382,18 @@ tfe_cmd_dir="$tfe_lib_dir/commands"
 tfe_libexec_dir="$tfe_prefix/libexec/tfe"
 tfe_payload_dir="$tfe_prefix/share/tfe/commands"
 
+#
 # Load required functions
-if [ ! -f "$tfe_lib_dir/echofuncs" ]; then
-    echo "Unable to load required functions from:" 1>&2
-    echo "$tfe_lib_dir/echofuncs" 1>&2
-fi
+#
 
-# Provides echoerr and echodebug
-. "$tfe_lib_dir/echofuncs"
+for func_file in echofuncs subcmd update_sh_config; do
+    if [ ! -f "$tfe_lib_dir/$func_file" ]; then
+        echo "Unable to load required functions from:" 1>&2
+        echo "$tfe_lib_dir/$func_file" 1>&2
+    fi
 
-if [ ! -f "$tfe_lib_dir/subcmd" ]; then
-    echoerr "Unable to load required functions from:"
-    echoerr "$tfe_lib_dir/subcmd"
-fi
-
-# Provides execute_subcmd
-. "$tfe_lib_dir/subcmd"
+    . "$tfe_lib_dir/$func_file"
+done
 
 if [ -n "$TF_LOG" ]; then
     # Debugging. Print command errors and make them verbose
@@ -388,20 +407,65 @@ else
     exec 3>/dev/null
 fi
 
+# Default files and TFE address
+readonly tfe_default_config="$HOME/.tfe-cli"
+readonly tfe_default_address="https://app.terraform.io"
+readonly tfe_default_curl_config="$HOME/.tfe-cli-curl"
+readonly tf_default_config="$HOME/.terraformrc"
+
+# Source the tfe-cli configuration file if present
+tfe_config=${TFE_CONFIG:-"$tfe_default_config"}
+if [ -f "$tfe_config" ]; then
+    echodebug "[DEBUG] Loading $tfe_config"
+    . "$tfe_config"
+else
+    echodebug "[DEBUG] No tfe config file found"
+fi
+
 # Allow setting the URL to TFE with TFE_URL
-tfe_address=${TFE_URL:-"https://app.terraform.io"}
+tfe_address=${TFE_URL:-"$tfe_default_address"}
+
+# Token discovery:
+# * Use ~/.tfe-cli-curl if present (configure path with $TFE_CURL_CONFIG)
+# * Override with $ATLAS_TOKEN
+# * Override with $TFE_TOKEN
+# * Override with -token
+
+# If no other source has obtained a token yet, check for ~/.terraformrc, also
+# configurable with $TERRAFORM_CONFIG. If present, use the value of tfe_address
+# with .terraformrc to generate a .tfe-cli-curl and then use that.
+
+tfe_token_via=
+tfe_curl_token_arg=
+tfe_curl_config="${TFE_CURL_CONFIG:-"$tfe_default_curl_config"}"
+if [ -f "$tfe_curl_config" ]; then
+    # Setting this to the config location just so this variable has a value
+    tfe_token="$tfe_curl_config"
+
+    # Use the tfe-cli-curl config file
+    tfe_curl_token_arg="--config $tfe_curl_config"
+    tfe_token_via="$tfe_curl_config"
+fi
+
+# Support the old ATLAS_TOKEN variable
+if [ -n "$ATLAS_TOKEN" ]; then
+    tfe_token="$ATLAS_TOKEN"
+    tfe_token_via='$ATLAS_TOKEN'
+    tfe_curl_token_arg="--header \"Authorization: Bearer $tfe_token\""
+fi
+
+# Prefer TFE_TOKEN
+if [ -n "$TFE_TOKEN" ]; then
+    tfe_token="$TFE_TOKEN"
+    tfe_token_via='$TFE_TOKEN'
+    tfe_curl_token_arg="--header \"Authorization: Bearer $tfe_token\""
+fi
 
 # Allow setting the TFE organization with TFE_ORG
 tfe_org="$TFE_ORG"
 
 # Allow setting the TFE workspace with TFE_WORKSPACE
 tfe_workspace="$TFE_WORKSPACE"
-
-# Prefer TFE_TOKEN, fall back to ATLAS_TOKEN.
-tfe_token="$TFE_TOKEN"
-if [ -z "$tfe_token" ]; then
-    tfe_token="$ATLAS_TOKEN"
-fi
 
 echodebug "[DEBUG] $PWD"
 echodebug "[DEBUG] $0 $*"
@@ -486,6 +550,8 @@ for arg in "$@"; do
             ;;
         -token)
             tfe_token="$arg"
+            tfe_token_via="-token"
+            tfe_curl_token_arg="--header \"Authorization: Bearer $tfe_token\""
             assign=
             continue
             ;;
@@ -500,10 +566,67 @@ echodebug "[DEBUG] tfe_address: $tfe_address"
 echodebug "[DEBUG] tfe_org: $tfe_org"
 echodebug "[DEBUG] tfe_workspace: $tfe_workspace"
 
-if [ -n "$tfe_token" ]; then
-    echodebug "[DEBUG] tfe_token: (not empty)"
+# If no token has been found up to this point, or if the token source is a
+# .tfe-curl-config file, check for .terraformrc and either generate a
+# .tfe-cli-curl config file if there isn't one, or otherwise compare and
+# validate contents.
+if [ -z "$tfe_token" ] || [ "$tfe_token_via" = "$tfe_curl_config" ]; then
+    tf_config="${TERRAFORM_CONFIG:-"$HOME/.terraformrc"}"
+    if [ -f "$tf_config" ]; then
+        # This is simplified. It depends on the token keyword and value being
+        # on the same line in the .terraformrc.
+        tf_config_token="$(awk -v url="${tfe_address#https://}" '
+            $0 ~ "\"" url "\"" { in_url=1 }
+            in_url && /token *= *"[A-Za-z0-9\.][A-Za-z0-9\.]*"/ {
+                match($0, /"[A-Za-z0-9\.][A-Za-z0-9\.]*"/)
+                print substr($0, RSTART+1, RLENGTH-2)
+            }
+        ' "$tf_config")"
+
+        if [ -n "$tf_config_token" ] && [ -z "$tfe_token" ]; then
+            if ! make_tfe_curl_config "$tfe_curl_config" "$tf_config_token"; then
+                exit 1
+            fi
+
+            tfe_token_via="$tfe_curl_config generated from $tf_config"
+            tfe_curl_token_arg="--config $tfe_curl_config"
+
+            # Setting this to the config location just so this variable has a value
+            tfe_token="$tfe_curl_config"
+        elif [ -n "$tf_config_token" ] &&
+             [ -n "$tfe_token" ] &&
+             [ "$tfe_token_via" = "$tfe_curl_config" ] &&
+             [ -z "$TFE_NO_CURL_CONFIG_DIFF" ] ; then
+            # Got a .terraformrc token and the current token is from a tfe curl
+            # config. Compare the tokens to see if they're the same.
+            tfe_curl_config_token="$(awk '
+                    /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/ {
+                        match($0, /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/)
+                        print substr($0, RSTART+7, RLENGTH-7)
+                    }
+                ' "$tfe_curl_config")"
+
+            if [ "$tfe_curl_config_token" != "$tf_config_token" ]; then
+                echoerr "WARNING Tokens do not match in files:"
+                echoerr "$tf_config"
+                echoerr "$tfe_curl_config"
+                echoerr
+                echoerr "Using $tfe_curl_config"
+                echoerr "Remove $tfe_curl_config to use the token from $tf_config"
+                echoerr "Suppress this message by setting TFE_NO_CURL_CONFIG_DIFF=1"
+                echoerr
+            fi
+        fi
+    fi
+fi
+
+# The whole point of tfe is to talk to the TFE server, so if there's no token
+# then exit.
+if [ -z "$tfe_token" ]; then
+    echoerr "Error: TFE token not found"
+    exit 1
 else
-    echodebug "[DEBUG] tfe_token: (empty)"
+    echodebug "[DEBUG] tfe_token: (set by $tfe_token_via)"
 fi
 
 # Run the subcommand
