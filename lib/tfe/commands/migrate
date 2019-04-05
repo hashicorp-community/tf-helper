@@ -106,7 +106,7 @@ EOF
 }
 
 tfe_migrate () (
-    payload="$TMPDIR/tfe-migrate-payload-$(date +%s)"
+    payload="$TMPDIR/tfe-migrate-payload-$(random_enough)"
     legacy_name=
     vcs_id=
     oauth_id=

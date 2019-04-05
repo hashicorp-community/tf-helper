@@ -63,7 +63,7 @@ cat "$payload" 1>&3
 }
 
 tfe_unassign () (
-    payload="$TMPDIR/tfe-new-payload-$(date +%s)"
+    payload="$TMPDIR/tfe-new-payload-$(random_enough)"
 
     # Ensure all of the common required variables are set
     if ! check_required; then

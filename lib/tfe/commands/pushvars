@@ -291,7 +291,7 @@ process_vars () {
 }
 
 tfe_pushvars () (
-    payload="$TMPDIR/tfe-push-vars-payload-$(date +%s)"
+    payload="$TMPDIR/tfe-push-vars-payload-$(random_enough)"
     dry_run=
     dry_run_set=
     config_dir=
@@ -628,7 +628,7 @@ tfe_pushvars () (
         # Will get the values by using the tfvars file and creating a
         # temporary config with just variable names in it for use with
         # the terraform console command.
-        tfvar_dir="$TMPDIR/tfe-push-vars-$(date +%s)"
+        tfvar_dir="$TMPDIR/tfe-push-vars-$(random_enough)"
         if ! mkdir "$tfvar_dir"; then
             echoerr "Error creating temporary directory for tfvars."
             return 1

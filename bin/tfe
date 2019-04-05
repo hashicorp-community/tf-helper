@@ -376,6 +376,14 @@ fi
 # Provides execute_subcmd
 . "$tfe_lib_dir/subcmd"
 
+if [ ! -f "$tfe_lib_dir/random_enough" ]; then
+    echoerr "Unable to load required functions from:"
+    echoerr "$tfe_lib_dir/random_enough"
+fi
+
+# Provides random_enough
+. "$tfe_lib_dir/random_enough"
+
 if [ -n "$TF_LOG" ]; then
     # Debugging. Print command errors and make them verbose
     tfe_tar_verbose=v

@@ -70,8 +70,8 @@ gnutar () {
 bsdtar () {
     echodebug "[DEBUG] Using BSD tar"
 
-    vcslist="$TMPDIR/vcslist-$(date +%s)"
-    hardlinklist="$TMPDIR/hardlinklist-$(date +%s)"
+    vcslist="$TMPDIR/vcslist-$(random_enough)"
+    hardlinklist="$TMPDIR/hardlinklist-$(random_enough)"
 
     hardlinks="$(list_hardlinked | sort)"
     echo "$hardlinks" > "$hardlinklist"
@@ -230,9 +230,9 @@ tfe_pushconfig () (
     poll_run=0
     destroy=
     current_config=
-    run_payload="$TMPDIR/run-$(date +%s).json"
-    config_payload="$TMPDIR/content-$(date +%s).tar.gz"
-    tarlist="$TMPDIR/tarlist-$(date +%s)"
+    run_payload="$TMPDIR/run-$(random_enough).json"
+    config_payload="$TMPDIR/content-$(random_enough).tar.gz"
+    tarlist="$TMPDIR/tarlist-$(random_enough)"
 
     # Check for additional required commands.
     if [ -z "$(command -v tar)" ]; then
