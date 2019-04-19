@@ -95,7 +95,7 @@ cat $payload 1>&3
 }
 
 tfe_update () (
-    payload="$TMPDIR/tfe-migrate-payload-$(date +%s)"
+    payload="$TMPDIR/tfe-migrate-payload-$(random_enough)"
     auto_apply=false
     queue_all_runs=false
     tf_version=

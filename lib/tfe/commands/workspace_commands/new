@@ -139,7 +139,7 @@ cat "$payload" 1>&3
 }
 
 tfe_new () (
-    payload="$TMPDIR/tfe-new-payload-$(date +%s)"
+    payload="$TMPDIR/tfe-new-payload-$(random_enough)"
     auto_apply=false
     queue_all_runs=false
     tf_version=

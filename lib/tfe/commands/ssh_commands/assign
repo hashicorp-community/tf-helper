@@ -71,7 +71,7 @@ cat "$payload" 1>&3
 }
 
 tfe_assign () (
-    payload="$TMPDIR/tfe-new-payload-$(date +%s)"
+    payload="$TMPDIR/tfe-new-payload-$(random_enough)"
     ssh_name=
     ssh_id=
 
