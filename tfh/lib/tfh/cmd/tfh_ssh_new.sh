@@ -45,13 +45,13 @@ echodebug "[DEBUG] Payload contents:"
 cat "$payload" 1>&3
 }
 
-tfe_new () (
+tfh_ssh_new () (
     payload="$TMPDIR/tfe-new-payload-$(random_enough)"
     ssh_name=
     ssh_key=
 
-    # Ensure all of tfe_org, etc, are set. Workspace is not required.
-    if ! check_required tfe_org tfe_token tfe_address; then
+    # Ensure all of org, etc, are set. Workspace is not required.
+    if ! check_required org tfh_token address; then
         return 1
     fi
 
@@ -97,8 +97,8 @@ tfe_new () (
     fi
 
     echodebug "[DEBUG] API request for new SSH key:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/ssh-keys"
-    if ! new_resp="$(tfe_api_call -d @"$payload" "$url")"; then
+    url="$address/api/v2/organizations/$org/ssh-keys"
+    if ! new_resp="$(tfh_api_call -d @"$payload" "$url")"; then
         echoerr "Error creating SSH key $ssh_name"
         return 1
     fi

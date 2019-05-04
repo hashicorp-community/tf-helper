@@ -20,18 +20,18 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_delete () (
-    # Ensure all of tfe_org, etc, are set.
+ws_delete () (
+    # Ensure all of org, etc, are set.
     if ! check_required; then
         return 1
     fi
 
     echodebug "[DEBUG] API request to delete workspace:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces/$tfe_workspace"
-    if ! tfe_api_call -X DELETE "$url" >/dev/null; then
-        echoerr "Error deleting workspaces $tfe_org/$tfe_workspace"
+    url="$address/api/v2/organizations/$org/workspaces/$ws"
+    if ! tfh_api_call -X DELETE "$url" >/dev/null; then
+        echoerr "Error deleting workspaces $org/$ws"
         return 1
     fi
 
-    echo "Deleted $tfe_org/$tfe_workspace"
+    echo "Deleted $org/$ws"
 )

@@ -20,7 +20,7 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_show () (
+tfh_ssh_show () (
     ssh_name=
     ssh_id=
 
@@ -62,7 +62,7 @@ tfe_show () (
     # the output to the one of interest.
     . "$cmd_dir/list"
 
-    if ! listing="$(tfe_list)"; then
+    if ! listing="$(tfh_list)"; then
         # The listing command will have printed error messages.
         return 1
     fi

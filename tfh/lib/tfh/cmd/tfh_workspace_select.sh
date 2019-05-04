@@ -20,7 +20,7 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_select () (
+ws_select () (
     if [ -z "$1" ]; then
         echoerr "Exactly one argument required: workspace name"
         return 1
@@ -34,8 +34,8 @@ tfe_select () (
 
     . "$cmd_dir/list"
 
-    if ! workspace_list="$(tfe_list)"; then
-        # An error from tfe_list should have been printed
+    if ! workspace_list="$(tfh_list)"; then
+        # An error from tfh_list should have been printed
         return 1
     fi
 
@@ -45,7 +45,7 @@ tfe_select () (
     fi
 
     # Write the workspace configuration
-    if err="$(update_sh_config "$tfe_config" "TFE_WORKSPACE=$1")"; then
+    if err="$(update_sh_config "$tfh_config" "TFE_WORKSPACE=$1")"; then
         echo "Switched to workspace: $1"
     else
         echoerr "$err"

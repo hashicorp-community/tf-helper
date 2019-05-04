@@ -20,16 +20,16 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_list () (
-    # Ensure all of tfe_org, etc, are set. Workspace is not required.
-    if ! check_required tfe_org tfe_token tfe_address; then
+tfh_ssh_list () (
+    # Ensure all of org, etc, are set. Workspace is not required.
+    if ! check_required org tfh_token address; then
         return 1
     fi
 
     echodebug "[DEBUG] API request to list SSH keys:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/ssh-keys"
-    if ! list_resp="$(tfe_api_call "$url")"; then
-        echoerr "Error listing SSH keys for $tfe_org"
+    url="$address/api/v2/organizations/$org/ssh-keys"
+    if ! list_resp="$(tfh_api_call "$url")"; then
+        echoerr "Error listing SSH keys for $org"
         return 1
     fi
 

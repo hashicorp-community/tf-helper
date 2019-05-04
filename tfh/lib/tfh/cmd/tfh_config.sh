@@ -20,7 +20,7 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_config () (
+tfh_config () (
     # Parse options
 
     while [ -n "$1" ]; do
@@ -52,29 +52,29 @@ tfe_config () (
         # Create/update the .tfe-cli config.
 
         # Only write TFE_URL if it's not the default value.
-        if [ "$tfe_address" = "$tfe_default_address"  ]; then
+        if [ "$address" = "$tfh_default_address"  ]; then
             url=
         else
-            url="$tfe_address"
+            url="$address"
         fi
 
-        update_sh_config "$tfe_config" "TFE_ORG=$tfe_org" \
-            "TFE_WORKSPACE=$tfe_workspace" "TFE_URL=$url"
+        update_sh_config "$tfh_config" "TFE_ORG=$org" \
+            "TFE_WORKSPACE=$ws" "TFE_URL=$url"
 
         # (Re)create / overwrite the .tfe-cli-curl config
-        if [ "$tfe_token_via" = '$ATLAS_TOKEN' ] ||
-           [ "$tfe_token_via" = '$TFE_TOKEN'   ] ||
-           [ "$tfe_token_via" = '-token'       ]; then
-            make_tfe_curl_config "$tfe_curl_config" "$tfe_token"
-            echo "# Wrote $tfe_curl_config"
+        if [ "$tfh_token_via" = '$ATLAS_TOKEN' ] ||
+           [ "$tfh_token_via" = '$TFE_TOKEN'   ] ||
+           [ "$tfh_token_via" = '-token'       ]; then
+            make_tfh_curl_config "$tfh_curl_config" "$tfh_token"
+            echo "# Wrote $tfh_curl_config"
         fi
     else
-        printf 'TFE_ORG="%s"\n' "$tfe_org"
-        printf 'TFE_WORKSPACE="%s"\n' "$tfe_workspace"
-        printf 'TFE_URL="%s"\n' "$tfe_address"
+        printf 'TFE_ORG="%s"\n' "$org"
+        printf 'TFE_WORKSPACE="%s"\n' "$ws"
+        printf 'TFE_URL="%s"\n' "$address"
 
-        if [ -n "$tfe_token" ]; then
-            echo "# TFE_TOKEN set by $tfe_token_via"
+        if [ -n "$tfh_token" ]; then
+            echo "# TFE_TOKEN set by $tfh_token_via"
         else
             echo "# TFE_TOKEN is unset"
         fi

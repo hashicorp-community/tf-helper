@@ -20,7 +20,7 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_pullvars () (
+tfh_pullvars () (
     # List of vars to retrieve
     vars=
 
@@ -83,14 +83,14 @@ tfe_pullvars () (
     fi
 
     # request template
-    url="$tfe_address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$tfe_org&filter%5Bworkspace%5D%5Bname%5D=$tfe_workspace"
+    url="$address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$org&filter%5Bworkspace%5D%5Bname%5D=$ws"
 
     echodebug "[DEBUG] API list variables URL:"
     echodebug "$url"
 
     # API call to get all of the variables
     echodebug "[DEBUG] API request for variable list:"
-    if ! var_get_resp="$(tfe_api_call $url)"; then
+    if ! var_get_resp="$(tfh_api_call $url)"; then
         echoerr "Error listing variables"
         return 1
     fi

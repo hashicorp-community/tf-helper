@@ -74,7 +74,7 @@ echodebug "[DEBUG] Payload contents:"
 cat "$payload" 1>&3
 }
 
-tfe_new () (
+ws_new () (
     payload="$TMPDIR/tfe-new-payload-$(random_enough)"
     auto_apply=false
     queue_all_runs=false
@@ -85,7 +85,7 @@ tfe_new () (
     vcs_submodules=false
     oauth_id=
 
-    # Ensure all of tfe_org, etc, are set
+    # Ensure all of org, etc, are set
     if ! check_required all; then
         return 1
     fi
@@ -162,10 +162,10 @@ tfe_new () (
         # If no oauth id was given, then see if there is only one and use
         # that one
         if [ -z "$oauth_id" ]; then
-            echodebug "[DEBUG] API request for OAuth tokens for $tfe_org"
+            echodebug "[DEBUG] API request for OAuth tokens for $org"
 
-            url="$tfe_address/api/v2/organizations/$tfe_org/oauth-tokens"
-            oauth_list_resp="$(tfe_api_call "$url")"
+            url="$address/api/v2/organizations/$org/oauth-tokens"
+            oauth_list_resp="$(tfh_api_call "$url")"
 
             oauth_id="$(printf "%s" "$oauth_list_resp" | jq -r '.data[] | .id')"
             echodebug "[DEBUG] OAuth IDs:"
@@ -205,8 +205,8 @@ tfe_new () (
                     ot="$(echo "$ot_oc" | cut -d ' ' -f 1)"
                     oc="$(echo "$ot_oc" | cut -d ' ' -f 2)"
 
-                    url="$tfe_address/api/v2/oauth-clients/$oc"
-                    oauth_client_resp="$(tfe_api_call "$url")"
+                    url="$address/api/v2/oauth-clients/$oc"
+                    oauth_client_resp="$(tfh_api_call "$url")"
 
                     printf '%s' "$oauth_list_resp" | \
                         jq -r --arg ID "$ot" '
@@ -246,7 +246,7 @@ tfe_new () (
     # $7 VCS submodules
     # $8 VCS repo ID (e.g. "github_org/github_repo")
     # $9 queue-all-runs
-    make_new_workspace_payload "$tfe_workspace" "$auto_apply" "$tf_version" \
+    make_new_workspace_payload "$ws" "$auto_apply" "$tf_version" \
                                "$working_dir" "$oauth_id" "$vcs_branch" \
                                "$vcs_submodules" "$vcs_id" "$queue_all_runs"
     if [ 0 -ne $? ]; then
@@ -255,13 +255,13 @@ tfe_new () (
     fi
 
     echodebug "[DEBUG] API request for new workspace:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces"
-    if ! new_resp="$(tfe_api_call -d @"$payload" "$url")"; then
-        echoerr "Error creating workspace $tfe_org/$tfe_workspace"
+    url="$address/api/v2/organizations/$org/workspaces"
+    if ! new_resp="$(tfh_api_call -d @"$payload" "$url")"; then
+        echoerr "Error creating workspace $org/$ws"
         return 1
     fi
 
     cleanup "$payload"
 
-    echo "Created new workspace $tfe_org/$tfe_workspace"
+    echo "Created new workspace $org/$ws"
 )

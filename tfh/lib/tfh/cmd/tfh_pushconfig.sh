@@ -62,7 +62,7 @@ gnutar () {
         list_modules >> "$tarlist"
     fi
 
-    tar ${tfe_tar_verbose}zcfh \
+    tar ${tfh_tar_verbose}zcfh \
         "$1" -T "$tarlist" --hard-dereference
 }
 
@@ -95,7 +95,7 @@ bsdtar () {
             list_modules >> "$tarlist"
         fi
 
-        tar ${tfe_tar_verbose}zcfh \
+        tar ${tfh_tar_verbose}zcfh \
             "$1" -T "$tarlist"
     else
         # If there are hardlinks they have to be added separately
@@ -122,12 +122,12 @@ bsdtar () {
 
         # Start by creating an uncompressed tar of the non-hardlinks
         echodebug "[DEBUG] Creating initial tar"
-        tar ${tfe_tar_verbose}cfh "${1%.gz}" -T "$tarlist"
+        tar ${tfh_tar_verbose}cfh "${1%.gz}" -T "$tarlist"
 
         # Add each hardlink to the archive individually
         echodebug "[DEBUG] Adding each hardlink"
         cat "$hardlinklist" | while read -r hl; do
-            tar ${tfe_tar_verbose}rf "${1%.gz}" "$hl"
+            tar ${tfh_tar_verbose}rf "${1%.gz}" "$hl"
         done
 
         # Compress the completed archive
@@ -174,7 +174,7 @@ cat >> "$run_payload" <<EOF
 EOF
 }
 
-tfe_pushconfig () (
+tfh_pushconfig () (
     upload_modules=1
     vcs=1
     message="Queued via tfe-cli"
@@ -282,10 +282,10 @@ tfe_pushconfig () (
     # Gets the workspace ID given the organization name and workspace name
     workspace_id="$( (
         set -e
-        echodebug "[DEBUG] Requesting workspace information for $tfe_org/$tfe_workspace"
+        echodebug "[DEBUG] Requesting workspace information for $org/$ws"
 
-        url="$tfe_address/api/v2/organizations/$tfe_org/workspaces/$tfe_workspace"
-        workspace_id_resp="$(tfe_api_call "$url")"
+        url="$address/api/v2/organizations/$org/workspaces/$ws"
+        workspace_id_resp="$(tfh_api_call "$url")"
         echodebug "[DEBUG] Workspace ID response:"
         echodebug "$workspace_id_resp"
 
@@ -344,7 +344,7 @@ tfe_pushconfig () (
 
         echo "Uploading Terraform config..."
 
-        echodebug "[DEBUG] Creating a new config version for $tfe_workspace"
+        echodebug "[DEBUG] Creating a new config version for $ws"
 
         # The JSON Payload used to create the new configuration version
         config_ver_payload='{"data":{"type":"configuration-versions","attributes":{"auto-queue-runs":false}}}'
@@ -352,12 +352,12 @@ tfe_pushconfig () (
         echodebug "[DEBUG] Creating config version in workspace $workspace_id"
 
         # Creates the configuration version and extractes the upload-url
-        url=$tfe_address/api/v2/workspaces/$workspace_id/configuration-versions
+        url=$address/api/v2/workspaces/$workspace_id/configuration-versions
 
         echodebug "[DEBUG] URL: $url"
 
         echodebug "[DEBUG] API request for config upload:"
-        if ! upload_url_resp="$(tfe_api_call -d "$config_ver_payload" $url)"; then
+        if ! upload_url_resp="$(tfh_api_call -d "$config_ver_payload" $url)"; then
             echoerr "Error creating config version"
             cleanup "$config_payload" "$tarlist"
             return 1
@@ -377,7 +377,7 @@ tfe_pushconfig () (
             echodebug "[DEBUG] Upload URL: $url"
             echodebug "[DEBUG] Uploading content to upload URL"
 
-            upload_config_resp="$(curl -f $tfe_curl_silent -X PUT --data-binary "@$config_payload" ${url})"
+            upload_config_resp="$(curl -f $tfh_curl_silent -X PUT --data-binary "@$config_payload" ${url})"
 
             echodebug "[DEBUG] Upload config response:"
             echodebug "$upload_config_resp"
@@ -393,13 +393,13 @@ tfe_pushconfig () (
     # that the config version is ready for use. It has a status, and it's
     # necessary to poll on that status to make sure that the upload is
     # "uploaded", even if the upload is complete on the client side.
-    url="$tfe_address/api/v2/configuration-versions/$config_id"
+    url="$address/api/v2/configuration-versions/$config_id"
     config_status=
     retries=0
     while [ "$config_status" != "uploaded" ] && [ $retries -lt 3 ]; do
         # Initially don't sleep, and then back off linearly
         sleep $retries
-        if config_get_resp="$(tfe_api_call $url)"; then
+        if config_get_resp="$(tfh_api_call $url)"; then
             config_status="$(printf "%s" "$config_get_resp" | jq -r '.data.attributes.status')"
         fi
         echodebug "[DEBUG] Config status: $config_status"
@@ -415,8 +415,8 @@ tfe_pushconfig () (
     echodebug "[DEBUG] Run payload contents:"
     echodebug "$(cat "$run_payload")"
 
-    url=$tfe_address/api/v2/runs
-    if ! run_create_resp="$(tfe_api_call -d @"$run_payload" $url)"; then
+    url=$address/api/v2/runs
+    if ! run_create_resp="$(tfh_api_call -d @"$run_payload" $url)"; then
         echoerr "Error creating run"
         if [ $destroy ]; then
             echoerr "Note: -destroy requires CONFIRM_DESTROY=1 in the workspace"
@@ -438,7 +438,7 @@ tfe_pushconfig () (
         return 1
     fi
 
-    printf "Run $run_id submitted to $tfe_org/$tfe_workspace"
+    printf "Run $run_id submitted to $org/$ws"
     if [ -n "$config_id" ]; then
         printf " using config $config_id"
     fi
@@ -468,17 +468,17 @@ tfe_pushconfig () (
             fi
 
             echodebug "[DEBUG] API request to poll run:"
-            url=$tfe_address/api/v2/workspaces/$workspace_id/runs
-            poll_run_resp="$(tfe_api_call $url)"
+            url=$address/api/v2/workspaces/$workspace_id/runs
+            poll_run_resp="$(tfh_api_call $url)"
 
             run_status="$(printf "%s" "$poll_run_resp" | jq -r '.data[] | select(.id == "'$run_id'") | .attributes.status')"
             [ 0 -ne $? ] && continue
 
             echo "$run_status"
 
-            echodebug "[DEBUG] API Request for workspace info $tfe_org/$tfe_workspace"
-            url="$tfe_address/api/v2/organizations/$tfe_org/workspaces/$tfe_workspace"
-            workspace_info_resp="$(tfe_api_call "$url")"
+            echodebug "[DEBUG] API Request for workspace info $org/$ws"
+            url="$address/api/v2/organizations/$org/workspaces/$ws"
+            workspace_info_resp="$(tfh_api_call "$url")"
 
             workspace_locked="$(printf "%s" "$workspace_info_resp" | jq -r '.data.attributes.locked')"
 

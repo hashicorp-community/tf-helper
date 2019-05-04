@@ -20,18 +20,18 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_delete () (
+tfh_ssh_delete () (
     # Use the show command to check for and retrieve the ID of the key
     # in the case of being passed a name.
     . "$cmd_dir/show"
 
     # Pass the command line arguments to show and get back a key (or error)
-    if ! ssh_show="$(tfe_show "$@")"; then
+    if ! ssh_show="$(tfh_show "$@")"; then
         # The show command will have printed error messages.
         return 1
     fi
 
-    # Really, if it's empty then tfe_show should have exited non-zero
+    # Really, if it's empty then tfh_show should have exited non-zero
     if [ -z "$ssh_show" ]; then
         echoerr "SSH key not found"
         return 1
@@ -40,8 +40,8 @@ tfe_delete () (
     ssh_id="$(echo "$ssh_show" | cut -d ' ' -f 2)"
 
     echodebug "[DEBUG] API request to delete SSH key:"
-    url="$tfe_address/api/v2/ssh-keys/$ssh_id"
-    if ! tfe_api_call -X DELETE "$url" >/dev/null; then
+    url="$address/api/v2/ssh-keys/$ssh_id"
+    if ! tfh_api_call -X DELETE "$url" >/dev/null; then
         echoerr "Error deleting SSH key $ssh_id"
         return 1
     fi

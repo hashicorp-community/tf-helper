@@ -20,16 +20,16 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_show () (
-    # Ensure all of tfe_org, etc, are set. Workspace is not required.
-    if ! check_required tfe_org tfe_token tfe_address; then
+ws_show () (
+    # Ensure all of org, etc, are set. Workspace is not required.
+    if ! check_required org tfh_token address; then
         return 1
     fi
 
     echodebug "[DEBUG] API request to show workspace:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces/$tfe_workspace"
-    if ! show_resp="$(tfe_api_call "$url")"; then
-        echoerr "Error showing workspace information for $tfe_workspace"
+    url="$address/api/v2/organizations/$org/workspaces/$ws"
+    if ! show_resp="$(tfh_api_call "$url")"; then
+        echoerr "Error showing workspace information for $ws"
         return 1
     fi
 

@@ -40,7 +40,7 @@ echodebug "[DEBUG] Payload contents:"
 cat $payload 1>&3
 }
 
-tfe_update () (
+ws_update () (
     payload="$TMPDIR/tfe-migrate-payload-$(random_enough)"
     auto_apply=false
     queue_all_runs=false
@@ -54,7 +54,7 @@ tfe_update () (
     vcs_obj=
     attr_obj=
 
-    # Ensure all of tfe_org, etc, are set
+    # Ensure all of org, etc, are set
     if ! check_required all; then
         return 1
     fi
@@ -169,13 +169,13 @@ tfe_update () (
     fi
 
     echodebug "[DEBUG] API request to update workspace:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces/$tfe_workspace"
-    if ! update_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"; then
-        echoerr "Error updating workspace $tfe_org/$tfe_workspace"
+    url="$address/api/v2/organizations/$org/workspaces/$ws"
+    if ! update_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
+        echoerr "Error updating workspace $org/$ws"
         return 1
     fi
 
     cleanup "$payload"
 
-    echo "Updated workspace $tfe_org/$tfe_workspace"
+    echo "Updated workspace $org/$ws"
 )

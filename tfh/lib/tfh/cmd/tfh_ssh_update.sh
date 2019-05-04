@@ -43,15 +43,15 @@ echodebug "[DEBUG] Payload contents:"
 cat "$payload" 1>&3
 }
 
-tfe_update () (
+tfh_ssh_update () (
     payload="$TMPDIR/tfe-new-payload-$(random_enough)"
     ssh_name=
     ssh_key=
     ssh_id=
     attr_obj=
 
-    # Ensure all of tfe_org, etc, are set. Workspace is not required.
-    if ! check_required tfe_org tfe_token tfe_address; then
+    # Ensure all of org, etc, are set. Workspace is not required.
+    if ! check_required org tfh_token address; then
         return 1
     fi
 
@@ -119,12 +119,12 @@ tfe_update () (
         . "$cmd_dir/show"
 
         # Pass the command line arguments to show and get back a key (or error)
-        if ! ssh_show="$(tfe_show -ssh-name "$ssh_name")"; then
+        if ! ssh_show="$(tfh_show -ssh-name "$ssh_name")"; then
             # The show command will have printed error messages.
             return 1
         fi
 
-        # Really, if it's empty then tfe_show should have exited non-zero
+        # Really, if it's empty then tfh_show should have exited non-zero
         if [ -z "$ssh_show" ]; then
             echoerr "SSH key not found"
             return 1
@@ -149,8 +149,8 @@ tfe_update () (
     fi
 
     echodebug "[DEBUG] API request for update SSH key:"
-    url="$tfe_address/api/v2/ssh-keys/$ssh_id"
-    if ! update_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"; then
+    url="$address/api/v2/ssh-keys/$ssh_id"
+    if ! update_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
         echoerr "Error updating SSH key $ssh_show"
         return 1
     fi

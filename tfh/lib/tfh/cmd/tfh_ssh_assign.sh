@@ -43,7 +43,7 @@ echodebug "[DEBUG] Payload contents:"
 cat "$payload" 1>&3
 }
 
-tfe_assign () (
+tfh_ssh_assign () (
     payload="$TMPDIR/tfe-new-payload-$(random_enough)"
     ssh_name=
     ssh_id=
@@ -98,12 +98,12 @@ tfe_assign () (
         . "$cmd_dir/show"
 
         # Pass the command line arguments to show and get back a key (or error)
-        if ! ssh_show="$(tfe_show -ssh-name "$ssh_name")"; then
+        if ! ssh_show="$(tfh_show -ssh-name "$ssh_name")"; then
             # The show command will have printed error messages.
             return 1
         fi
 
-        # Really, if it's empty then tfe_show should have exited non-zero
+        # Really, if it's empty then tfh_show should have exited non-zero
         if [ -z "$ssh_show" ]; then
             echoerr "SSH key not found"
             return 1
@@ -129,22 +129,22 @@ tfe_assign () (
 
     # Need the workspace ID from the workspace name
     echodebug "[DEBUG] API request to show workspace:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces/$tfe_workspace"
-    if ! show_resp="$(tfe_api_call "$url")"; then
-        echoerr "Error showing workspace information for $tfe_workspace"
+    url="$address/api/v2/organizations/$org/workspaces/$ws"
+    if ! show_resp="$(tfh_api_call "$url")"; then
+        echoerr "Error showing workspace information for $ws"
         return 1
     fi
 
     workspace_id="$(printf "%s" "$show_resp" | jq -r '.data.id')"
 
     echodebug "[DEBUG] API request for SSH key assignment:"
-    url="$tfe_address/api/v2/workspaces/$workspace_id/relationships/ssh-key"
-    if ! assign_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"; then
-        echoerr "Error assigning SSH key $ssh_show to $tfe_workspace"
+    url="$address/api/v2/workspaces/$workspace_id/relationships/ssh-key"
+    if ! assign_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
+        echoerr "Error assigning SSH key $ssh_show to $ws"
         return 1
     fi
 
     cleanup "$payload"
 
-    echo "Assigned SSH key $ssh_show to $tfe_workspace"
+    echo "Assigned SSH key $ssh_show to $ws"
 )

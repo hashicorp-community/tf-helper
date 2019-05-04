@@ -20,21 +20,21 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_list () (
-    # Ensure all of tfe_org, etc, are set. Workspace is not required.
-    if ! check_required tfe_org tfe_token tfe_address; then
+ws_list () (
+    # Ensure all of org, etc, are set. Workspace is not required.
+    if ! check_required org tfh_token address; then
         return 1
     fi
 
     echodebug "[DEBUG] API request to list workspaces:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces"
-    if ! list_resp="$(tfe_api_call "$url")"; then
-        echoerr "Error listing workspaces for $tfe_org"
+    url="$address/api/v2/organizations/$org/workspaces"
+    if ! list_resp="$(tfh_api_call "$url")"; then
+        echoerr "Error listing workspaces for $org"
         return 1
     fi
 
     listing="$(printf "%s" "$list_resp" |
-        jq -r --arg ws "$tfe_workspace" '
+        jq -r --arg ws "$ws" '
             .data[]
                 | if .attributes.name == $ws then
                       "* " + .attributes.name

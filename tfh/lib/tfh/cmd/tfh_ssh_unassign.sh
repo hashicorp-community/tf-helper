@@ -41,7 +41,7 @@ echodebug "[DEBUG] Payload contents:"
 cat "$payload" 1>&3
 }
 
-tfe_unassign () (
+tfh_ssh_unassign () (
     payload="$TMPDIR/tfe-new-payload-$(random_enough)"
 
     # Ensure all of the common required variables are set
@@ -56,22 +56,22 @@ tfe_unassign () (
 
     # Need the workspace ID from the workspace name
     echodebug "[DEBUG] API request to show workspace:"
-    url="$tfe_address/api/v2/organizations/$tfe_org/workspaces/$tfe_workspace"
-    if ! show_resp="$(tfe_api_call "$url")"; then
-        echoerr "Error showing workspace information for $tfe_workspace"
+    url="$address/api/v2/organizations/$org/workspaces/$ws"
+    if ! show_resp="$(tfh_api_call "$url")"; then
+        echoerr "Error showing workspace information for $ws"
         return 1
     fi
 
     workspace_id="$(printf "%s" "$show_resp" | jq -r '.data.id')"
 
     echodebug "[DEBUG] API request for SSH key unassignment:"
-    url="$tfe_address/api/v2/workspaces/$workspace_id/relationships/ssh-key"
-    if ! unassign_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"; then
-        echoerr "Error unassigning SSH key from $tfe_workspace"
+    url="$address/api/v2/workspaces/$workspace_id/relationships/ssh-key"
+    if ! unassign_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
+        echoerr "Error unassigning SSH key from $ws"
         return 1
     fi
 
     cleanup "$payload"
 
-    echo "Unassigned SSH key from $tfe_workspace"
+    echo "Unassigned SSH key from $ws"
 )
