@@ -20,37 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_list_description () (
-    echo "List Terraform Enterprise workspaces for an organization"
-)
-
-tfe_list_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe workspace list [OPTIONS]
-
-DESCRIPTION
- List Terraform Enterprise workspaces for an organization. An organization
- must be specified with the -name argument, the -tfe-org argument, or
- the TFE_ORG environment variable. Specifying a workspace is optional. If
- a workspace is specified with the -name argument, the -tfe-workspace
- argument, or the TFE_WORKSPACE environment variable it will be preceded
- by an asterisk.
-
-OPTIONS
-$(tfe_usage_args)
-
-NOTES
- The curl and jq commands are required.
-
- An asterisk in the listing indicates the Terraform Enterprise workspace
- currently specified by -name, -tfe-workspace, or the TFE_WORKSPACE
- environment variable.
-
-EOF
-)
-
 tfe_list () (
     # Ensure all of tfe_org, etc, are set. Workspace is not required.
     if ! check_required tfe_org tfe_token tfe_address; then

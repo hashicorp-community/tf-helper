@@ -20,35 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_new_description () (
-    echo "Create a new Terraform Enterprise SSH key"
-)
-
-tfe_new_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe ssh new -tfe-org <ORGANIZATION> [OPTIONS]
-
-DESCRIPTION
- Create a new Terraform Enterprise SSH key.
-
-OPTIONS
-$(tfe_usage_args)
-
- -ssh-name <NAME>     The name to be used to identify the SSH key in TFE.
-
- -ssh-file <KEYFILE>  The SSH private key file.
-
-NOTES
- The curl and jq commands are required.
-
- SSH keys are defined at the organization level. An organization must be
- specified with the -name argument, the -tfe-org argument, or the TFE_ORG
- environment variable. A workspace does not need to be specified.
-EOF
-)
-
 ##
 ## Helper functions
 ##

@@ -20,33 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_assign_description () (
-    echo "Assign an SSH key to a Terraform Enterprise workspace"
-)
-
-tfe_assign_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe ssh assign -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
-
-DESCRIPTION
-
- Assign a Terraform Enterprise SSH key to a workspace. The workspace and SSH
- key must already exist.
-
-OPTIONS
-$(tfe_usage_args)
-
- -ssh-id <ID>         The ID of the SSH key to assign.
-
- -ssh-name <NAME>     The name of the SSH key in TFE to assign.
-
-NOTES
- The curl and jq commands are required.
-EOF
-)
-
 ##
 ## Helper functions
 ##

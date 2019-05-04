@@ -20,28 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_show_description () (
-    echo "Show Terraform Enterprise workspace details"
-)
-
-tfe_show_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe workspace show -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
-
-DESCRIPTION
- Show Terraform Enterprise workspace details.
-
-OPTIONS
-$(tfe_usage_args)
-
-NOTES
- The curl and jq commands are required.
-
-EOF
-)
-
 tfe_show () (
     # Ensure all of tfe_org, etc, are set. Workspace is not required.
     if ! check_required tfe_org tfe_token tfe_address; then

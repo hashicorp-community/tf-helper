@@ -20,35 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_delete_description () (
-    echo "Delete a Terraform Enterprise SSH key"
-)
-
-tfe_delete_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe ssh delete -tfe-org <ORGANIZATION> [OPTIONS]
-
-DESCRIPTION
- Delete a Terraform Enterprise SSH key
-
-OPTIONS
-$(tfe_usage_args)
-
- -ssh-name <ID>     The name of the SSH key to show.
-
- -ssh-id <ID>       The ID of the SSH key to show.
-
-NOTES
- The curl and jq commands are required.
-
- SSH keys are defined at the organization level. An organization must be
- specified with the -name argument, the -tfe-org argument, or the TFE_ORG
- environment variable. A workspace does not need to be specified.
-EOF
-)
-
 tfe_delete () (
     # Use the show command to check for and retrieve the ID of the key
     # in the case of being passed a name.

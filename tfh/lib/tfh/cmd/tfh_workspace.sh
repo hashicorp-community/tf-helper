@@ -20,27 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_workspace_description () (
-    echo "Perform operations on workspaces"
-)
-
-tfe_workspace_help () (
-    cmd_dir="$cmd_dir/workspace_commands"
-
-    # Be sure to include the common options with tfe_usage_args
-    cat << EOF
-SYNOPSIS
- tfe workspace <SUBCOMMAND>
-
-DESCRIPTION
- Perform a variety of operations on workspaces, where subcommand is one
- of the following:
-
-$(list_cmd_descriptions)
-
-EOF
-)
-
-tfe_workspace () (
-    execute_subcmd $bin_name "$cmd_dir/workspace_commands" "$@"
+tfh_workspace () (
+    exec $0 workspace help
 )

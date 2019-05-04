@@ -20,28 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_delete_description () (
-    echo "Delete a Terraform Enterprise workspace"
-)
-
-tfe_delete_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe workspace delete -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
-
-DESCRIPTION
- Delete a Terraform Enterprise workspace
-
-OPTIONS
-$(tfe_usage_args)
-
-NOTES
- The curl and jq commands are required.
-
-EOF
-)
-
 tfe_delete () (
     # Ensure all of tfe_org, etc, are set.
     if ! check_required; then

@@ -20,42 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_select_description () (
-    echo "Set TFE_WORKSPACE in the tfe-cli configuration file"
-)
-
-tfe_select_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe workspace select WORKSPACE_NAME
-
-DESCRIPTION
-
- Selecting a Terraform Enterprise workspace edits the tfe-cli configuration
- file, setting the TFE_WORKSPACE variable to the specified value. The workspace
- must exist in TFE. To set TFE_WORKSPACE to a non-existent name (for the
- purpose of, for example, using tfe workspace new), use tfe config.
-
- This behavior mimics terraform workspace select. The workspace cannot be
- specified via any other source than the single named argument.
-
- An organization must be specified via the environment, configuration file, or
- command argument.
-
-OPTIONS
-$(tfe_usage_args)
-
-NOTES
- The curl and jq commands are required.
-
- An asterisk in the listing indicates the Terraform Enterprise workspace
- currently specified by -name, -tfe-workspace, or the TFE_WORKSPACE
- environment variable.
-
-EOF
-)
-
 tfe_select () (
     if [ -z "$1" ]; then
         echoerr "Exactly one argument required: workspace name"

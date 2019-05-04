@@ -20,35 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_show_description () (
-    echo "Show the name and ID of an SSH key in Terraform Enterprise"
-)
-
-tfe_show_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe ssh show -tfe-org <ORGANIZATION> [OPTIONS]
-
-DESCRIPTION
- Show Terraform Enterprise SSH key details.
-
-OPTIONS
-$(tfe_usage_args)
-
- -ssh-name <ID>     The name of the SSH key to show.
-
- -ssh-id <ID>       The ID of the SSH key to show.
-
-NOTES
- The curl and jq commands are required.
-
- SSH keys are defined at the organization level. An organization must be
- specified with the -name argument, the -tfe-org argument, or the TFE_ORG
- environment variable. A workspace does not need to be specified.
-EOF
-)
-
 tfe_show () (
     ssh_name=
     ssh_id=

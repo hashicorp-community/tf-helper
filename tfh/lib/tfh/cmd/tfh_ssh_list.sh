@@ -20,31 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_list_description () (
-    echo "List the SSH keys for a Terraform Enterprise organization"
-)
-
-tfe_list_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe ssh list -tfe-org <ORGANIZATION> [OPTIONS]
-
-DESCRIPTION
- List Terraform Enterprise SSH keys for an organization.
-
-OPTIONS
-$(tfe_usage_args)
-
-NOTES
- The curl and jq commands are required.
-
- SSH keys are defined at the organization level. An organization must be
- specified with the -name argument, the -tfe-org argument, or the TFE_ORG
- environment variable. A workspace does not need to be specified.
-EOF
-)
-
 tfe_list () (
     # Ensure all of tfe_org, etc, are set. Workspace is not required.
     if ! check_required tfe_org tfe_token tfe_address; then

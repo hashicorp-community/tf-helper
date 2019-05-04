@@ -20,45 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_config_description () (
-    echo "Show and modify the tfe command configuration"
-)
-
-tfe_config_help () (
-cat << EOF
-SYNOPSIS
- tfe config [ -write [true|false] ] [OPTIONS]
-
-DESCRIPTION
- Show and optionally write configuration information to files for tfe. When
- -write is not specified, the configuration that would be used when executing
- commands is shown. The token source is shown rather than the value. The tfe
- configuration file manages the following values:
-
- TFE_ORG
- TFE_WORKSPACE
- TFE_URL
- TFE_CURL_CONFIG
-
- Only non-default values are set in the configuration file. The file itself is
- simply sourced at the beginning of tfe execution. The -write option will
- update values in place.
-
- The curl configuration file is always generated and overwritten if -write is
- specified. The token source can be the ATLAS_TOKEN or TFE_TOKEN environment
- variable, or the -token command line argument, in that order. A curl
- configuration file is already created if there is a .terraformrc and no curl
- configuration file already.
- 
-OPTIONS
-$(tfe_usage_args)
-
- -write <BOOLEAN>     Write the specified configuration to the specified
-                      configuration file.
-
-EOF
-)
-
 tfe_config () (
     # Parse options
 
@@ -119,4 +80,3 @@ tfe_config () (
         fi
     fi
 )
-

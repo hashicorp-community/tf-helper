@@ -20,27 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_unassign_description () (
-    echo "Unassign the current SSH key from a Terraform Enterprise workspace"
-)
-
-tfe_unassign_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe ssh unassign -name <ORGANIZATION>/<WORKSPACE> [OPTIONS]
-
-DESCRIPTION
- Assign a Terraform Enterprise SSH key to a workspace.
-
-OPTIONS
-$(tfe_usage_args)
-
-NOTES
- The curl and jq commands are required.
-EOF
-)
-
 ##
 ## Helper functions
 ##

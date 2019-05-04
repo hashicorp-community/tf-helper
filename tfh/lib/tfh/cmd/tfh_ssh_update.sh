@@ -20,39 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_update_description () (
-    echo "Update an existing Terraform Enterprise SSH key"
-)
-
-tfe_update_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe ssh update -tfe-org <ORGANIZATION> [OPTIONS]
-
-DESCRIPTION
- Update a Terraform Enterprise SSH key.
-
-OPTIONS
-$(tfe_usage_args)
-
- -ssh-id <ID>         The ID of the SSH key to update.
-
- -ssh-name <NAME>     The name of the SSH key in TFE to update.
-
- -ssh-new-name <NAME> The name to rename the SSH key to.
-
- -ssh-file <KEYFILE>  SSH private key file.
-
-NOTES
- The curl and jq commands are required.
-
- SSH keys are defined at the organization level. An organization must be
- specified with the -name argument, the -tfe-org argument, or the TFE_ORG
- environment variable. A workspace does not need to be specified.
-EOF
-)
-
 ##
 ## Helper functions
 ##

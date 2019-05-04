@@ -174,53 +174,6 @@ cat >> "$run_payload" <<EOF
 EOF
 }
 
-tfe_pushconfig_description () (
-    echo "Upload a Terraform config to a TFE workspace and begin a run"
-)
-
-tfe_pushconfig_help () (
-# Be sure to include the common options with tfe_usage_args
-cat << EOF
-SYNOPSIS
- tfe pushconfig -name <ORGANIZATION>/<WORKSPACE> [OPTIONS] [CONFIG_DIR]
-
-DESCRIPTION
- Upload a Terraform configuration to a Terraform Enterprise workspace
- and begin a run.
-
-OPTIONS
-$(tfe_usage_args)
-
- -upload-modules <BOOLEAN>
-                      If true (default), then the modules are locked at
-                      their current checkout and uploaded completely. This
-                      prevents modules from being retrieved with "terraform
-                      init". This does not lock provider versions; use the
-                      "version" parameter in provider blocks in the
-                      configuration to accomplish that.
-
- -vcs <BOOLEAN>       If true (default), push will upload only files
-                      committed to your VCS, if detected. Currently supports
-                      git repositories.
-
- -message <MESSAGE>   An optional message to associate with the run. Defaults
-                      to "Queued via tfe-cli".
-
- -destroy <BOOLEAN>   Queue a destroy plan. Defaults to false.
-
- -current-config <BOOLEAN>
-                      Do not push a local configuration. Instead, queue a
-                      plan with the latest configuration supplied.
-
- -poll <SECONDS>      Number of seconds to wait between polling the submitted
-                      run for a non-active status. Defaults to 0 (no polling).
-
-NOTES
- The curl and jq commands are required.
-
-EOF
-)
-
 tfe_pushconfig () (
     upload_modules=1
     vcs=1

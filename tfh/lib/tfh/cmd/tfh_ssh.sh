@@ -20,27 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfe_ssh_description () (
-    echo "Perform operations on SSH keys"
-)
-
-tfe_ssh_help () (
-    cmd_dir="$cmd_dir/ssh_commands"
-
-    # Be sure to include the common options with tfe_usage_args
-    cat << EOF
-SYNOPSIS
- tfe ssh <SUBCOMMAND>
-
-DESCRIPTION
- Perform a variety of operations on SSH keys, where subcommand is one
- of the following:
-
-$(list_cmd_descriptions)
-
-EOF
-)
-
-tfe_ssh () (
-    execute_subcmd $bin_name "$cmd_dir/ssh_commands" "$@"
+tfh_ssh () (
+    exec $0 ssh help
 )
