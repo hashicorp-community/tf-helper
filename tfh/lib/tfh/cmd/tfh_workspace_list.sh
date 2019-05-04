@@ -21,28 +21,28 @@
 ## -------------------------------------------------------------------
 
 ws_list () (
-    # Ensure all of org, etc, are set. Workspace is not required.
-    if ! check_required org tfh_token address; then
-        return 1
-    fi
+  # Ensure all of org, etc, are set. Workspace is not required.
+  if ! check_required org token address; then
+    return 1
+  fi
 
-    echodebug "[DEBUG] API request to list workspaces:"
-    url="$address/api/v2/organizations/$org/workspaces"
-    if ! list_resp="$(tfh_api_call "$url")"; then
-        echoerr "Error listing workspaces for $org"
-        return 1
-    fi
+  echodebug "API request to list workspaces:"
+  url="$address/api/v2/organizations/$org/workspaces"
+  if ! list_resp="$(tfh_api_call "$url")"; then
+    echoerr "Error listing workspaces for $org"
+    return 1
+  fi
 
-    listing="$(printf "%s" "$list_resp" |
-        jq -r --arg ws "$ws" '
-            .data[]
-                | if .attributes.name == $ws then
-                      "* " + .attributes.name
-                  else
-                      "  " + .attributes.name
-                  end')"
+  listing="$(printf "%s" "$list_resp" |
+    jq -r --arg ws "$ws" '
+      .data[]
+        | if .attributes.name == $ws then
+            "* " + .attributes.name
+          else
+            "  " + .attributes.name
+          end')"
 
-    # Produce the listing, sorted. Sort on the third character of each line
-    # as each is indented two spaces and there may be one marked with an *.
-    echo "$listing" | sort -k 1.3
+  # Produce the listing, sorted. Sort on the third character of each line
+  # as each is indented two spaces and there may be one marked with an *.
+  echo "$listing" | sort -k 1.3
 )

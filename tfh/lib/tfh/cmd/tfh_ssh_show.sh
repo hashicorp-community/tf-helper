@@ -21,60 +21,31 @@
 ## -------------------------------------------------------------------
 
 tfh_ssh_show () (
-    ssh_name=
-    ssh_id=
+  ssh_name="$1"
+  ssh_id="$2"
 
-    # Parse options
+  if [ -z "$ssh_name" ] && [ -z "$ssh_id" ]; then
+    echoerr "One of -ssh-name or -ssh-id is required"
+    return 1
+  fi
 
-    while [ -n "$1" ]; do
-        # If this is a common option it has already been parsed. Skip it and
-        # its value.
-        if is_common_opt "$1"; then
-            shift
-            shift
-            continue
-        fi
+  # Use the list command to retrieve all keys, then narrow down
+  # the output to the one of interest.
+  . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ssh_list.sh"
 
-        case "$1" in
-            -ssh-name)
-                ssh_name=$(assign_arg "$1" "$2")
-                ;;
-            -ssh-id)
-                ssh_id=$(assign_arg "$1" "$2")
-                ;;
-            *)
-                echoerr "Unknown option: $1"
-                return 1
-                ;;
-        esac
+  if ! listing="$(tfh_ssh_list)"; then
+    # The listing command will have printed error messages.
+    return 1
+  fi
 
-        # Shift the parameter and argument
-        [ -n "$1" ] && shift
-        [ -n "$1" ] && shift
-    done
+  ssh_show="$(echo "$listing" | awk -v name="$ssh_name" -v id="$ssh_id" '
+     name && $1 == name;
+     id && $2 == id')"
 
-    if [ -z "$ssh_name" ] && [ -z "$ssh_id" ]; then
-        echoerr "One of -ssh-name or -ssh-id is required"
-        return 1
-    fi
-
-    # Use the list command to retrieve all keys, then narrow down
-    # the output to the one of interest.
-    . "$cmd_dir/list"
-
-    if ! listing="$(tfh_list)"; then
-        # The listing command will have printed error messages.
-        return 1
-    fi
-
-    ssh_show="$(echo "$listing" | awk -v name="$ssh_name" -v id="$ssh_id" '
-         name && $1 == name;
-         id && $2 == id')"
-
-    if [ -n "$ssh_show" ]; then
-        echo "$ssh_show"
-    else
-        echoerr "SSH key not found"
-        return 1
-    fi
+  if [ -n "$ssh_show" ]; then
+    echo "$ssh_show"
+  else
+    echoerr "SSH key not found"
+    return 1
+  fi
 )

@@ -40,172 +40,172 @@
 # Note that the list variable should have the end-of-list marker, ".",
 # removed when used.
 append () {
-    [ -n "$1" ] && printf "%s" "${1%.}"
-    printf "%s\n." "$2"
+  [ -n "$1" ] && printf "%s" "${1%.}"
+  printf "%s\n." "$2"
 }
 
 # Remove specified files
 cleanup () {
-    if [ -n "$1" ]; then
-        echo "$1" | while read f; do
-            echodebug "cleaning up $f"
-            rm "$f" 2>&3
-            if [ 0 -ne $? ]; then
-                echoerr "Error cleaning up $f"
-                echoerr "$f"
-            fi
-        done
-    else
-        echodebug "No file to clean up"
-    fi
+  if [ -n "$1" ]; then
+    echo "$1" | while read f; do
+      echodebug "cleaning up $f"
+      rm "$f" 2>&3
+      if [ 0 -ne $? ]; then
+        echoerr "Error cleaning up $f"
+        echoerr "$f"
+      fi
+    done
+  else
+    echodebug "No file to clean up"
+  fi
 }
 
 # Write a given token value to a curl config file at the given path.
 # $1 file path
 # $2 token
 make_tfh_curl_config () {
-    if ! echo > "$1"; then
-        echoerr "Error: cannot write to curl config file:"
-        echoerr "$1"
-        return 1
-    fi
+  if ! echo > "$1"; then
+    echoerr "Error: cannot write to curl config file:"
+    echoerr "$1"
+    return 1
+  fi
 
-    if ! chmod 600 "$1"; then
-        echoerr "WARNING: unable to set permissions on curl config file:"
-        echoerr "chmod 600 $1"
-    fi
+  if ! chmod 600 "$1"; then
+    echoerr "WARNING: unable to set permissions on curl config file:"
+    echoerr "chmod 600 $1"
+  fi
 
-    if ! echo "--header \"Authorization: Bearer $2\"" > "$1"; then
-        echoerr "Error: cannot generate curl config file:"
-        echoerr "$1"
-        return 1
-    fi
+  if ! echo "--header \"Authorization: Bearer $2\"" > "$1"; then
+    echoerr "Error: cannot generate curl config file:"
+    echoerr "$1"
+    return 1
+  fi
 
-    echodebug "Created $1"
+  echodebug "Created $1"
 }
 
 # Replace quotes and newlines with escape characters to prepare the
 # value for insertion into JSON.
 escape_value () {
-    printf '%s' "$1" | awk '
-    {
-        gsub(/"/,"\\\"")
-        gsub(/\\n/,"\\\\n")
-    }
-    NR == 1 {
-        value_line = $0
-    }
-    NR != 1 {
-        value_line = value_line "\\n" $0
-    }
-    END {
-        printf "%s", value_line
-    }'
+  printf '%s' "$1" | awk '
+  {
+    gsub(/"/,"\\\"")
+    gsub(/\\n/,"\\\\n")
+  }
+  NR == 1 {
+    value_line = $0
+  }
+  NR != 1 {
+    value_line = value_line "\\n" $0
+  }
+  END {
+    printf "%s", value_line
+  }'
 }
 
 # Common options to curl. Fail on HTTP error codes.
 tfh_api_call () {
-    echodebug "curl args: $@"
-    if resp="$(curl -f $tfh_curl_silent \
-                 $tfh_curl_token_arg \
-                 --header "Content-Type: application/vnd.api+json" \
-                 $@)"; then
-        echodebug "API request succeeded with exit code $?. Response:"
-        echodebug "$resp"
+  echodebug "curl args: $@"
+  if resp="$(curl -f $tfh_curl_silent \
+         $tfh_curl_token_arg \
+         --header "Content-Type: application/vnd.api+json" \
+         $@)"; then
+    echodebug "API request succeeded with exit code $?. Response:"
+    echodebug "$resp"
 
-        printf "%s" "$resp"
-        next_page="$(printf "%s" "$resp" | jq -r '.meta.pagination."next-page"')"
-        if [ -n "$next_page" ] && [ "$next_page" != null ]; then
-            echodebug "Next page: $next_page"
-            next_link="$(printf "%s" "$resp" | jq -r '.links.next')"
-            echodebug "Next link: $next_link"
-            tfh_api_call "$next_link"
-        fi
-    else
-        echodebug "API request failed with exit code $?. Response:"
-        echodebug "$resp"
-
-        return 1
+    printf "%s" "$resp"
+    next_page="$(printf "%s" "$resp" | jq -r '.meta.pagination."next-page"')"
+    if [ -n "$next_page" ] && [ "$next_page" != null ]; then
+      echodebug "Next page: $next_page"
+      next_link="$(printf "%s" "$resp" | jq -r '.links.next')"
+      echodebug "Next link: $next_link"
+      tfh_api_call "$next_link"
     fi
+  else
+    echodebug "API request failed with exit code $?. Response:"
+    echodebug "$resp"
+
+    return 1
+  fi
 }
 
 # Check the version of terraform in use. Commands can use this
 # to verify that their use of Terraform will go as expected.
 tf_version_required () {
-    if [ $# -ne 3 ]; then
-        echoerr "Unable to check the version of Terraform. This is a bug."
-        exit 1
-    fi
+  if [ $# -ne 3 ]; then
+    echoerr "Unable to check the version of Terraform. This is a bug."
+    exit 1
+  fi
 
-    # Verify the terraform command is present
-    if [ -z "$(command -v terraform)" ]; then
-        echoerr "The terraform command must be installed"
-        exit 1
-    fi
+  # Verify the terraform command is present
+  if [ -z "$(command -v terraform)" ]; then
+    echoerr "The terraform command must be installed"
+    exit 1
+  fi
 
-    # Test the version numbers provided in the output with the three arguments
-    if ! terraform -version | awk -v major=$1 -v minor=$2 -v micro=$3 -F. '
-        NR==1 {
-            sub(/[^[0-9]*/, "", $1)
-            if($1 > major) exit 0
-            if($1 == major && $2 > minor) exit 0
-            if($1 == major && $2 == minor && $3 >= micro) exit 0
-            exit 1
-        }'
-    then
-        echoerr "This operation requires at least Terraform $1.$2.$3"
-        exit 1
-    fi
+  # Test the version numbers provided in the output with the three arguments
+  if ! terraform -version | awk -v major=$1 -v minor=$2 -v micro=$3 -F. '
+    NR==1 {
+      sub(/[^[0-9]*/, "", $1)
+      if($1 > major) exit 0
+      if($1 == major && $2 > minor) exit 0
+      if($1 == major && $2 == minor && $3 >= micro) exit 0
+      exit 1
+    }'
+  then
+    echoerr "This operation requires at least Terraform $1.$2.$3"
+    exit 1
+  fi
 }
 
 check_required () {
-    if [ 0 -eq $# ]; then
-        check_for="org ws token address"
-    else
-        check_for="$*"
-    fi
+  if [ 0 -eq $# ]; then
+    check_for="org ws token address"
+  else
+    check_for="$*"
+  fi
 
-    missing=0
-    for i in $check_for; do
-        case "$i" in
-            org)
-                if [ -z "$org" ]; then
-                    missing=1
-                    echoerr 'TFE organization required.'
-                    echoerr 'Set with $TFH_org or use -org'
-                    echoerr
-                fi
-            ;;
-            ws)
-                if [ -z "$ws" ]; then
-                    missing=1
-                    echoerr 'TFE workspace required.'
-                    echoerr 'Set with $TFE_ws or use -ws'
-                    echoerr
-                fi
-            ;;
-            token)
-                if [ -z "$token" ]; then
-                    missing=1
-                    echoerr 'TFE API token required.'
-                    echoerr 'Set with $TFE_TOKEN, -token, or $ATLAS_TOKEN'
-                    echoerr
-                fi
-            ;;
-            address)
-                # This really shouldn't happen. Someone would have to
-                # explicitly pass in an empty string to the command line
-                # argument.
-                if [ -z "$address" ]; then
-                    missing=1
-                    echoerr 'TFE address required.'
-                    echoerr 'Set with -tfh-address or $TFE_URL'
-                    echoerr
-                fi
-            ;;
-        esac
-    done
-    return $missing
+  missing=0
+  for i in $check_for; do
+    case "$i" in
+      org)
+        if [ -z "$org" ]; then
+            missing=1
+            echoerr 'TFE organization required.'
+            echoerr 'Set with $TFH_org or use -org'
+            echoerr
+        fi
+      ;;
+      ws)
+        if [ -z "$ws" ]; then
+            missing=1
+            echoerr 'TFE workspace required.'
+            echoerr 'Set with $TFE_ws or use -ws'
+            echoerr
+        fi
+      ;;
+      token)
+        if [ -z "$token" ]; then
+            missing=1
+            echoerr 'TFE API token required.'
+            echoerr 'Set with $TFE_TOKEN, -token, or $ATLAS_TOKEN'
+            echoerr
+        fi
+      ;;
+      address)
+        # This really shouldn't happen. Someone would have to
+        # explicitly pass in an empty string to the command line
+        # argument.
+        if [ -z "$address" ]; then
+            missing=1
+            echoerr 'TFE hostname required.'
+            echoerr 'Set with -hostname or $TFE_hostname'
+            echoerr
+        fi
+      ;;
+    esac
+  done
+  return $missing
 }
 
 tfh_junonia_filter () {
@@ -221,72 +221,83 @@ tfh_junonia_filter () {
   echodebug "hostname: $hostname"
   echodebug "address: $address"
 
-  token_via="-token"
-  curl_token_arg="--header \"Authorization: Bearer $token\""
+  token_via=
+  if [ -n "$token" ]; then
+    token_via=junonia
+    curl_token_arg="--header \"Authorization: Bearer $token\""
+  fi
+
+  # If no other source has obtained a token yet, check for ~/.terraformrc, also
+  # configurable with $TERRAFORM_CONFIG. If present, use the value of address
+  # with .terraformrc to generate a curlrc and then use that.
+
+  curl_token_arg=
+  readonly default_curl_config="$JUNONIA_CONFIGDIR/curlrc"
+  curl_config="${TFH_CURL_CONFIG:-"$default_curl_config"}"
+  if [ -f "$curl_config" ]; then
+    # Setting this to the config location just so this variable has a value
+    token="$curl_config"
+
+    # Use the curlrc config file
+    curl_token_arg="--config $curl_config"
+    token_via="$curl_config"
+  fi
 
   # If no token has been found up to this point, or if the token source is a
   # .tfh-curl-config file, check for .terraformrc and either generate a
   # .tfh-cli-curl config file if there isn't one, or otherwise compare and
   # validate contents.
   if [ -z "$token" ] || [ "$token_via" = "$tfh_curl_config" ]; then
-      tf_config="${TERRAFORM_CONFIG:-"$HOME/.terraformrc"}"
-      if [ -f "$tf_config" ]; then
-          # This is simplified. It depends on the token keyword and value being
-          # on the same line in the .terraformrc.
-          tf_config_token="$(awk -v url="${address#https://}" '
-              $0 ~ "\"" url "\"" { in_url=1 }
-              in_url && /token *= *"[A-Za-z0-9\.][A-Za-z0-9\.]*"/ {
-                  match($0, /"[A-Za-z0-9\.][A-Za-z0-9\.]*"/)
-                  print substr($0, RSTART+1, RLENGTH-2)
-              }
-          ' "$tf_config")"
+    tf_config="${TERRAFORM_CONFIG:-"$HOME/.terraformrc"}"
+    if [ -f "$tf_config" ]; then
+      # This is simplified. It depends on the token keyword and value being
+      # on the same line in the .terraformrc.
+      tf_config_token="$(awk -v url="${address#https://}" '
+        $0 ~ "\"" url "\"" { in_url=1 }
+        in_url && /token *= *"[A-Za-z0-9\.][A-Za-z0-9\.]*"/ {
+          match($0, /"[A-Za-z0-9\.][A-Za-z0-9\.]*"/)
+          print substr($0, RSTART+1, RLENGTH-2)
+        }
+      ' "$tf_config")"
 
-          if [ -n "$tf_config_token" ] && [ -z "$token" ]; then
-              if ! make_tfh_curl_config "$tfh_curl_config" "$tf_config_token"; then
-                  exit 1
-              fi
+      if [ -n "$tf_config_token" ] && [ -z "$token" ]; then
+        if ! make_tfh_curl_config "$tfh_curl_config" "$tf_config_token"; then
+            exit 1
+        fi
 
-              token_via="$tfh_curl_config generated from $tf_config"
-              tfh_curl_token_arg="--config $tfh_curl_config"
+        token_via="$tfh_curl_config generated from $tf_config"
+        tfh_curl_token_arg="--config $tfh_curl_config"
 
-              # Setting this to the config location just so this variable has a value
-              token="$tfh_curl_config"
-          elif [ -n "$tf_config_token" ] &&
-               [ -n "$token" ] &&
-               [ "$token_via" = "$tfh_curl_config" ] &&
-               [ -z "$TFE_NO_CURL_CONFIG_DIFF" ] ; then
-              # Got a .terraformrc token and the current token is from a tfh curl
-              # config. Compare the tokens to see if they're the same.
-              tfh_curl_config_token="$(awk '
-                      /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/ {
-                          match($0, /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/)
-                          print substr($0, RSTART+7, RLENGTH-7)
-                      }
-                  ' "$tfh_curl_config")"
+        # Setting this to the config location just so this variable has a value
+        token="$tfh_curl_config"
+      elif [ -n "$tf_config_token" ] &&
+           [ -n "$token" ] &&
+           [ "$token_via" = "$tfh_curl_config" ] &&
+           [ -z "$TFE_NO_CURL_CONFIG_DIFF" ] ; then
+        # Got a .terraformrc token and the current token is from a tfh curl
+        # config. Compare the tokens to see if they're the same.
+        tfh_curl_config_token="$(awk '
+                /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/ {
+                    match($0, /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/)
+                    print substr($0, RSTART+7, RLENGTH-7)
+                }
+            ' "$tfh_curl_config")"
 
-              if [ "$tfh_curl_config_token" != "$tf_config_token" ]; then
-                  echoerr "WARNING Tokens do not match in files:"
-                  echoerr "$tf_config"
-                  echoerr "$tfh_curl_config"
-                  echoerr
-                  echoerr "Using $tfh_curl_config"
-                  echoerr "Remove $tfh_curl_config to use the token from $tf_config"
-                  echoerr "Suppress this message by setting TFE_NO_CURL_CONFIG_DIFF=1"
-                  echoerr
-              fi
-          fi
+        if [ "$tfh_curl_config_token" != "$tf_config_token" ]; then
+          echoerr "WARNING Tokens do not match in files:"
+          echoerr "$tf_config"
+          echoerr "$tfh_curl_config"
+          echoerr
+          echoerr "Using $tfh_curl_config"
+          echoerr "Remove $tfh_curl_config to use the token from $tf_config"
+          echoerr "Suppress this message by setting TFE_NO_CURL_CONFIG_DIFF=1"
+          echoerr
+        fi
       fi
+    fi
   fi
 
-  # The whole point of tfh is to talk to the TFE server, so if there's no token
-  # then exit.
-  if [ -z "$token" ]; then
-      echoerr "Error: TFE token not found"
-      exit 1
-  else
-      echodebug "token: (set by $token_via)"
-  fi
-
+  echodebug "token: (set by $token_via)"
 
   return 5
 }
@@ -300,10 +311,10 @@ junonia_bootstrap () {
     JUNONIA_PATH="$(file -h "$JUNONIA_TARGET" | \
                     sed 's/^.*symbolic link to //')"
     if [ "$(echo "$JUNONIA_PATH" | cut -c -1)" = "/" ]; then
-      JUNONIA_TARGET="$JUNONIA_PATH"
+    JUNONIA_TARGET="$JUNONIA_PATH"
     else
-      JUNONIA_TARGET="$(dirname $JUNONIA_TARGET)"
-      JUNONIA_TARGET="$JUNONIA_TARGET/$JUNONIA_PATH"
+    JUNONIA_TARGET="$(dirname $JUNONIA_TARGET)"
+    JUNONIA_TARGET="$JUNONIA_TARGET/$JUNONIA_PATH"
     fi
   done
   readonly JUNONIA_PATH="$(cd "$(dirname "$JUNONIA_TARGET")" && pwd -P)"
@@ -325,47 +336,21 @@ JUNONIA_CACHE=0      # Flag to optionally disable (0) caching
 # TMPDIR             # Temporary directory
 
 if [ -n "$TF_LOG" ]; then
-    # Debugging. Print command errors and make them verbose
-    tar_verbose=v
-    curl_silent=
-    JUNONIA_DEBUG=1
-    exec 3>&2
+  # Debugging. Print command errors and make them verbose
+  tar_verbose=v
+  curl_silent=
+  JUNONIA_DEBUG=1
+  exec 3>&2
 else
-    # Not debugging. Shut everyting up.
-    tar_verbose=
-    curl_silent="-s"
-    exec 3>/dev/null
+  # Not debugging. Shut everyting up.
+  tar_verbose=
+  curl_silent="-s"
+  exec 3>/dev/null
 fi
 
 junonia_bootstrap
 
-# Token discovery:
-# * Use ~/.tfh-cli-curl if present (configure path with $TFE_CURL_CONFIG)
-# * Override with $ATLAS_TOKEN
-# * Override with $TFE_TOKEN
-# * Override with -token
-
-# If no other source has obtained a token yet, check for ~/.terraformrc, also
-# configurable with $TERRAFORM_CONFIG. If present, use the value of address
-# with .terraformrc to generate a .tfh-cli-curl and then use that.
-
-token_via=
-curl_token_arg=
-readonly default_curl_config="$JUNONIA_CONFIGDIR/tfe-curl"
-curl_config="${TFE_curl_config:-"$default_curl_config"}"
-if [ -f "$curl_config" ]; then
-    # Setting this to the config location just so this variable has a value
-    token="$curl_config"
-
-    # Use the tfh-cli-curl config file
-    curl_token_arg="--config $curl_config"
-    token_via="$curl_config"
-fi
-
-if [ -n "$TFH_token" ]; then
-    token_via='$TFH_token'
-    curl_token_arg="--header \"Authorization: Bearer $token\""
-fi
+. ../lib/tfh/junonia
 
 echodebug "$PWD"
 echodebug "$0 $*"

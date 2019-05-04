@@ -26,7 +26,7 @@ ws_delete () (
         return 1
     fi
 
-    echodebug "[DEBUG] API request to delete workspace:"
+    echodebug "API request to delete workspace:"
     url="$address/api/v2/organizations/$org/workspaces/$ws"
     if ! tfh_api_call -X DELETE "$url" >/dev/null; then
         echoerr "Error deleting workspaces $org/$ws"

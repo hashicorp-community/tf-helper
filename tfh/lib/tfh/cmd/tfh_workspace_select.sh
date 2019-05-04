@@ -21,33 +21,29 @@
 ## -------------------------------------------------------------------
 
 ws_select () (
-    if [ -z "$1" ]; then
-        echoerr "Exactly one argument required: workspace name"
-        return 1
-    fi
+  ws="$1"
 
-    if [ ! -f "$cmd_dir/list" ]; then
-        echoerr "Cannot load required command for select:"
-        echoerr "$cmd_dir/list"
-        return 1
-    fi
+  if [ -z "$ws" ]; then
+    echoerr "Exactly one argument required: workspace name"
+    return 1
+  fi
 
-    . "$cmd_dir/list"
+  . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ws_list.sh"
 
-    if ! workspace_list="$(tfh_list)"; then
-        # An error from tfh_list should have been printed
-        return 1
-    fi
+  if ! ws_list="$(tfh_ws_list)"; then
+    # An error from tfh_list should have been printed
+    return 1
+  fi
 
-    if ! echo "$workspace_list" | grep -E "^[\* ] $1$" >/dev/null 2>&1; then
-        echoerr "Workspace not found: $1"
-        return 1
-    fi
+  if ! echo "$ws_list" | grep -E "^[\* ] $1$" >/dev/null 2>&1; then
+    echoerr "Workspace not found: $1"
+    return 1
+  fi
 
-    # Write the workspace configuration
-    if err="$(update_sh_config "$tfh_config" "TFE_WORKSPACE=$1")"; then
-        echo "Switched to workspace: $1"
-    else
-        echoerr "$err"
-    fi
+  # Write the workspace configuration
+  if err="$(update_sh_config "$JUNONIA_CONFIG" "TFE_workspace=$ws")"; then
+    echo "Switched to workspace: $ws"
+  else
+    echoerr "$err"
+  fi
 )

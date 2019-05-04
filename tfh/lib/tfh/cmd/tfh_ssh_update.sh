@@ -39,69 +39,36 @@ cat > "$payload" <<EOF
 }
 EOF
 
-echodebug "[DEBUG] Payload contents:"
+echodebug "Payload contents:"
 cat "$payload" 1>&3
 }
 
 tfh_ssh_update () (
+    ssh_id="$1"
+    ssh_name="$2"
+    ssh_new_name="$3"
+    ssh_key="$4"
+
     payload="$TMPDIR/tfe-new-payload-$(random_enough)"
-    ssh_name=
-    ssh_key=
-    ssh_id=
     attr_obj=
+
+    [ "$attr_obj" ] && attr_obj="$attr_obj,"
+    attr_obj="$attr_obj \"name\": \"$ssh_new_name\""
+
+    if [ ! -f "$ssh_file" ]; then
+        echoerr "File not found: $ssh_file"
+        return 1
+    else
+        ssh_key="$(escape_value "$(cat "$ssh_file")")"
+    fi
+
+    [ "$attr_obj" ] && attr_obj="$attr_obj,"
+    attr_obj="$attr_obj \"value\": \"$ssh_key\""
 
     # Ensure all of org, etc, are set. Workspace is not required.
     if ! check_required org tfh_token address; then
         return 1
     fi
-
-    # Parse options
-
-    while [ -n "$1" ]; do
-        # If this is a common option it has already been parsed. Skip it and
-        # its value.
-        if is_common_opt "$1"; then
-            shift
-            shift
-            continue
-        fi
-
-        case "$1" in
-            -ssh-id)
-                ssh_id=$(assign_arg "$1" "$2")
-                ;;
-            -ssh-name)
-                ssh_name=$(assign_arg "$1" "$2")
-                ;;
-            -ssh-new-name)
-                ssh_new_name=$(assign_arg "$1" "$2")
-
-                [ "$attr_obj" ] && attr_obj="$attr_obj,"
-                attr_obj="$attr_obj \"name\": \"$ssh_new_name\""
-                ;;
-            -ssh-file)
-                ssh_file=$(assign_arg "$1" "$(escape_value "$2")")
-
-                if [ ! -f "$ssh_file" ]; then
-                    echoerr "File not found: $ssh_file"
-                    return 1
-                else
-                    ssh_key="$(escape_value "$(cat "$ssh_file")")"
-                fi
-
-                [ "$attr_obj" ] && attr_obj="$attr_obj,"
-                attr_obj="$attr_obj \"value\": \"$ssh_key\""
-                ;;
-            *)
-                echoerr "Unknown option: $1"
-                return 1
-                ;;
-        esac
-
-        # Shift the parameter and argument
-        [ -n "$1" ] && shift
-        [ -n "$1" ] && shift
-    done
 
     if [ -z "$ssh_name" ] && [ -z "$ssh_id" ]; then
         echoerr "One of -ssh-name or -ssh-id is required"
@@ -116,15 +83,15 @@ tfh_ssh_update () (
     if [ -n "$ssh_name" ]; then
         # Use the show command to check for and retrieve the ID of the key
         # in the case of being passed a name.
-        . "$cmd_dir/show"
+        . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ssh_show.sh"
 
         # Pass the command line arguments to show and get back a key (or error)
-        if ! ssh_show="$(tfh_show -ssh-name "$ssh_name")"; then
+        if ! ssh_show="$(tfh_ssh_show "$ssh_name")"; then
             # The show command will have printed error messages.
             return 1
         fi
 
-        # Really, if it's empty then tfh_show should have exited non-zero
+        # Really, if it's empty then tfh_ssh_show should have exited non-zero
         if [ -z "$ssh_show" ]; then
             echoerr "SSH key not found"
             return 1
@@ -148,7 +115,7 @@ tfh_ssh_update () (
         return 1
     fi
 
-    echodebug "[DEBUG] API request for update SSH key:"
+    echodebug "API request for update SSH key:"
     url="$address/api/v2/ssh-keys/$ssh_id"
     if ! update_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
         echoerr "Error updating SSH key $ssh_show"

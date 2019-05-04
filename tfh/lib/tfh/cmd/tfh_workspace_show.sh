@@ -21,25 +21,25 @@
 ## -------------------------------------------------------------------
 
 ws_show () (
-    # Ensure all of org, etc, are set. Workspace is not required.
-    if ! check_required org tfh_token address; then
-        return 1
-    fi
+  # Ensure all of org, etc, are set. Workspace is not required.
+  if ! check_required org tfh_token address; then
+    return 1
+  fi
 
-    echodebug "[DEBUG] API request to show workspace:"
-    url="$address/api/v2/organizations/$org/workspaces/$ws"
-    if ! show_resp="$(tfh_api_call "$url")"; then
-        echoerr "Error showing workspace information for $ws"
-        return 1
-    fi
+  echodebug "API request to show workspace:"
+  url="$address/api/v2/organizations/$org/workspaces/$ws"
+  if ! show_resp="$(tfh_api_call "$url")"; then
+    echoerr "Error showing workspace information for $ws"
+    return 1
+  fi
 
-    printf "%s" "$show_resp" | jq -r '
-        "name              = " + .data.attributes.name,
-        "id                = " + .data.id,
-        "auto-apply        = " + (.data.attributes."auto-apply"|tostring),
-        "queue-all-runs    = " + (.data.attributes."queue-all-runs"|tostring),
-        "locked            = " + (.data.attributes.locked|tostring),
-        "created-at        = " + .data.attributes."created-at",
-        "working-directory = " + .data.attributes."working-directory",
-        "terraform-version = " + .data.attributes."terraform-version"'
+  printf "%s" "$show_resp" | jq -r '
+    "name              = " + .data.attributes.name,
+    "id                = " + .data.id,
+    "auto-apply        = " + (.data.attributes."auto-apply"|tostring),
+    "queue-all-runs    = " + (.data.attributes."queue-all-runs"|tostring),
+    "locked            = " + (.data.attributes.locked|tostring),
+    "created-at        = " + .data.attributes."created-at",
+    "working-directory = " + .data.attributes."working-directory",
+    "terraform-version = " + .data.attributes."terraform-version"'
 )

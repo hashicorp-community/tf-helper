@@ -28,50 +28,50 @@ make_unassign_ssh_payload () {
 
 cat > "$payload" <<EOF
 {
-  "data" : {
-    "attributes": {
-      "id": null
-    },
-    "type": "workspaces"
-  }
+"data" : {
+  "attributes": {
+  "id": null
+  },
+  "type": "workspaces"
+}
 }
 EOF
 
-echodebug "[DEBUG] Payload contents:"
+echodebug "Payload contents:"
 cat "$payload" 1>&3
 }
 
 tfh_ssh_unassign () (
-    payload="$TMPDIR/tfe-new-payload-$(random_enough)"
+  payload="$TMPDIR/tfe-new-payload-$(random_enough)"
 
-    # Ensure all of the common required variables are set
-    if ! check_required; then
-        return 1
-    fi
+  # Ensure all of the common required variables are set
+  if ! check_required; then
+    return 1
+  fi
 
-    if ! make_unassign_ssh_payload; then
-        echoerr "Error generating payload file for SSH key unassignment"
-        return 1
-    fi
+  if ! make_unassign_ssh_payload; then
+    echoerr "Error generating payload file for SSH key unassignment"
+    return 1
+  fi
 
-    # Need the workspace ID from the workspace name
-    echodebug "[DEBUG] API request to show workspace:"
-    url="$address/api/v2/organizations/$org/workspaces/$ws"
-    if ! show_resp="$(tfh_api_call "$url")"; then
-        echoerr "Error showing workspace information for $ws"
-        return 1
-    fi
+  # Need the workspace ID from the workspace name
+  echodebug "API request to show workspace:"
+  url="$address/api/v2/organizations/$org/workspaces/$ws"
+  if ! show_resp="$(tfh_api_call "$url")"; then
+    echoerr "Error showing workspace information for $ws"
+    return 1
+  fi
 
-    workspace_id="$(printf "%s" "$show_resp" | jq -r '.data.id')"
+  workspace_id="$(printf "%s" "$show_resp" | jq -r '.data.id')"
 
-    echodebug "[DEBUG] API request for SSH key unassignment:"
-    url="$address/api/v2/workspaces/$workspace_id/relationships/ssh-key"
-    if ! unassign_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
-        echoerr "Error unassigning SSH key from $ws"
-        return 1
-    fi
+  echodebug "API request for SSH key unassignment:"
+  url="$address/api/v2/workspaces/$workspace_id/relationships/ssh-key"
+  if ! unassign_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
+    echoerr "Error unassigning SSH key from $ws"
+    return 1
+  fi
 
-    cleanup "$payload"
+  cleanup "$payload"
 
-    echo "Unassigned SSH key from $ws"
+  echo "Unassigned SSH key from $ws"
 )

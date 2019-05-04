@@ -21,21 +21,21 @@
 ## -------------------------------------------------------------------
 
 tfh_ssh_list () (
-    # Ensure all of org, etc, are set. Workspace is not required.
-    if ! check_required org tfh_token address; then
-        return 1
-    fi
+  # Ensure all of org, etc, are set. Workspace is not required.
+  if ! check_required org token address; then
+    return 1
+  fi
 
-    echodebug "[DEBUG] API request to list SSH keys:"
-    url="$address/api/v2/organizations/$org/ssh-keys"
-    if ! list_resp="$(tfh_api_call "$url")"; then
-        echoerr "Error listing SSH keys for $org"
-        return 1
-    fi
+  echodebug "API request to list SSH keys:"
+  url="$address/api/v2/organizations/$org/ssh-keys"
+  if ! list_resp="$(tfh_api_call "$url")"; then
+    echoerr "Error listing SSH keys for $org"
+    return 1
+  fi
 
-    listing="$(printf "%s" "$list_resp" |
-        jq -r '.data[] | .attributes.name + " " + .id')"
+  listing="$(printf "%s" "$list_resp" |
+    jq -r '.data[] | .attributes.name + " " + .id')"
 
-    # Sort the listing by name.
-    echo "$listing" | sort
+  # Sort the listing by name.
+  echo "$listing" | sort
 )

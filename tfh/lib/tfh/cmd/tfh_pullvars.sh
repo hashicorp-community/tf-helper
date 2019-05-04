@@ -21,205 +21,159 @@
 ## -------------------------------------------------------------------
 
 tfh_pullvars () (
-    # List of vars to retrieve
-    vars=
+  vars="$1"
+  env_vars="$2"
+  env="$3"
+  
+  # Check for required standard options
+  if ! check_required; then
+    return 1
+  fi
 
-    # List of env vars to retrieve
-    env_vars=
+  # Handle conflicting options
+  if [ $env ] && ( [ -n "$vars" ] || [ -n "$env_vars" ] ); then
+    echoerr "-env true cannot be specified along with -var and/or -env-var"
+    return 1
+  fi
 
-    # Whether to list all env vars instead of tf vars
-    env=
+  # request template
+  url="$address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$org&filter%5Bworkspace%5D%5Bname%5D=$ws"
 
-    # Check for required standard options
-    if ! check_required; then
-        return 1
-    fi
+  echodebug "API list variables URL:"
+  echodebug "$url"
 
-    # Parse options
+  # API call to get all of the variables
+  echodebug "API request for variable list:"
+  if ! var_get_resp="$(tfh_api_call $url)"; then
+    echoerr "Error listing variables"
+    return 1
+  fi
 
-    while [ -n "$1" ]; do
-        should_shift=1
+  vars_retval=0
+  tfevar=
 
-        # If this is a common option it has already been parsed. Skip it and
-        # its value.
-        if is_common_opt "$1"; then
-            shift
-            shift
-            continue
-        fi
+  if [ -n "$vars" ]; then
+    # Removoe the end-of-list marker added by append when using vars
+    for v in ${vars%.}; do
+      # Get this tf var out of the variable list with jq
+      tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
+        | select(.attributes.category == "terraform")
+        | select(.attributes.key == $var)
+        | [
+          .attributes.key + " = ",
+          (if .attributes.hcl == false or .attributes.sensitive == true then "\"" else empty end),
+          .attributes.value,
+          (if .attributes.hcl == false or .attributes.sensitive == true then "\"" else empty end)
+          ]
+        | join("")')"
 
-        case "$1" in
-            -var)
-                # -var can be specified multiple times
-                new_var="$(assign_arg "$1" "$2")"
-                vars="$(append "$vars" "$new_var")"
-                ;;
-            -env-var)
-                # -env-var can be specified multiple times
-                new_var="$(assign_arg "$1" "$2")"
-                env_vars="$(append "$env_vars" "$new_var")"
-                ;;
-            -env)
-                env="$(assign_bool "$1" "$2")"
-                should_shift=${?#0}
-                ;;
-            *)
-                echoerr "Unknown option $1"
-                return 1
-                ;;
-        esac
-
-        # Shift the parameter
-        [ -n "$1" ] && shift
-
-        # Shift the argument. There may not be one if the parameter was a flag.
-        [ $should_shift ] && [ -n "$1" ] && shift
+      if [ -z "$tfevar" ]; then
+        echoerr "Variable $v not found"
+        vars_retval=1
+      else
+        echo "$tfevar"
+      fi
     done
+  fi
 
-    # Handle conflicting options
-    if [ $env ] && ( [ -n "$vars" ] || [ -n "$env_vars" ] ); then
-        echoerr "-env true cannot be specified along with -var and/or -env-var"
-        return 1
-    fi
+  if [ -n "$env_vars" ]; then
+    # Removoe the end-of-list marker added by append when using env_vars
+    for v in ${env_vars%.}; do
+      # Get this env var out of the variable list with jq
+      tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
+        | select(.attributes.category == "env")
+        | select(.attributes.key == $var)
+        | .attributes.key + "=\"" + .attributes.value + "\""')"
 
-    # request template
-    url="$address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$org&filter%5Bworkspace%5D%5Bname%5D=$ws"
+      if [ -z "$tfevar" ]; then
+        echoerr "Variable $v not found"
+        vars_retval=1
+      else
+        echo "$tfevar"
+      fi
+    done
+  fi
 
-    echodebug "[DEBUG] API list variables URL:"
-    echodebug "$url"
+  if [ -n "$vars" ] || [ -n "$env_vars" ]; then
+    return $vars_retval
+  fi
 
-    # API call to get all of the variables
-    echodebug "[DEBUG] API request for variable list:"
-    if ! var_get_resp="$(tfh_api_call $url)"; then
-        echoerr "Error listing variables"
-        return 1
-    fi
+  # Didn't retrieve a specific list of vars so
+  # either list all tf or all env vars
+  terraform_tfvars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
+    | select(.attributes.category == "terraform")
+    | select(.attributes.sensitive == false)
+    | [
+      .attributes.key + " = ",
+      (if .attributes.hcl == false then
+        if .attributes.value | contains("\n") then
+          "<<EOF\n"
+        else
+          "\""
+        end
+      else empty end),
+      .attributes.value,
+      (if .attributes.hcl == false then
+        if .attributes.value | contains("\n") then
+          "\nEOF"
+        else
+          "\""
+        end
+      else empty end),
+      "\n"
+      ]
+    | join("")')"
+  if [ 0 -ne $? ]; then
+    echoerr "Error parsing API response for Terraform variables"
+    return 1
+  fi
 
-    vars_retval=0
-    tfevar=
+  sensitive_tfvars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
+    | select(.attributes.category == "terraform")
+    | select(.attributes.sensitive == true)
+    | .attributes.key + " = \"\""')"
+  if [ 0 -ne $? ]; then
+    echoerr "Error parsing API response for sensitive Terraform variables"
+    return 1
+  fi
 
-    if [ -n "$vars" ]; then
-        # Removoe the end-of-list marker added by append when using vars
-        for v in ${vars%.}; do
-            # Get this tf var out of the variable list with jq
-            tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
-                | select(.attributes.category == "terraform")
-                | select(.attributes.key == $var)
-                | [
-                    .attributes.key + " = ",
-                    (if .attributes.hcl == false or .attributes.sensitive == true then "\"" else empty end),
-                    .attributes.value,
-                    (if .attributes.hcl == false or .attributes.sensitive == true then "\"" else empty end)
-                  ]
-                | join("")')"
+  env_vars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
+    | select(.attributes.category == "env")
+    | select(.attributes.sensitive == false)
+    | .attributes.key + "=\"" + .attributes.value + "\""')"
+  if [ 0 -ne $? ]; then
+    echoerr "Error parsing API response for environment variables"
+    return 1
+  fi
 
-            if [ -z "$tfevar" ]; then
-                echoerr "Variable $v not found"
-                vars_retval=1
-            else
-                echo "$tfevar"
-            fi
-        done
+  sensitive_env_vars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
+    | select(.attributes.category == "env")
+    | select(.attributes.sensitive == true)
+    | .attributes.key + "="')"
+  if [ 0 -ne $? ]; then
+    echoerr "Error parsing API response for sensitive environment variables"
+    return 1
+  fi
+
+  # All env vars were requested
+  if [ $env ]; then
+    if [ -n "$sensitive_env_vars" ]; then
+      echo "$sensitive_env_vars"
     fi
 
     if [ -n "$env_vars" ]; then
-        # Removoe the end-of-list marker added by append when using env_vars
-        for v in ${env_vars%.}; do
-            # Get this env var out of the variable list with jq
-            tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
-                | select(.attributes.category == "env")
-                | select(.attributes.key == $var)
-                | .attributes.key + "=\"" + .attributes.value + "\""')"
-
-            if [ -z "$tfevar" ]; then
-                echoerr "Variable $v not found"
-                vars_retval=1
-            else
-                echo "$tfevar"
-            fi
-        done
+      echo "$env_vars"
     fi
 
-    if [ -n "$vars" ] || [ -n "$env_vars" ]; then
-        return $vars_retval
-    fi
+    return 0
+  fi
 
-    # Didn't retrieve a specific list of vars so
-    # either list all tf or all env vars
-    terraform_tfvars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
-        | select(.attributes.category == "terraform")
-        | select(.attributes.sensitive == false)
-        | [
-            .attributes.key + " = ",
-            (if .attributes.hcl == false then
-                if .attributes.value | contains("\n") then
-                    "<<EOF\n"
-                else
-                    "\""
-                end
-            else empty end),
-            .attributes.value,
-            (if .attributes.hcl == false then
-                if .attributes.value | contains("\n") then
-                    "\nEOF"
-                else
-                    "\""
-                end
-            else empty end),
-            "\n"
-          ]
-        | join("")')"
-    if [ 0 -ne $? ]; then
-        echoerr "Error parsing API response for Terraform variables"
-        return 1
-    fi
+  # All tf vars were requested
+  if [ -n "$sensitive_tfvars" ]; then
+    echo "$sensitive_tfvars"
+  fi
 
-    sensitive_tfvars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
-        | select(.attributes.category == "terraform")
-        | select(.attributes.sensitive == true)
-        | .attributes.key + " = \"\""')"
-    if [ 0 -ne $? ]; then
-        echoerr "Error parsing API response for sensitive Terraform variables"
-        return 1
-    fi
-
-    env_vars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
-        | select(.attributes.category == "env")
-        | select(.attributes.sensitive == false)
-        | .attributes.key + "=\"" + .attributes.value + "\""')"
-    if [ 0 -ne $? ]; then
-        echoerr "Error parsing API response for environment variables"
-        return 1
-    fi
-
-    sensitive_env_vars="$(printf "%s" "$var_get_resp" | jq -r '.data[]
-        | select(.attributes.category == "env")
-        | select(.attributes.sensitive == true)
-        | .attributes.key + "="')"
-    if [ 0 -ne $? ]; then
-        echoerr "Error parsing API response for sensitive environment variables"
-        return 1
-    fi
-
-    # All env vars were requested
-    if [ $env ]; then
-        if [ -n "$sensitive_env_vars" ]; then
-            echo "$sensitive_env_vars"
-        fi
-
-        if [ -n "$env_vars" ]; then
-            echo "$env_vars"
-        fi
-
-        return 0
-    fi
-
-    # All tf vars were requested
-    if [ -n "$sensitive_tfvars" ]; then
-        echo "$sensitive_tfvars"
-    fi
-
-    if [ -n "$terraform_tfvars" ]; then
-        echo "$terraform_tfvars"
-    fi
+  if [ -n "$terraform_tfvars" ]; then
+    echo "$terraform_tfvars"
+  fi
 )

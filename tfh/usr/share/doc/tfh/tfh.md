@@ -16,7 +16,7 @@ The name of the Terraform Enterprise workspace, formatted as "<ORGANIZATION>/<WO
 
 The name of the Terraform Enterprise organization. If unspecified, uses the TFE_ORG environment variable.  The -tfh-org and -tfh-workspace can be used as an alternative to specifying -name. The option specified last is the effective value used.
 
-* `-workspace WORKSPACE`
+* `-ws WORKSPACE`
 
 The name of the Terraform Enterprise workspace. If unspecified, uses the TFE_WORKSPACE environment variable. The -tfh-org and -tfh-workspace can be used as an alternative to specifying -name. The option specified last is the effective value used.
 
