@@ -60,29 +60,6 @@ cleanup () {
   fi
 }
 
-# Write a given token value to a curl config file at the given path.
-# $1 file path
-# $2 token
-make_tfh_curl_config () {
-  if ! echo > "$1"; then
-    echoerr "Error: cannot write to curl config file:"
-    echoerr "$1"
-    return 1
-  fi
-
-  if ! chmod 600 "$1"; then
-    echoerr "WARNING: unable to set permissions on curl config file:"
-    echoerr "chmod 600 $1"
-  fi
-
-  if ! echo "--header \"Authorization: Bearer $2\"" > "$1"; then
-    echoerr "Error: cannot generate curl config file:"
-    echoerr "$1"
-    return 1
-  fi
-
-  echodebug "Created $1"
-}
 
 # Replace quotes and newlines with escape characters to prepare the
 # value for insertion into JSON.
@@ -209,95 +186,32 @@ check_required () {
 }
 
 tfh_junonia_filter () {
-  org="$1"
-  ws="$2"
-  token="$3"
-  hostname="$4"
+  readonly org="$1"
+  readonly ws="$2"
+  readonly token="$3"
+  readonly hostname="$4"
+  readonly verbose="$5"
 
-  address="https://$hostname"
+  readonly address="https://$hostname"
 
   echodebug "org: $org"
   echodebug "workspace: $ws"
-  echodebug "hostname: $hostname"
-  echodebug "address: $address"
-
-  token_via=
-  if [ -n "$token" ]; then
-    token_via=junonia
+  if [ -z "$token" ]; then
+    echodebug "token: (empty)"
+    if [ -f "$curlrc" ]; then
+      # Use the curlrc config file
+      curl_token_arg="--config $curlrc"
+    fi
+  else
+    echodebug "token: (not empty)"
     curl_token_arg="--header \"Authorization: Bearer $token\""
   fi
+  echodebug "hostname: $hostname"
+  echodebug "address: $address"
+  echodebug "verbose: $verbose"
 
-  # If no other source has obtained a token yet, check for ~/.terraformrc, also
-  # configurable with $TERRAFORM_CONFIG. If present, use the value of address
-  # with .terraformrc to generate a curlrc and then use that.
-
-  curl_token_arg=
-  readonly default_curl_config="$JUNONIA_CONFIGDIR/curlrc"
-  curl_config="${TFH_CURL_CONFIG:-"$default_curl_config"}"
-  if [ -f "$curl_config" ]; then
-    # Setting this to the config location just so this variable has a value
-    token="$curl_config"
-
-    # Use the curlrc config file
-    curl_token_arg="--config $curl_config"
-    token_via="$curl_config"
-  fi
-
-  # If no token has been found up to this point, or if the token source is a
-  # .tfh-curl-config file, check for .terraformrc and either generate a
-  # .tfh-cli-curl config file if there isn't one, or otherwise compare and
-  # validate contents.
-  if [ -z "$token" ] || [ "$token_via" = "$tfh_curl_config" ]; then
-    tf_config="${TERRAFORM_CONFIG:-"$HOME/.terraformrc"}"
-    if [ -f "$tf_config" ]; then
-      # This is simplified. It depends on the token keyword and value being
-      # on the same line in the .terraformrc.
-      tf_config_token="$(awk -v url="${address#https://}" '
-        $0 ~ "\"" url "\"" { in_url=1 }
-        in_url && /token *= *"[A-Za-z0-9\.][A-Za-z0-9\.]*"/ {
-          match($0, /"[A-Za-z0-9\.][A-Za-z0-9\.]*"/)
-          print substr($0, RSTART+1, RLENGTH-2)
-        }
-      ' "$tf_config")"
-
-      if [ -n "$tf_config_token" ] && [ -z "$token" ]; then
-        if ! make_tfh_curl_config "$tfh_curl_config" "$tf_config_token"; then
-            exit 1
-        fi
-
-        token_via="$tfh_curl_config generated from $tf_config"
-        tfh_curl_token_arg="--config $tfh_curl_config"
-
-        # Setting this to the config location just so this variable has a value
-        token="$tfh_curl_config"
-      elif [ -n "$tf_config_token" ] &&
-           [ -n "$token" ] &&
-           [ "$token_via" = "$tfh_curl_config" ] &&
-           [ -z "$TFE_NO_CURL_CONFIG_DIFF" ] ; then
-        # Got a .terraformrc token and the current token is from a tfh curl
-        # config. Compare the tokens to see if they're the same.
-        tfh_curl_config_token="$(awk '
-                /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/ {
-                    match($0, /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/)
-                    print substr($0, RSTART+7, RLENGTH-7)
-                }
-            ' "$tfh_curl_config")"
-
-        if [ "$tfh_curl_config_token" != "$tf_config_token" ]; then
-          echoerr "WARNING Tokens do not match in files:"
-          echoerr "$tf_config"
-          echoerr "$tfh_curl_config"
-          echoerr
-          echoerr "Using $tfh_curl_config"
-          echoerr "Remove $tfh_curl_config to use the token from $tf_config"
-          echoerr "Suppress this message by setting TFE_NO_CURL_CONFIG_DIFF=1"
-          echoerr
-        fi
-      fi
-    fi
-  fi
-
-  echodebug "token: (set by $token_via)"
+  readonly default_curlrc="$JUNONIA_CONFIGDIR/curlrc"
+  curlrc="${TFH_CURLRC:-"$default_curlrc"}"
 
   return 5
 }
@@ -317,8 +231,8 @@ junonia_bootstrap () {
     JUNONIA_TARGET="$JUNONIA_TARGET/$JUNONIA_PATH"
     fi
   done
-  readonly JUNONIA_PATH="$(cd "$(dirname "$JUNONIA_TARGET")" && pwd -P)"
-  readonly JUNONIA_TARGET="$JUNONIA_PATH/$(basename $JUNONIA_TARGET)"
+  JUNONIA_PATH="$(cd "$(dirname "$JUNONIA_TARGET")" && pwd -P)"
+  JUNONIA_TARGET="$JUNONIA_PATH/$(basename $JUNONIA_TARGET)"
 }
 
 ##

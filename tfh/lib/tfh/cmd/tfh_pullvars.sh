@@ -52,9 +52,9 @@ tfh_pullvars () (
   vars_retval=0
   tfevar=
 
+  IFS="$JUNONIA_US"
   if [ -n "$vars" ]; then
-    # Removoe the end-of-list marker added by append when using vars
-    for v in ${vars%.}; do
+    for v in $vars; do
       # Get this tf var out of the variable list with jq
       tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
         | select(.attributes.category == "terraform")
@@ -77,8 +77,7 @@ tfh_pullvars () (
   fi
 
   if [ -n "$env_vars" ]; then
-    # Removoe the end-of-list marker added by append when using env_vars
-    for v in ${env_vars%.}; do
+    for v in $env_vars; do
       # Get this env var out of the variable list with jq
       tfevar="$(printf "%s" "$var_get_resp" | jq -r --arg var "$v" '.data[]
         | select(.attributes.category == "env")
@@ -93,6 +92,7 @@ tfh_pullvars () (
       fi
     done
   fi
+  unset IFS
 
   if [ -n "$vars" ] || [ -n "$env_vars" ]; then
     return $vars_retval

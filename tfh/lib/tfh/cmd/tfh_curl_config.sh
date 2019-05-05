@@ -20,10 +20,118 @@
 ##
 ## -------------------------------------------------------------------
 
-tfh_curl_config () (
-  if [ $# -gt 1 ]; then
-    # (Re)create / overwrite the curlrc
-    make_tfh_curl_config "$tfh_curl_config" "$tfh_token"
-    echo "# Wrote $tfh_curl_config"
+# Write a given token value to a curl config file at the given path.
+# $1 file path
+# $2 token
+make_curlrc () {
+  curlrc_dir="$(dirname "$1")"
+
+  if [ ! -d "$curlrc_dir" ]; then
+    if ! mkdir -p "$curlrc_dir"; then
+      echoerr "unable to create configuration directory:"
+      echoerr "$curlrc_dir"
+      return 1
+    fi
   fi
-)
+
+  if ! echo > "$1"; then
+    echoerr "Error: cannot write to curl config file:"
+    echoerr "$1"
+    return 1
+  fi
+
+  if ! chmod 600 "$1"; then
+    echoerr "WARNING: unable to set permissions on curl config file:"
+    echoerr "chmod 600 $1"
+  fi
+
+  if ! echo "--header \"Authorization: Bearer $2\"" > "$1"; then
+    echoerr "Error: cannot generate curl config file:"
+    echoerr "$1"
+    return 1
+  fi
+
+  echodebug "Created $1"
+}
+
+tfh_curl_config () {
+  tfrc="$1"
+  curltoken="$2"
+
+  if [ -n "$curloken" ] && [ -n "$tfrc" ]; then
+    echoerr "only one of -curltoken or -tfrc can be specified"
+    return 1
+  fi
+
+  if [ -n "$curltoken" ]; then
+    # (Re)create / overwrite the curlrc
+    make_curlrc "$curlrc" "$curltoken"
+    echo "wrote $curlrc"
+    return 0
+  fi
+
+  tf_config="${TERRAFORM_CONFIG:-"$HOME/.terraformrc"}"
+  if [ -f "$tf_config" ]; then
+    # This is simplified. It depends on the token keyword and value being
+    # on the same line in the .terraformrc.
+    tf_config_token="$(awk -v url="$hostname" '
+      $0 ~ "\"" url "\"" { in_url=1 }
+      in_url && /token *= *"[A-Za-z0-9\.]+"/ {
+        match($0, /"[A-Za-z0-9\.]+"/)
+        print substr($0, RSTART+1, RLENGTH-2)
+      }' "$tf_config")"
+  else
+    tf_config_token=
+  fi
+
+  if [ $tfrc ]; then
+    if [ -n "$tf_config_token" ]; then
+      if ! make_curlrc "$curlrc" "$tf_config_token"; then
+        echoerr "failed to create curlrc with terraformrc token"
+        echoerr "source: $tf_config"
+        echoerr "destination: $curlrc"
+        return 1
+      fi
+      echo "$curlrc generated from $tf_config"
+      return 0
+    else
+      echoerr "unable to extract token from terraformrc:"
+      echoerr "$tf_config"
+      return 1
+    fi
+  fi
+
+  if [ -f "$curlrc" ]; then
+    echo "$curlrc"
+    echov "$(cat "$curlrc")"
+
+    if [ -f "$tf_config" ] && [ -z "$TFH_NO_CURLRC_DIFF" ] ; then
+      # Got a .terraformrc token and the current token is from a tfh curl
+      # config. Compare the tokens to see if they're the same.
+      curlrc_token="$(awk '
+        /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/ {
+          match($0, /Bearer [A-Za-z0-9\.][A-Za-z0-9\.]*/)
+          print substr($0, RSTART+7, RLENGTH-7)
+        }' "$curlrc")"
+
+      if [ "$curlrc_token" != "$tf_config_token" ]; then
+        echo
+        echo "WARNING tokens do not match in files:"
+        echo "$tf_config"
+        echo "$curlrc"
+        echo
+        echo "tfh will use: $curlrc"
+        echo
+        echo "to use $tf_config, run \`tfh curl-config -tfrc\`"
+        echo
+        echo "suppress this message by setting TFH_NO_CURLRC_DIFF=1"
+        echo
+
+        echov "curlrc     : $curlrc_token"
+        echov "terraformrc: $tf_config_token"
+      fi
+    fi
+  else
+    echo "no curlrc file at $curlrc"
+  fi
+}
