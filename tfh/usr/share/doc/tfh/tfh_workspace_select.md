@@ -4,7 +4,7 @@ Set `TFH_workspace` in the tfh configuration file
 
 ### Synopsis
 
-    tfh ws select WORKSPACE_NAME
+    tfh workspace select WORKSPACE_NAME
 
 ### Description
 

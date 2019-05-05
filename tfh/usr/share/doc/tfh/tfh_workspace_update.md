@@ -4,7 +4,7 @@ Modify a Terraform Enterprise workspace
 
 ### Synopsis
 
-    tfh ws update [OPTIONS]
+    tfh workspace update [OPTIONS]
 
 ### Description
 

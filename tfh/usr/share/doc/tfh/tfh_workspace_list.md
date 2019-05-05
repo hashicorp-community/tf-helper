@@ -4,7 +4,7 @@ List Terraform Enterprise workspaces for an organization
 
 ### Synopsis
 
-    tfh ws list [OPTIONS]
+    tfh workspace list [OPTIONS]
 
 ### Description
 

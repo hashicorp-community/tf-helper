@@ -4,7 +4,7 @@ Create a new Terraform Enterprise workspace
 
 ### Synopsis
 
-    tfh ws new [OPTIONS]
+    tfh workspace new [OPTIONS]
 
 ### Description
 

@@ -4,7 +4,7 @@ Perform operations on workspaces
 
 ### Synopsis
 
-    tfh ws SUBCOMMAND
+    tfh workspace SUBCOMMAND
 
 ### Description
 

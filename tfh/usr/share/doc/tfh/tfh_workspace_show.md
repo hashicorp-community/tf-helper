@@ -4,7 +4,7 @@ Show Terraform Enterprise workspace details
 
 ### Synopsis
 
-    tfh ws show [OPTIONS]
+    tfh workspace show [OPTIONS]
 
 ### Description
 

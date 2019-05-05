@@ -4,7 +4,7 @@ Delete a Terraform Enterprise workspace
 
 ### Synopsis
 
-    tfh ws delete [OPTIONS]
+    tfh workspace delete [OPTIONS]
 
 ### Description
 
