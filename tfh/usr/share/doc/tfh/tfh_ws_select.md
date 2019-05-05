@@ -1,10 +1,10 @@
-## `tfh workspace select`
+## `tfh ws select`
 
 Set `TFH_workspace` in the tfh configuration file
 
 ### Synopsis
 
-    tfh workspace select WORKSPACE_NAME
+    tfh ws select WORKSPACE_NAME
 
 ### Description
 

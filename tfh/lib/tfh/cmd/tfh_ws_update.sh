@@ -40,7 +40,7 @@ echodebug "Payload contents:"
 cat $payload 1>&3
 }
 
-ws_update () (
+tfh_ws_update () {
   auto_apply="$1"
   tf_version="$2"
   working_dir="$3"
@@ -121,4 +121,4 @@ ws_update () (
   cleanup "$payload"
 
   echo "Updated workspace $org/$ws"
-)
+}

@@ -1,10 +1,10 @@
-## `tfh workspace update`
+## `tfh ws update`
 
 Modify a Terraform Enterprise workspace
 
 ### Synopsis
 
-    tfh workspace update [OPTIONS]
+    tfh ws update [OPTIONS]
 
 ### Description
 

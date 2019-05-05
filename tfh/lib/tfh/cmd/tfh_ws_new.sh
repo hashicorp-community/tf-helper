@@ -74,7 +74,7 @@ echodebug "Payload contents:"
 cat "$payload" 1>&3
 }
 
-ws_new () (
+tfh_ws_new () {
   auto_apply="$1"
   tf_version="$2"
   working_dir="$3"
@@ -198,4 +198,4 @@ ws_new () (
   cleanup "$payload"
 
   echo "Created new workspace $org/$ws"
-)
+}

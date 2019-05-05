@@ -1,10 +1,10 @@
-## `tfh workspace new`
+## `tfh ws new`
 
 Create a new Terraform Enterprise workspace
 
 ### Synopsis
 
-    tfh workspace new [OPTIONS]
+    tfh ws new [OPTIONS]
 
 ### Description
 

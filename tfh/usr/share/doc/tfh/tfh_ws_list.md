@@ -1,10 +1,10 @@
-## `tfh workspace list`
+## `tfh ws list`
 
 List Terraform Enterprise workspaces for an organization
 
 ### Synopsis
 
-    tfh workspace list [OPTIONS]
+    tfh ws list [OPTIONS]
 
 ### Description
 

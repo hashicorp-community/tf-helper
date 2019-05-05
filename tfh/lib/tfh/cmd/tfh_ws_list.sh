@@ -20,18 +20,29 @@
 ##
 ## -------------------------------------------------------------------
 
-ws_delete () (
-    # Ensure all of org, etc, are set.
-    if ! check_required; then
-        return 1
-    fi
+tfh_ws_list () {
+  # Ensure all of org, etc, are set. Workspace is not required.
+  if ! check_required org token address; then
+    return 1
+  fi
 
-    echodebug "API request to delete workspace:"
-    url="$address/api/v2/organizations/$org/workspaces/$ws"
-    if ! tfh_api_call -X DELETE "$url" >/dev/null; then
-        echoerr "Error deleting workspaces $org/$ws"
-        return 1
-    fi
+  echodebug "API request to list workspaces:"
+  url="$address/api/v2/organizations/$org/workspaces"
+  if ! list_resp="$(tfh_api_call "$url")"; then
+    echoerr "Error listing workspaces for $org"
+    return 1
+  fi
 
-    echo "Deleted $org/$ws"
-)
+  listing="$(printf "%s" "$list_resp" |
+    jq -r --arg ws "$ws" '
+      .data[]
+        | if .attributes.name == $ws then
+            "* " + .attributes.name
+          else
+            "  " + .attributes.name
+          end')"
+
+  # Produce the listing, sorted. Sort on the third character of each line
+  # as each is indented two spaces and there may be one marked with an *.
+  echo "$listing" | sort -k 1.3
+}

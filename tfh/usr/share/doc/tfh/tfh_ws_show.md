@@ -1,10 +1,10 @@
-## `tfh workspace show`
+## `tfh ws show`
 
 Show Terraform Enterprise workspace details
 
 ### Synopsis
 
-    tfh workspace show [OPTIONS]
+    tfh ws show [OPTIONS]
 
 ### Description
 

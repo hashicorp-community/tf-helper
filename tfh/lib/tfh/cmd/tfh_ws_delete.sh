@@ -20,30 +20,18 @@
 ##
 ## -------------------------------------------------------------------
 
-ws_select () (
-  ws="$1"
+tfh_ws_delete () {
+    # Ensure all of org, etc, are set.
+    if ! check_required; then
+        return 1
+    fi
 
-  if [ -z "$ws" ]; then
-    echoerr "Exactly one argument required: workspace name"
-    return 1
-  fi
+    echodebug "API request to delete workspace:"
+    url="$address/api/v2/organizations/$org/workspaces/$ws"
+    if ! tfh_api_call -X DELETE "$url" >/dev/null; then
+        echoerr "Error deleting workspaces $org/$ws"
+        return 1
+    fi
 
-  . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ws_list.sh"
-
-  if ! ws_list="$(tfh_ws_list)"; then
-    # An error from tfh_list should have been printed
-    return 1
-  fi
-
-  if ! echo "$ws_list" | grep -E "^[\* ] $1$" >/dev/null 2>&1; then
-    echoerr "Workspace not found: $1"
-    return 1
-  fi
-
-  # Write the workspace configuration
-  if err="$(update_sh_config "$JUNONIA_CONFIG" "TFE_workspace=$ws")"; then
-    echo "Switched to workspace: $ws"
-  else
-    echoerr "$err"
-  fi
-)
+    echo "Deleted $org/$ws"
+}

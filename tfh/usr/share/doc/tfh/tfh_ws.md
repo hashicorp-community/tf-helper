@@ -1,10 +1,10 @@
-## `tfh workspace`
+## `tfh ws`
 
 Perform operations on workspaces
 
 ### Synopsis
 
-    tfh workspace SUBCOMMAND
+    tfh ws SUBCOMMAND
 
 ### Description
 

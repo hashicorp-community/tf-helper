@@ -20,7 +20,7 @@
 ##
 ## -------------------------------------------------------------------
 
-ws_show () (
+tfh_ws_show () {
   # Ensure all of org, etc, are set. Workspace is not required.
   if ! check_required org tfh_token address; then
     return 1
@@ -42,4 +42,4 @@ ws_show () (
     "created-at        = " + .data.attributes."created-at",
     "working-directory = " + .data.attributes."working-directory",
     "terraform-version = " + .data.attributes."terraform-version"'
-)
+}
