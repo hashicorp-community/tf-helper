@@ -20,30 +20,29 @@
 ##
 ## -------------------------------------------------------------------
 
-tfh_ws_select () {
-  ws="$1"
-
-  if [ -z "$ws" ]; then
-    echoerr "Exactly one argument required: workspace name"
+tfh_workspace_list () {
+  # Ensure all of org, etc, are set. Workspace is not required.
+  if ! check_required org token address; then
     return 1
   fi
 
-  . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ws_list.sh"
-
-  if ! ws_list="$(tfh_ws_list)"; then
-    # An error from tfh_list should have been printed
+  echodebug "API request to list workspaces:"
+  url="$address/api/v2/organizations/$org/workspaces"
+  if ! list_resp="$(tfh_api_call "$url")"; then
+    echoerr "Error listing workspaces for $org"
     return 1
   fi
 
-  if ! echo "$ws_list" | grep -E "^[\* ] $1$" >/dev/null 2>&1; then
-    echoerr "Workspace not found: $1"
-    return 1
-  fi
+  listing="$(printf "%s" "$list_resp" |
+    jq -r --arg ws "$ws" '
+      .data[]
+        | if .attributes.name == $ws then
+            "* " + .attributes.name
+          else
+            "  " + .attributes.name
+          end')"
 
-  # Write the workspace configuration
-  if err="$(update_sh_config "$JUNONIA_CONFIG" "TFE_workspace=$ws")"; then
-    echo "Switched to workspace: $ws"
-  else
-    echoerr "$err"
-  fi
+  # Produce the listing, sorted. Sort on the third character of each line
+  # as each is indented two spaces and there may be one marked with an *.
+  echo "$listing" | sort -k 1.3
 }

@@ -74,7 +74,7 @@ echodebug "Payload contents:"
 cat "$payload" 1>&3
 }
 
-tfh_ws_new () {
+tfh_workspace_new () {
   auto_apply="$1"
   tf_version="$2"
   working_dir="$3"
@@ -84,7 +84,7 @@ tfh_ws_new () {
   oauth_id="$7"
   queue_all_runs="$8"
 
-  payload="$TMPDIR/tfe-new-payload-$(random_enough)"
+  payload="$TMPDIR/new-ws-payload-$(random_enough)"
 
   # Ensure all of org, etc, are set
   if ! check_required all; then

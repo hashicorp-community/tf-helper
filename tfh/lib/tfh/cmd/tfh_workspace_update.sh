@@ -40,7 +40,7 @@ echodebug "Payload contents:"
 cat $payload 1>&3
 }
 
-tfh_ws_update () {
+tfh_workspace_update () {
   auto_apply="$1"
   tf_version="$2"
   working_dir="$3"

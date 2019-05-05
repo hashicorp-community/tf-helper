@@ -1,4 +1,4 @@
-## `tfh ws show`
+## `tfh workspace show`
 
 Show Terraform Enterprise workspace details
 

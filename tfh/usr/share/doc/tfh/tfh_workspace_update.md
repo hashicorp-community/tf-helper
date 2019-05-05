@@ -1,17 +1,14 @@
-## `tfh ws new`
+## `tfh workspace update`
 
-Create a new Terraform Enterprise workspace
+Modify a Terraform Enterprise workspace
 
 ### Synopsis
 
-    tfh ws new [OPTIONS]
+    tfh ws update [OPTIONS]
 
 ### Description
 
-Create a new Terraform Enterprise workspace. If more than one OAuth client is configured use the OAuth Tokens API to list the clients and their IDs. Provide the appropriate ID from the list to the -oauth-id option.
-
-https://www.terraform.io/docs/enterprise/api/oauth-tokens.html
-
+Modify a Terraform Enterprise workspace.
 
 ### Options
 
@@ -41,7 +38,7 @@ If true, when the configuration is ingressed from the VCS service VCS submodules
 
 * `-oauth-id ID`
 
-The OAuth ID, obtained from the Terraform Enterprise API, which corresponds to the VCS ID provided. Defaults to the OAuth ID of the configured client if there is only one.
+The OAuth ID to be used with the VCS integration.
 
 * `-queue-all-runs`
 

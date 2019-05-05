@@ -1,4 +1,4 @@
-## `tfh ws delete`
+## `tfh workspace delete`
 
 Delete a Terraform Enterprise workspace
 

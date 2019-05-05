@@ -20,7 +20,7 @@
 ##
 ## -------------------------------------------------------------------
 
-tfh_ws_show () {
+tfh_workspace_show () {
   # Ensure all of org, etc, are set. Workspace is not required.
   if ! check_required org tfh_token address; then
     return 1

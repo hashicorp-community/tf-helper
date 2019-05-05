@@ -1,4 +1,4 @@
-## `tfh ws list`
+## `tfh workspace list`
 
 List Terraform Enterprise workspaces for an organization
 

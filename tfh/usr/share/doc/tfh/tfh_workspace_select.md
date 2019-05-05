@@ -1,4 +1,4 @@
-## `tfh ws select`
+## `tfh workspace select`
 
 Set `TFH_workspace` in the tfh configuration file
 
