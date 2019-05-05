@@ -84,7 +84,19 @@ tfh_workspace_new () {
   oauth_id="$7"
   queue_all_runs="$8"
 
-  payload="$TMPDIR/new-ws-payload-$(random_enough)"
+  if [ $auto_apply ]; then
+    auto_apply=true
+  else
+    auto_apply=false
+  fi
+
+  if [ $queue_all_runs ]; then
+    queue_all_runs=true
+  else
+    queue_all_runs=false
+  fi
+
+  payload="$TMPDIR/new-ws-payload-$(junonia_randomish_int)"
 
   # Ensure all of org, etc, are set
   if ! check_required all; then

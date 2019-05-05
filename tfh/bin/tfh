@@ -83,8 +83,8 @@ escape_value () {
 # Common options to curl. Fail on HTTP error codes.
 tfh_api_call () {
   echodebug "curl args: $@"
-  if resp="$(curl -f $tfh_curl_silent \
-         $tfh_curl_token_arg \
+  if resp="$(curl -f $curl_silent \
+         $curl_token_arg \
          --header "Content-Type: application/vnd.api+json" \
          $@)"; then
     echodebug "API request succeeded with exit code $?. Response:"
@@ -147,26 +147,26 @@ check_required () {
     case "$i" in
       org)
         if [ -z "$org" ]; then
-            missing=1
-            echoerr 'TFE organization required.'
-            echoerr 'Set with $TFH_org or use -org'
-            echoerr
+          missing=1
+          echoerr 'TFE organization required.'
+          echoerr 'Set with $TFH_org or use -org'
+          echoerr
         fi
       ;;
       ws)
         if [ -z "$ws" ]; then
-            missing=1
-            echoerr 'TFE workspace required.'
-            echoerr 'Set with $TFE_ws or use -ws'
-            echoerr
+          missing=1
+          echoerr 'TFE workspace required.'
+          echoerr 'Set with $TFH_ws or use -ws'
+          echoerr
         fi
       ;;
       token)
-        if [ -z "$token" ]; then
-            missing=1
-            echoerr 'TFE API token required.'
-            echoerr 'Set with $TFE_TOKEN, -token, or $ATLAS_TOKEN'
-            echoerr
+        if [ -z "$curl_token_arg" ]; then
+          missing=1
+          echoerr 'TFE API token required.'
+          echoerr 'Set `tfh curl-config,  $TFH_token, or -token'
+          echoerr
         fi
       ;;
       address)
@@ -174,10 +174,10 @@ check_required () {
         # explicitly pass in an empty string to the command line
         # argument.
         if [ -z "$address" ]; then
-            missing=1
-            echoerr 'TFE hostname required.'
-            echoerr 'Set with -hostname or $TFE_hostname'
-            echoerr
+          missing=1
+          echoerr 'TFE hostname required.'
+          echoerr 'Set with -hostname or $TFE_hostname'
+          echoerr
         fi
       ;;
     esac
@@ -194,6 +194,9 @@ tfh_junonia_filter () {
 
   readonly address="https://$hostname"
 
+  readonly default_curlrc="$JUNONIA_CONFIGDIR/curlrc"
+  curlrc="${TFH_CURLRC:-"$default_curlrc"}"
+
   echodebug "org: $org"
   echodebug "workspace: $ws"
   if [ -z "$token" ]; then
@@ -209,9 +212,6 @@ tfh_junonia_filter () {
   echodebug "hostname: $hostname"
   echodebug "address: $address"
   echodebug "verbose: $verbose"
-
-  readonly default_curlrc="$JUNONIA_CONFIGDIR/curlrc"
-  curlrc="${TFH_CURLRC:-"$default_curlrc"}"
 
   return 5
 }
@@ -233,6 +233,9 @@ junonia_bootstrap () {
   done
   JUNONIA_PATH="$(cd "$(dirname "$JUNONIA_TARGET")" && pwd -P)"
   JUNONIA_TARGET="$JUNONIA_PATH/$(basename $JUNONIA_TARGET)"
+  if [ "$(basename "$JUNONIA_PATH")" = bin ]; then
+    JUNONIA_PATH="$(dirname "$JUNONIA_PATH")"
+  fi
 }
 
 ##
@@ -264,7 +267,7 @@ fi
 
 junonia_bootstrap
 
-. ../lib/tfh/junonia
+. "$JUNONIA_PATH"/lib/tfh/junonia
 
 echodebug "$PWD"
 echodebug "$0 $*"

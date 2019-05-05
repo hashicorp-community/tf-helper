@@ -21,15 +21,27 @@
 ## -------------------------------------------------------------------
 
 tfh_workspace_show () {
-  # Ensure all of org, etc, are set. Workspace is not required.
-  if ! check_required org tfh_token address; then
+  if ! check_required org token address; then
     return 1
   fi
 
+  # Positional workspace argument
+  show_ws="$1"
+
+  if [ -z "$show_ws" ]; then
+    if ! check_required ws; then
+      echoerr 'For workspace commands, a positional parameter is also accepted:'
+      echoerr 'tfh workspace show WORKSPACE_NAME'
+      return 1
+    fi
+
+    show_ws="$ws"
+  fi
+
   echodebug "API request to show workspace:"
-  url="$address/api/v2/organizations/$org/workspaces/$ws"
+  url="$address/api/v2/organizations/$org/workspaces/$show_ws"
   if ! show_resp="$(tfh_api_call "$url")"; then
-    echoerr "Error showing workspace information for $ws"
+    echoerr "Error showing workspace information for $show_ws"
     return 1
   fi
 

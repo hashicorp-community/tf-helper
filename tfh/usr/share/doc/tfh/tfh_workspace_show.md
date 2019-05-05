@@ -10,3 +10,8 @@ Show Terraform Enterprise workspace details
 
 Show Terraform Enterprise workspace details.
 
+### Positional parameters
+
+* `NAME`
+
+Workspace name to show. Overrides the `-ws` common option.
