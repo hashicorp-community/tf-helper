@@ -21,11 +21,6 @@
 ## -------------------------------------------------------------------
 
 tfh_workspace_show () {
-  if ! check_required org token address; then
-    return 1
-  fi
-
-  # Positional workspace argument
   show_ws="$1"
 
   if [ -z "$show_ws" ]; then
@@ -33,9 +28,9 @@ tfh_workspace_show () {
       echoerr 'For workspace commands, a positional parameter is also accepted:'
       echoerr 'tfh workspace show WORKSPACE_NAME'
       return 1
+    else
+      show_ws="$ws"
     fi
-
-    show_ws="$ws"
   fi
 
   echodebug "API request to show workspace:"

@@ -10,6 +10,12 @@ Modify a Terraform Enterprise workspace
 
 Modify a Terraform Enterprise workspace.
 
+### Positional parameters
+
+* `NAME`
+
+Workspace name to show. Overrides the `-ws` common option.
+
 ### Options
 
 * `-auto-apply`

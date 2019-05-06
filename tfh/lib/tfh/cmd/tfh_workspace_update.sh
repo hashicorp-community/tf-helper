@@ -41,23 +41,29 @@ cat $payload 1>&3
 }
 
 tfh_workspace_update () {
-  auto_apply="$1"
-  tf_version="$2"
-  working_dir="$3"
-  vcs_id="$4"
-  vcs_branch="$5"
-  vcs_submodules="$6"
-  oauth_id="$7"
-  queue_all_runs="$8"
+  up_ws="$prefix$1"
+  auto_apply="$2"
+  tf_version="$3"
+  working_dir="$4"
+  vcs_id="$5"
+  vcs_branch="$6"
+  vcs_submodules="$7"
+  oauth_id="$8"
+  queue_all_runs="$9"
 
   payload="$TMPDIR/tfe-migrate-payload-$(random_enough)"
 
   vcs_obj=
   attr_obj=
 
-  # Ensure all of org, etc, are set
-  if ! check_required all; then
-    return 1
+  if [ -z "$up_ws" ]; then
+    if ! check_required ws; then
+      echoerr 'For workspace commands, a positional parameter is also accepted:'
+      echoerr 'tfh workspace update WORKSPACE_NAME'
+      return 1
+    else
+      show_ws="$ws"
+    fi
   fi
 
   if [ $auto_apply ]; then
@@ -112,13 +118,13 @@ tfh_workspace_update () {
   fi
 
   echodebug "API request to update workspace:"
-  url="$address/api/v2/organizations/$org/workspaces/$ws"
+  url="$address/api/v2/organizations/$org/workspaces/$up_ws"
   if ! update_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
-    echoerr "Error updating workspace $org/$ws"
+    echoerr "Error updating workspace $org/$up_ws"
     return 1
   fi
 
   cleanup "$payload"
 
-  echo "Updated workspace $org/$ws"
+  echo "Updated workspace $org/$up_ws"
 }

@@ -156,8 +156,8 @@ check_required () {
       ws)
         if [ -z "$ws" ]; then
           missing=1
-          echoerr 'TFE workspace required.'
-          echoerr 'Set with $TFH_ws or use -ws'
+          echoerr 'TFE workspace name required.'
+          echoerr 'Set with $TFH_name or use -name, and optionally -prefix'
           echoerr
         fi
       ;;
@@ -187,18 +187,21 @@ check_required () {
 
 tfh_junonia_filter () {
   readonly org="$1"
-  readonly ws="$2"
-  readonly token="$3"
-  readonly hostname="$4"
-  readonly verbose="$5"
+  readonly name="$2"
+  readonly prefix="$3"
+  readonly token="$4"
+  readonly hostname="$5"
+  readonly verbose="$6"
 
   readonly address="https://$hostname"
+  readonly ws="$prefix$name"
 
   readonly default_curlrc="$JUNONIA_CONFIGDIR/curlrc"
   curlrc="${TFH_CURLRC:-"$default_curlrc"}"
 
   echodebug "org: $org"
-  echodebug "workspace: $ws"
+  echodebug "prefix: $prefix"
+  echodebug "workspace: $name"
   if [ -z "$token" ]; then
     echodebug "token: (empty)"
     if [ -f "$curlrc" ]; then

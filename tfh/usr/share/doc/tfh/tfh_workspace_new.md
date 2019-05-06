@@ -12,6 +12,11 @@ Create a new Terraform Enterprise workspace. If more than one OAuth client is co
 
 https://www.terraform.io/docs/enterprise/api/oauth-tokens.html
 
+### Positional parameters
+
+* `NAME`
+
+Workspace name to show. Overrides the `-ws` common option.
 
 ### Options
 
@@ -46,4 +51,3 @@ The OAuth ID, obtained from the Terraform Enterprise API, which corresponds to t
 * `-queue-all-runs`
 
 If true, runs will be queued immediately after workspace creation. If false, runs will not queue until a run is manually queued first. Defaults to false.
-

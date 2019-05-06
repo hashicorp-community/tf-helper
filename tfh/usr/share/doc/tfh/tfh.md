@@ -10,11 +10,15 @@ Details to come
 
 * `-org ORGANIZATION`
 
-The name of the Terraform Enterprise organization. If unspecified, uses the TFE_ORG environment variable.  The -tfh-org and -tfh-workspace can be used as an alternative to specifying -name. The option specified last is the effective value used.
+The name of the Terraform Enterprise organization.
 
-* `-ws WORKSPACE`
+* `-ws, -name WS_NAME`
 
-The name of the Terraform Enterprise workspace. If unspecified, uses the TFE_WORKSPACE environment variable. The -tfh-org and -tfh-workspace can be used as an alternative to specifying -name. The option specified last is the effective value used.
+The name of the Terraform Enterprise workspace.
+
+* `-prefix WS_PREFIX`
+
+Terraform Enterprise workspace prefix. Used when working with multiple workspaces in a single configuration.
 
 * `-token TOKEN`
 

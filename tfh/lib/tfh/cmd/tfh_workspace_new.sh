@@ -75,14 +75,30 @@ cat "$payload" 1>&3
 }
 
 tfh_workspace_new () {
-  auto_apply="$1"
-  tf_version="$2"
-  working_dir="$3"
-  vcs_id="$4"
-  vcs_branch="$5"
-  vcs_submodules="$6"
-  oauth_id="$7"
-  queue_all_runs="$8"
+  new_ws="$prefix$1"
+  auto_apply="$2"
+  tf_version="$3"
+  working_dir="$4"
+  vcs_id="$5"
+  vcs_branch="$6"
+  vcs_submodules="$7"
+  oauth_id="$8"
+  queue_all_runs="$9"
+
+  if [ -z "$new_ws" ]; then
+    if ! check_required ws; then
+      echoerr 'For workspace commands, a positional parameter is also accepted:'
+      echoerr 'tfh workspace new WORKSPACE_NAME'
+      return 1
+    else
+      new_ws="$ws"
+    fi
+  fi
+
+  # Ensure that the rest of the required items have values
+  if ! check_required org token address; then
+    return 1
+  fi
 
   if [ $auto_apply ]; then
     auto_apply=true
@@ -97,11 +113,6 @@ tfh_workspace_new () {
   fi
 
   payload="$TMPDIR/new-ws-payload-$(junonia_randomish_int)"
-
-  # Ensure all of org, etc, are set
-  if ! check_required all; then
-    return 1
-  fi
 
   # Need oauth if vcs was specified
   if [ -n "$vcs_id" ]; then
@@ -192,7 +203,7 @@ tfh_workspace_new () {
   # $7 VCS submodules
   # $8 VCS repo ID (e.g. "github_org/github_repo")
   # $9 queue-all-runs
-  make_new_workspace_payload "$ws" "$auto_apply" "$tf_version" \
+  make_new_workspace_payload "$new_ws" "$auto_apply" "$tf_version" \
                      "$working_dir" "$oauth_id" "$vcs_branch" \
                      "$vcs_submodules" "$vcs_id" "$queue_all_runs"
   if [ 0 -ne $? ]; then
@@ -203,11 +214,11 @@ tfh_workspace_new () {
   echodebug "API request for new workspace:"
   url="$address/api/v2/organizations/$org/workspaces"
   if ! new_resp="$(tfh_api_call -d @"$payload" "$url")"; then
-    echoerr "Error creating workspace $org/$ws"
+    echoerr "Error creating workspace $org/$new_ws"
     return 1
   fi
 
   cleanup "$payload"
 
-  echo "Created new workspace $org/$ws"
+  echo "Created new workspace $org/$new_ws"
 }

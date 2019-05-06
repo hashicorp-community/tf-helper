@@ -18,6 +18,6 @@ An asterisk in the listing indicates the Terraform Enterprise workspace currentl
 
 ### Positional parameters
 
-* `WORKSPACE_NAME`
+* `NAME`
 
-Name of the workspace to set in the configuration file.
+Workspace name to show. Overrides the `-ws` common option.

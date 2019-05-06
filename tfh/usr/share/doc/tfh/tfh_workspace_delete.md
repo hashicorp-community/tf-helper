@@ -9,3 +9,9 @@ Delete a Terraform Enterprise workspace
 ### Description
 
 Delete a Terraform Enterprise workspace.
+
+### Positional parameters
+
+* `NAME`
+
+Workspace name to show. Overrides the `-ws` common option.

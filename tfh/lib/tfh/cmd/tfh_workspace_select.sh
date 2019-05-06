@@ -21,16 +21,16 @@
 ## -------------------------------------------------------------------
 
 tfh_workspace_select () {
-  ws="$1"
+  sel_ws="$prefix$1"
 
-  if [ -z "$ws" ]; then
+  if [ -z "$sel_ws" ]; then
     echoerr "Exactly one argument required: workspace name"
     return 1
   fi
 
-  . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ws_list.sh"
+  . "$JUNONIA_PATH/lib/tfh/cmd/tfh_workspace_list.sh"
 
-  if ! ws_list="$(tfh_ws_list)"; then
+  if ! ws_list="$(tfh_workspace_list)"; then
     # An error from tfh_list should have been printed
     return 1
   fi
@@ -41,8 +41,8 @@ tfh_workspace_select () {
   fi
 
   # Write the workspace configuration
-  if err="$(update_sh_config "$JUNONIA_CONFIG" "TFE_workspace=$ws")"; then
-    echo "Switched to workspace: $ws"
+  if err="$(update_sh_config "$JUNONIA_CONFIG" "TFE_workspace=$sel_ws")"; then
+    echo "Switched to workspace: $sel_ws"
   else
     echoerr "$err"
   fi
