@@ -12,13 +12,13 @@ Update a Terraform Enterprise SSH key.  SSH keys are defined at the organization
 
 ### Options
 
-* `-ssh-id ID`
-
-The ID of the SSH key to update.
-
 * `-ssh-name NAME`
 
 The name of the SSH key in TFE to update.
+
+* `-ssh-id ID`
+
+The ID of the SSH key to update.
 
 * `-ssh-new-name NAME`
 

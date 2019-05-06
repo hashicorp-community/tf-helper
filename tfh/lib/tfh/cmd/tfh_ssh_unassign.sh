@@ -42,7 +42,19 @@ cat "$payload" 1>&3
 }
 
 tfh_ssh_unassign () (
-  payload="$TMPDIR/tfe-new-payload-$(random_enough)"
+  unassign_ws="$1"
+
+  if [ -z "$unassign_ws" ]; then
+    if ! check_required ws; then
+      echoerr 'A positional parameter is also accepted for this command:'
+      echoerr 'tfh ssh unassign WORKSPACE_NAME'
+      return 1
+    else
+      unassign_ws="$ws"
+    fi
+  fi
+
+  payload="$TMPDIR/tfe-new-payload-$(junonia_randomish_int)"
 
   # Ensure all of the common required variables are set
   if ! check_required; then
@@ -56,9 +68,9 @@ tfh_ssh_unassign () (
 
   # Need the workspace ID from the workspace name
   echodebug "API request to show workspace:"
-  url="$address/api/v2/organizations/$org/workspaces/$ws"
+  url="$address/api/v2/organizations/$org/workspaces/$unassign_ws"
   if ! show_resp="$(tfh_api_call "$url")"; then
-    echoerr "Error showing workspace information for $ws"
+    echoerr "Error showing workspace information for $unassign_ws"
     return 1
   fi
 
@@ -67,11 +79,11 @@ tfh_ssh_unassign () (
   echodebug "API request for SSH key unassignment:"
   url="$address/api/v2/workspaces/$workspace_id/relationships/ssh-key"
   if ! unassign_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
-    echoerr "Error unassigning SSH key from $ws"
+    echoerr "Error unassigning SSH key from $unassign_ws"
     return 1
   fi
 
   cleanup "$payload"
 
-  echo "Unassigned SSH key from $ws"
+  echo "Unassigned SSH key from $unassign_ws"
 )

@@ -44,9 +44,15 @@ cat "$payload" 1>&3
 }
 
 tfh_ssh_assign () (
-  ssh_id="$1"
-  ssh_name="$2"
-  payload="$TMPDIR/tfe-new-payload-$(random_enough)"
+  ssh_name="$1"
+  ssh_id="$2"
+
+  if [ -z $ssh_name$ssh_id ]; then
+    exec $0 ssh assign help
+    return 1
+  fi
+
+  payload="$TMPDIR/tfe-new-payload-$(junonia_randomish_int)"
 
   # Ensure all of the common required variables are set
   if ! check_required; then
@@ -66,7 +72,7 @@ tfh_ssh_assign () (
   if [ -n "$ssh_name" ]; then
     # Use the show command to check for and retrieve the ID of the key
     # in the case of being passed a name.
-    . "$cmd_dir/show"
+    . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ssh_show.sh"
 
     # Pass the command line arguments to show and get back a key (or error)
     if ! ssh_show="$(tfh_show -ssh-name "$ssh_name")"; then

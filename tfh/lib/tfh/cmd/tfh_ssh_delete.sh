@@ -21,6 +21,14 @@
 ## -------------------------------------------------------------------
 
 tfh_ssh_delete () (
+  ssh_name="$1"
+  ssh_id="$2"
+
+  if [ -z $ssh_name$ssh_id ]; then
+    exec $0 ssh delete help
+    return 1
+  fi
+
   # Use the show command to check for and retrieve the ID of the key
   # in the case of being passed a name.
   . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ssh_show.sh"

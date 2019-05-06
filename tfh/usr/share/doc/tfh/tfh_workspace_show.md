@@ -14,4 +14,4 @@ Show Terraform Enterprise workspace details.
 
 * `NAME`
 
-Workspace name to show. Overrides the `-ws` common option.
+Workspace name to show. Overrides the `-name` common option.

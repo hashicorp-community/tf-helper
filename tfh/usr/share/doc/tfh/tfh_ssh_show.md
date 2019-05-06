@@ -12,7 +12,7 @@ Show Terraform Enterprise SSH key details.  SSH keys are defined at the organiza
 
 ### Options
 
-* `-ssh-name ID`
+* `-ssh-name NAME`
 
 The name of the SSH key to show.
 

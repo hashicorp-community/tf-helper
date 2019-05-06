@@ -12,10 +12,10 @@ Assign a Terraform Enterprise SSH key to a workspace. The workspace and SSH key 
 
 ### Options
 
-* `-ssh-id ID`
-
-The ID of the SSH key to assign.
-
 * `-ssh-name NAME`
 
 The name of the SSH key in TFE to assign.
+
+* `-ssh-id ID`
+
+The ID of the SSH key to assign.

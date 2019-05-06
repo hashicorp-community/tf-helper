@@ -30,12 +30,12 @@ make_new_ssh_payload () {
 
 cat > "$payload" <<EOF
 {
-  "data" : {
-    "attributes": {
-      $1
-    },
-    "type": "ssh-keys"
-  }
+"data" : {
+  "attributes": {
+    $1
+  },
+  "type": "ssh-keys"
+}
 }
 EOF
 
@@ -44,85 +44,90 @@ cat "$payload" 1>&3
 }
 
 tfh_ssh_update () (
-    ssh_id="$1"
-    ssh_name="$2"
-    ssh_new_name="$3"
-    ssh_key="$4"
+  ssh_name="$1"
+  ssh_id="$2"
+  ssh_new_name="$3"
+  ssh_key="$4"
 
-    payload="$TMPDIR/tfe-new-payload-$(random_enough)"
-    attr_obj=
+  if [ -z $ssh_name$ssh_id$ssh_new_name$ssh_key ]; then
+    exec $0 ssh update help
+    return 1
+  fi
 
-    [ "$attr_obj" ] && attr_obj="$attr_obj,"
-    attr_obj="$attr_obj \"name\": \"$ssh_new_name\""
+  payload="$TMPDIR/tfe-new-payload-$(junonia_randomish_int)"
+  attr_obj=
 
-    if [ ! -f "$ssh_file" ]; then
-        echoerr "File not found: $ssh_file"
-        return 1
-    else
-        ssh_key="$(escape_value "$(cat "$ssh_file")")"
+  [ "$attr_obj" ] && attr_obj="$attr_obj,"
+  attr_obj="$attr_obj \"name\": \"$ssh_new_name\""
+
+  if [ ! -f "$ssh_file" ]; then
+    echoerr "File not found: $ssh_file"
+    return 1
+  else
+    ssh_key="$(escape_value "$(cat "$ssh_file")")"
+  fi
+
+  [ "$attr_obj" ] && attr_obj="$attr_obj,"
+  attr_obj="$attr_obj \"value\": \"$ssh_key\""
+
+  # Ensure all of org, etc, are set. Workspace is not required.
+  if ! check_required org token address; then
+    return 1
+  fi
+
+  if [ -z "$ssh_name" ] && [ -z "$ssh_id" ]; then
+    echoerr "One of -ssh-name or -ssh-id is required"
+    return 1
+  fi
+
+  if [ -n "$ssh_name" ] && [ -n "$ssh_id" ]; then
+    echoerr "Only one of -ssh-name or -ssh-id should be specified"
+    return 1
+  fi
+
+  if [ -n "$ssh_name" ]; then
+    # Use the show command to check for and retrieve the ID of the key
+    # in the case of being passed a name.
+    . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ssh_show.sh"
+
+    # Pass the command line arguments to show and get back a key (or error)
+    if ! ssh_show="$(tfh_ssh_show "$ssh_name")"; then
+      # The show command will have printed error messages.
+      return 1
     fi
 
-    [ "$attr_obj" ] && attr_obj="$attr_obj,"
-    attr_obj="$attr_obj \"value\": \"$ssh_key\""
-
-    # Ensure all of org, etc, are set. Workspace is not required.
-    if ! check_required org tfh_token address; then
-        return 1
+    # Really, if it's empty then tfh_ssh_show should have exited non-zero
+    if [ -z "$ssh_show" ]; then
+      echoerr "SSH key not found"
+      return 1
     fi
 
-    if [ -z "$ssh_name" ] && [ -z "$ssh_id" ]; then
-        echoerr "One of -ssh-name or -ssh-id is required"
-        return 1
-    fi
+    ssh_id="$(echo "$ssh_show" | cut -d ' ' -f 2)"
+  else
+    # To simplify error reporting later, we'll print ssh_show, but if
+    # we were given an ID set ssh_show to the ID as it will be empty.
+    ssh_show="$ssh_id"
+  fi
 
-    if [ -n "$ssh_name" ] && [ -n "$ssh_id" ]; then
-        echoerr "Only one of -ssh-name or -ssh-id should be specified"
-        return 1
-    fi
+  # This shouldn't happen...
+  if [ -z "$ssh_id" ]; then
+    echoerr "SSH key not found"
+    return 1
+  fi
 
-    if [ -n "$ssh_name" ]; then
-        # Use the show command to check for and retrieve the ID of the key
-        # in the case of being passed a name.
-        . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ssh_show.sh"
+  if ! make_new_ssh_payload "$attr_obj"; then
+    echoerr "Error generating payload file for SSH key update"
+    return 1
+  fi
 
-        # Pass the command line arguments to show and get back a key (or error)
-        if ! ssh_show="$(tfh_ssh_show "$ssh_name")"; then
-            # The show command will have printed error messages.
-            return 1
-        fi
+  echodebug "API request for update SSH key:"
+  url="$address/api/v2/ssh-keys/$ssh_id"
+  if ! update_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
+    echoerr "Error updating SSH key $ssh_show"
+    return 1
+  fi
 
-        # Really, if it's empty then tfh_ssh_show should have exited non-zero
-        if [ -z "$ssh_show" ]; then
-            echoerr "SSH key not found"
-            return 1
-        fi
+  cleanup "$payload"
 
-        ssh_id="$(echo "$ssh_show" | cut -d ' ' -f 2)"
-    else
-        # To simplify error reporting later, we'll print ssh_show, but if
-        # we were given an ID set ssh_show to the ID as it will be empty.
-        ssh_show="$ssh_id"
-    fi
-
-    # This shouldn't happen...
-    if [ -z "$ssh_id" ]; then
-        echoerr "SSH key not found"
-        return 1
-    fi
-
-    if ! make_new_ssh_payload "$attr_obj"; then
-        echoerr "Error generating payload file for SSH key update"
-        return 1
-    fi
-
-    echodebug "API request for update SSH key:"
-    url="$address/api/v2/ssh-keys/$ssh_id"
-    if ! update_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
-        echoerr "Error updating SSH key $ssh_show"
-        return 1
-    fi
-
-    cleanup "$payload"
-
-    echo "Updated SSH key $ssh_name"
+  echo "Updated SSH key $ssh_name"
 )

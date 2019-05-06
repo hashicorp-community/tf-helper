@@ -48,10 +48,16 @@ cat "$payload" 1>&3
 tfh_ssh_new () (
   ssh_name="$1"
   ssh_key="$2"
-  payload="$TMPDIR/tfe-new-payload-$(random_enough)"
+
+  if [ -z $ssh_name$ssh_key ]; then
+    exec $0 ssh new help
+    return 1
+  fi
+
+  payload="$TMPDIR/tfe-new-payload-$(junonia_randomish_int)"
 
   # Ensure all of org, etc, are set. Workspace is not required.
-  if ! check_required org tfh_token address; then
+  if ! check_required org token address; then
     return 1
   fi
 

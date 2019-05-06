@@ -12,7 +12,7 @@ SSH keys are defined at the organization level. An organization must be specifie
 
 ### Options
 
-* `-ssh-name ID`
+* `-ssh-name NAME`
 
 The name of the SSH key to show.
 

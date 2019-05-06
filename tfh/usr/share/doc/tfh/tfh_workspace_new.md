@@ -16,7 +16,7 @@ https://www.terraform.io/docs/enterprise/api/oauth-tokens.html
 
 * `NAME`
 
-Workspace name to show. Overrides the `-ws` common option.
+Workspace name to show. Overrides the `-name` common option.
 
 ### Options
 

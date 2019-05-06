@@ -14,4 +14,4 @@ Delete a Terraform Enterprise workspace.
 
 * `NAME`
 
-Workspace name to show. Overrides the `-ws` common option.
+Workspace name to show. Overrides the `-name` common option.

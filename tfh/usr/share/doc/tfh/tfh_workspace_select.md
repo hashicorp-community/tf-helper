@@ -20,4 +20,4 @@ An asterisk in the listing indicates the Terraform Enterprise workspace currentl
 
 * `NAME`
 
-Workspace name to show. Overrides the `-ws` common option.
+Workspace name to show. Overrides the `-name` common option.

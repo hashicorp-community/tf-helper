@@ -24,8 +24,8 @@ tfh_ssh_show () (
   ssh_name="$1"
   ssh_id="$2"
 
-  if [ -z "$ssh_name" ] && [ -z "$ssh_id" ]; then
-    echoerr "One of -ssh-name or -ssh-id is required"
+  if [ -z $ssh_name$ssh_id ]; then
+    exec $0 ssh show help
     return 1
   fi
 
