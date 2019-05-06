@@ -230,6 +230,11 @@ junonia_bootstrap () {
   fi
 }
 
+# Top level invocation of the command.
+tfh () {
+  exec $0 help
+}
+
 ##
 ## Program begins here
 ##
