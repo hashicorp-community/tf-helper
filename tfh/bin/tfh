@@ -216,7 +216,7 @@ tfh_junonia_filter () {
   echodebug "address: $address"
   echodebug "verbose: $verbose"
 
-  return 5
+  return 6
 }
 
 # This is a compact version of junonia_bootstrap for easy copyhing into user

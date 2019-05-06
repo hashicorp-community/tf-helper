@@ -46,5 +46,5 @@ tfh_workspace_delete () {
     return 1
   fi
 
-  echo "Deleted $org/$ws"
+  echo "Deleted $org/$del_ws"
 }

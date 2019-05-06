@@ -12,11 +12,11 @@ Details to come
 
 The name of the Terraform Enterprise organization.
 
-* `-ws, -name WS_NAME`
+* `-name WORKSPACE_NAME`
 
 The name of the Terraform Enterprise workspace.
 
-* `-prefix WS_PREFIX`
+* `-prefix WORKSPACE_PREFIX`
 
 Terraform Enterprise workspace prefix. Used when working with multiple workspaces in a single configuration.
 

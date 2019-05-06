@@ -41,7 +41,7 @@ tfh_workspace_select () {
   fi
 
   # Write the workspace configuration
-  if err="$(update_sh_config "$JUNONIA_CONFIG" "TFE_workspace=$sel_ws")"; then
+  if err="$(junonia_update_config "$JUNONIA_CONFIG" "TFH_name=$sel_ws")"; then
     echo "Switched to workspace: $sel_ws"
   else
     echoerr "$err"
