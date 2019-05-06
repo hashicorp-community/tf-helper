@@ -44,18 +44,29 @@ cat "$payload" 1>&3
 }
 
 tfh_ssh_assign () (
-  ssh_name="$1"
-  ssh_id="$2"
+  assign_ws="$1"
+  ssh_name="$2"
+  ssh_id="$3"
 
   if [ -z $ssh_name$ssh_id ]; then
     exec $0 ssh assign help
     return 1
   fi
 
+  if [ -z "$assign_ws" ]; then
+    if ! check_required ws; then
+      echoerr 'A positional parameter is also accepted for this command:'
+      echoerr 'tfh ssh assign WORKSPACE_NAME [-ssh-name|-ssh-id]'
+      return 1
+    else
+      assign_ws="$ws"
+    fi
+  fi
+
   payload="$TMPDIR/tfe-new-payload-$(junonia_randomish_int)"
 
   # Ensure all of the common required variables are set
-  if ! check_required; then
+  if ! check_required org token address; then
     return 1
   fi
 
@@ -75,7 +86,7 @@ tfh_ssh_assign () (
     . "$JUNONIA_PATH/lib/tfh/cmd/tfh_ssh_show.sh"
 
     # Pass the command line arguments to show and get back a key (or error)
-    if ! ssh_show="$(tfh_show -ssh-name "$ssh_name")"; then
+    if ! ssh_show="$(tfh_ssh_show "$ssh_name")"; then
       # The show command will have printed error messages.
       return 1
     fi
@@ -106,9 +117,9 @@ tfh_ssh_assign () (
 
   # Need the workspace ID from the workspace name
   echodebug "API request to show workspace:"
-  url="$address/api/v2/organizations/$org/workspaces/$ws"
+  url="$address/api/v2/organizations/$org/workspaces/$assign_ws"
   if ! show_resp="$(tfh_api_call "$url")"; then
-    echoerr "Error showing workspace information for $ws"
+    echoerr "Error showing workspace information for $assign_ws"
     return 1
   fi
 
@@ -117,11 +128,11 @@ tfh_ssh_assign () (
   echodebug "API request for SSH key assignment:"
   url="$address/api/v2/workspaces/$workspace_id/relationships/ssh-key"
   if ! assign_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
-    echoerr "Error assigning SSH key $ssh_show to $ws"
+    echoerr "Error assigning SSH key $ssh_show to $assign_ws"
     return 1
   fi
 
   cleanup "$payload"
 
-  echo "Assigned SSH key $ssh_show to $ws"
+  echo "Assigned SSH key $ssh_show to $assign_ws"
 )

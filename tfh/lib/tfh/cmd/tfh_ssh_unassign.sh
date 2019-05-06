@@ -57,7 +57,7 @@ tfh_ssh_unassign () (
   payload="$TMPDIR/tfe-new-payload-$(junonia_randomish_int)"
 
   # Ensure all of the common required variables are set
-  if ! check_required; then
+  if ! check_required org token address; then
     return 1
   fi
 

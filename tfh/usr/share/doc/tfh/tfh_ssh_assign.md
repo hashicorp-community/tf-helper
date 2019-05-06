@@ -10,6 +10,12 @@ Assign an SSH key to a Terraform Enterprise workspace
 
 Assign a Terraform Enterprise SSH key to a workspace. The workspace and SSH key must already exist.
 
+### Positional parameters
+
+* `NAME`
+
+Workspace name to assign the ssh key to. Overrides the `-name` common option.
+
 ### Options
 
 * `-ssh-name NAME`

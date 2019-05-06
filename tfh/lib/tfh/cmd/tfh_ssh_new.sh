@@ -47,9 +47,9 @@ cat "$payload" 1>&3
 
 tfh_ssh_new () (
   ssh_name="$1"
-  ssh_key="$2"
+  ssh_file="$2"
 
-  if [ -z $ssh_name$ssh_key ]; then
+  if [ -z $ssh_name$ssh_file ]; then
     exec $0 ssh new help
     return 1
   fi

@@ -47,9 +47,9 @@ tfh_ssh_update () (
   ssh_name="$1"
   ssh_id="$2"
   ssh_new_name="$3"
-  ssh_key="$4"
+  ssh_file="$4"
 
-  if [ -z $ssh_name$ssh_id$ssh_new_name$ssh_key ]; then
+  if [ -z $ssh_name$ssh_id$ssh_new_name$ssh_file ]; then
     exec $0 ssh update help
     return 1
   fi
@@ -57,18 +57,22 @@ tfh_ssh_update () (
   payload="$TMPDIR/tfe-new-payload-$(junonia_randomish_int)"
   attr_obj=
 
-  [ "$attr_obj" ] && attr_obj="$attr_obj,"
-  attr_obj="$attr_obj \"name\": \"$ssh_new_name\""
-
-  if [ ! -f "$ssh_file" ]; then
-    echoerr "File not found: $ssh_file"
-    return 1
+  if [ -n "$ssh_new_name" ]; then
+    [ "$attr_obj" ] && attr_obj="$attr_obj,"
+    attr_obj="$attr_obj \"name\": \"$ssh_new_name\""
+  elif [ -n "$ssh_file" ]; then
+    if [ ! -f "$ssh_file" ]; then
+      echoerr "File not found: $ssh_file"
+      return 1
+    else
+      ssh_key="$(escape_value "$(cat "$ssh_file")")"
+      [ "$attr_obj" ] && attr_obj="$attr_obj,"
+      attr_obj="$attr_obj \"value\": \"$ssh_key\""
+    fi
   else
-    ssh_key="$(escape_value "$(cat "$ssh_file")")"
+    echoerr "One of -ssh-new-name or -ssh-file is required"
+    return 1
   fi
-
-  [ "$attr_obj" ] && attr_obj="$attr_obj,"
-  attr_obj="$attr_obj \"value\": \"$ssh_key\""
 
   # Ensure all of org, etc, are set. Workspace is not required.
   if ! check_required org token address; then
