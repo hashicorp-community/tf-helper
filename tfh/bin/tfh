@@ -255,6 +255,9 @@ JUNONIA_CACHE=0      # Flag to optionally disable (0) caching
 # JUNONIA_COL2       # Width of column two
 # TMPDIR             # Temporary directory
 
+# Save the whole command line
+TFH_CMDLINE="$0 $*"
+
 if [ -n "$TF_LOG" ]; then
   # Debugging. Print command errors and make them verbose
   tar_verbose=v

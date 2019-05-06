@@ -24,7 +24,7 @@ tfh_pullvars () (
   vars="$1"
   env_vars="$2"
   env="$3"
-  
+
   # Check for required standard options
   if ! check_required; then
     return 1

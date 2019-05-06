@@ -18,6 +18,10 @@ If you specify a config directory to load variables from, it must be a directory
 
 The terraform command is required if operating on a tfvars file or a Terraform configuration.
 
+### Positional parameters
+
+* `CONFIG_DIR`
+
 ### Options
 
 * `-dry-run`
@@ -48,29 +52,29 @@ Set an environment variable.
 
 Set a sensitive environment variable.
 
-* `-var-file FILE`
-
-Load Terraform variables from a tfvars file. Files can only set non-sensitive variables.
-
-* `-delete NAME`
+* `-delete NAME [-delete NAME]`
 
 Delete an existing Terraform variable. Can be set multiple times.
 
-* `-delete-env NAME`
+* `-delete-env NAME [-delete-env NAME]`
 
 Delete an existing environment variable. Can be set multiple times.
 
-* `-overwrite NAME`
+* `-overwrite NAME [-overwrite NAME]`
 
 Overwrite an existing value if the <NAME> Terraform variable is already set in Terraform Enterprise. You must enable this for every variable you want to overwrite. Can be set multiple times.
 
-* `-overwrite-env NAME`
+* `-overwrite-env NAME [-overwrite-env NAME]`
 
 Overwrite an existing value if the <NAME> environment variable is already set in Terraform Enterprise. You must enable this for every variable you want to overwrite. Can be set multiple times.
 
 * `-overwrite-all`
 
 Overwrite the existing value of every variable being operated on if that variable is already set in Terraform Enterprise. Defaults to false. Use with extreme caution.  To perform the overwrites, -dry-run must be explicitly set to false, otherwise a dry run will be performed.
+
+* `-var-file FILE`
+
+Load Terraform variables from a tfvars file. Files can only set non-sensitive variables.
 
 * `-hide-sensitive=1`
 

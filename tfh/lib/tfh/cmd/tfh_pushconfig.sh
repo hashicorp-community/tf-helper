@@ -70,8 +70,8 @@ gnutar () {
 bsdtar () {
   echodebug "Using BSD tar"
 
-  vcslist="$TMPDIR/vcslist-$(random_enough)"
-  hardlinklist="$TMPDIR/hardlinklist-$(random_enough)"
+  vcslist="$TMPDIR/vcslist-$(junonia_randomish_int)"
+  hardlinklist="$TMPDIR/hardlinklist-$(junonia_randomish_int)"
 
   hardlinks="$(list_hardlinked | sort)"
   echo "$hardlinks" > "$hardlinklist"
@@ -174,18 +174,25 @@ cat >> "$run_payload" <<EOF
 EOF
 }
 
-tfh_pushconfig () (
-  upload_modules=1
-  vcs=1
-  message="Queued via tfe-cli"
-  config_dir=.
+tfh_pushconfig () {
+  config_dir="$1"
+  message="$2"
+  destroy="$3"
+  current_config="$4"
+  upload_modules="$5"
+  vcs="$6"
+  stream="$7"
+  poll="$8"
+
   config_id=
-  poll_run=0
-  destroy=
-  current_config=
-  run_payload="$TMPDIR/run-$(random_enough).json"
-  config_payload="$TMPDIR/content-$(random_enough).tar.gz"
-  tarlist="$TMPDIR/tarlist-$(random_enough)"
+  run_payload="$TMPDIR/run-$(junonia_randomish_int).json"
+  config_payload="$TMPDIR/content-$(junonia_randomish_int).tar.gz"
+  tarlist="$TMPDIR/tarlist-$(junonia_randomish_int)"
+
+  if ! [ "$poll" -eq "$poll" ] >/dev/null 2>&1; then
+    echoerr "-poll must be an integer"
+    return 1
+  fi
 
   # Check for additional required commands.
   if [ -z "$(command -v tar)" ]; then
@@ -213,66 +220,6 @@ tfh_pushconfig () (
   if ! check_required; then
     return 1
   fi
-
-  # Parse options
-
-  while [ -n "$1" ]; do
-    should_shift=1
-
-    # If this is a common option it has already been parsed. Skip it and
-    # its value.
-    if is_common_opt "$1"; then
-      shift
-      shift
-      continue
-    fi
-
-    case "$1" in
-      -upload-modules)
-        upload_modules="$(assign_bool "$1" "$2")"
-        should_shift=${?#0}
-        ;;
-      -vcs)
-        vcs="$(assign_bool "$1" "$2")"
-        should_shift=${?#0}
-        ;;
-      -message)
-        message="$(assign_arg "$1" "$2")"
-        ;;
-      -destroy)
-        destroy="$(assign_bool "$1" "$2")"
-        should_shift=${?#0}
-        ;;
-      -current-config)
-        current_config="$(assign_bool "$1" "$2")"
-        should_shift=${?#0}
-        ;;
-      -poll)
-        if [ "$2" -eq "$2" ] >/dev/null 2>&1; then
-          poll_run=$(assign_arg "$1" "$2")
-        else
-          echoerr "-poll must be an integer"
-          return 1
-        fi
-        ;;
-      *)
-        # Shouldn't get here until the last option, the optional
-        # config directory
-        if [ $# -gt 1 ]; then
-          echoerr "Trailing options following config directory $1"
-          return 1
-        fi
-
-        config_dir=$1
-        ;;
-    esac
-
-    # Shift the parameter
-    [ -n "$1" ] && shift
-
-    # Shift the argument. There may not be one if the parameter was a flag.
-    [ $should_shift ] && [ -n "$1" ] && shift
-  done
 
   if [ $destroy ] && [ $current_config ]; then
     echoerr "Options -destroy and -current-config conflict"
@@ -322,7 +269,7 @@ tfh_pushconfig () (
       # VCS detection was requested so it must actually be present
       if ! git status >/dev/null 2>&1; then
         echoerr "VCS not present in $config_dir"
-        echoerr "Disable VCS detection with -vcs false"
+        echoerr "Disable VCS detection with -vcs 0"
         return 1
       fi
       echodebug "tar: Uploading vcs tracked files"
@@ -444,7 +391,7 @@ tfh_pushconfig () (
   fi
   printf "\n"
 
-  if [ 0 -eq "$poll_run" ]; then
+  if [ 0 -eq "$poll" ]; then
     return 0
   fi
 
@@ -464,7 +411,7 @@ tfh_pushconfig () (
       # if the workspace was determined to be locked in the previous
       # poll, don't delay getting the final status and exiting.
       if [ true != "$workspace_locked" ]; then
-        sleep $poll_run
+        sleep $poll
       fi
 
       echodebug "API request to poll run:"
@@ -494,4 +441,4 @@ tfh_pushconfig () (
     echoerr "Error polling run"
     return 1
   fi
-)
+}

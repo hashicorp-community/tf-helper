@@ -39,10 +39,10 @@ cat > "$payload" <<EOF
 },
 "filter": {
   "organization": {
-    "name":"$tfe_org"
+    "name":"$org"
   },
   "workspace": {
-    "name":"$tfe_workspace"
+    "name":"$ws"
   }
 }
 }
@@ -70,10 +70,9 @@ EOF
 # Given a list of variables followed by the properties all of those variables
 # should have, either create or update them in TFE.
 # $1 variables list
-# $2 corresponding variable values list
-# $3 variables type (terraform or env)
-# $4 hcl true or false, or delete if processing a delete list
-# $5 sensitive true or false, or empty if processing a delete list
+# $2 variables type (terraform or env)
+# $3 hcl true or false, or delete if processing a delete list
+# $4 sensitive true or false, or empty if processing a delete list
 process_vars () {
   # Bail out if the list is empty
   if [ -z "$1" ]; then
@@ -83,20 +82,23 @@ process_vars () {
   # Loop through the given variables. See if they are already in the
   # workspace. If so create them, else update them if they should be
   # updated.
-  i=1
-  for v in $1; do
-    echodebug "$(printf "Processing %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5")"
+  IFS=$JUNONIA_US
+  for var in $1; do
+    unset IFS
+    v="${var%%=*}"
+    val="${var#*=}"
+    echodebug "$(printf "Processing %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$2" "$3" "$4" "$val")"
 
     # Don't bother creating or updating if it's just going to be
     # deleted later.
-    if [ "$4" != "delete" ]; then
-      if [ "$3" = "terraform" ]; then
-        if echo "$deletes" | grep -E "^$v$" >/dev/null 2>&1; then
+    if [ "$3" != "delete" ]; then
+      if [ "$2" = "terraform" ]; then
+        if echo "$deletes" | grep -E "$JUNONIA_UFS$v$JUNONIA_UFS" >/dev/null 2>&1; then
           echodebug "skipping $v due to later delete"
           continue
         fi
       else
-        if echo "$env_deletes" | grep -E "^$v$" >/dev/null 2>&1; then
+        if echo "$env_deletes" | grep -E "$JUNONIA_UFS$v$JUNONIA_UFS" >/dev/null 2>&1; then
           echodebug "skipping $v due to later delete"
           continue
         fi
@@ -104,67 +106,65 @@ process_vars () {
     fi
 
     var_id="$(printf "%s" "$var_get_resp" | \
-           jq -r --arg var "$v" --arg type "$3" '.data[]
+           jq -r --arg var "$v" --arg type "$2" '.data[]
       | select(.attributes.category == $type)
       | select(.attributes.key == $var)
       | .id')"
-    val="$(printf "%s" "$2" | awk -v i=$i 'NR==i{print;exit}')"
     if [ -z "$var_id" ]; then
       echodebug "$v not in variable listing"
 
-      if [ "$4" = "delete" ]; then
+      if [ "$3" = "delete" ]; then
         echoerr "Variable $v specified for deletion but doesn't exist"
         continue
       fi
 
-      if [ $hide_sensitive ] && [ "$5" = true ]; then
+      if [ $hide_sensitive ] && [ "$4" = true ]; then
         output_val=REDACTED
       else
         output_val="$val"
       fi
 
-      printf "Creating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5" "$output_val"
+      printf "Creating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$2" "$3" "$4" "$output_val"
 
       if [ ! $dry_run ]; then
-        url="$tfe_address/api/v2/vars"
-        if ! make_var_create_payload "$v" "$val" $3 "$4" "$5"; then
+        url="$address/api/v2/vars"
+        if ! make_var_create_payload "$v" "$val" $2 "$3" "$4"; then
           echoerr "Error generating payload file for $v"
-          i=$(($i + 1))
           continue
         fi
 
         echodebug "API request for variable create:"
-        if ! var_create_resp="$(tfe_api_call -d @"$payload" "$url")"; then
-          echoerr "Error creating variable $v"
+        if ! var_create_resp="$(tfh_api_call -d @"$payload" "$url")"; then
+          echoerr "error creating variable $v"
         fi
 
         cleanup "$payload"
       fi
     else
-      if [ "$4" = "delete" ]; then
+      if [ "$3" = delete ]; then
         h="$(printf "%s" "$var_get_resp" | \
-               jq -r --arg var "$v" --arg type "$3" '.data[]
+               jq -r --arg var "$v" --arg type "$2" '.data[]
           | select(.attributes.category == $type)
           | select(.attributes.key == $var)
           | .attributes.hcl')"
 
         s="$(printf "%s" "$var_get_resp" | \
-               jq -r --arg var "$v" --arg type "$3" '.data[]
+               jq -r --arg var "$v" --arg type "$2" '.data[]
           | select(.attributes.category == $type)
           | select(.attributes.key == $var)
           | .attributes.sensitive')"
 
         o="$(printf "%s" "$var_get_resp" | \
-               jq -r --arg var "$v" --arg type "$3" '.data[]
+               jq -r --arg var "$v" --arg type "$2" '.data[]
           | select(.attributes.category == $type)
           | select(.attributes.key == $var)
           | .attributes.value')"
 
-        printf "Deleting %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$h" "$s" "$o"
+        printf "Deleting %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$2" "$h" "$s" "$o"
 
         if [ ! $dry_run ]; then
-          url="$tfe_address/api/v2/vars/$var_id"
-          if ! tfe_api_call --request DELETE "$url"; then
+          url="$address/api/v2/vars/$var_id"
+          if ! tfh_api_call --request DELETE "$url"; then
             echoerr "Error deleting variable $v"
           fi
         fi
@@ -173,27 +173,26 @@ process_vars () {
         # specified in the correct overwrite list or if -overwrite-all
         # is true.
         if [ $overwrite_all ] ||
-           ( [ "$3" = "terraform" ] && echo "$overwrites" | grep -E "^$v$" >/dev/null 2>&1 ) ||
-           ( [ "$3" = "env" ] && echo "$envvar_overwrites" | grep -E "^$v$" >/dev/null 2>&1 ); then
+           ( [ "$2" = terraform ] && echo "$overwrites" | grep -Eq "$JUNONIA_UFS$v$JUNONIA_UFS" ) ||
+           ( [ "$2" = env ] && echo "$envvar_overwrites" | grep -Eq "$JUNONIA_UFS$v$JUNONIA_UFS" ); then
 
-          if [ $hide_sensitive ] && [ "$5" = true ]; then
+          if [ $hide_sensitive ] && [ "$4" = true ]; then
             output_val=REDACTED
           else
             output_val="$val"
           fi
 
-          printf "Updating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$3" "$4" "$5" "$output_val"
+          printf "Updating %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$2" "$3" "$4" "$output_val"
 
           if [ ! $dry_run ]; then
-            url="$tfe_address/api/v2/vars/$var_id"
-            if ! make_var_update_payload "$var_id" "$v" "$val" "$3" "$4" "$5"; then
+            url="$address/api/v2/vars/$var_id"
+            if ! make_var_update_payload "$var_id" "$v" "$val" "$2" "$3" "$4"; then
               echoerr "Error generating payload file for $v"
-              i=$(($i + 1))
               continue
             fi
 
             echodebug "API request for variable update:"
-            if ! var_update_resp="$(tfe_api_call --request PATCH -d @"$payload" "$url")"; then
+            if ! var_update_resp="$(tfh_api_call --request PATCH -d @"$payload" "$url")"; then
               echoerr "Error updating variable $v"
             fi
 
@@ -202,154 +201,43 @@ process_vars () {
         fi
       fi
     fi
-    i=$(($i + 1))
+    IFS=$JUNONIA_US
   done
+  unset IFS
 }
 
-tfe_pushvars () (
-  payload="$TMPDIR/tfe-push-vars-payload-$(random_enough)"
-  dry_run=
-  dry_run_set=
-  config_dir=
-  var_file=
-  var_file_arg=
-  deletes=
-  envvar_deletes=
-  overwrites=
-  envvar_overwrites=
-  overwrite_all=
-  hide_sensitive=1
+tfh_pushvars () {
+  config_dir="$1"
+  dry_run="$2"
+  vars="$3"
+  svars="$4"
+  hclvars="$5"
+  shclvars="$6"
+  envvars="$7"
+  senvvars="$8"
+  deletes="$9"
+  env_deletes="${10}"
+  overwrites="${11}"
+  envvar_overwrites="${12}"
+  overwrite_all="${13}"
+  var_file="${14}"
+  var_file_arg="${15}"
+  hide_sensitive="${16}"
 
-  vars=
-  vars_values=
-  svars=
-  svars_values=
-  hclvars=
-  hclvars_values=
-  shclvars=
-  shclvars_values=
-  envvars=
-  envvars_values=
-  sensvars=
-  sensvars_values=
   defaultvars=
   defaultvars_values=
   defaulthclvars=
   defaulthclvars_values=
+
+  payload="$TMPDIR/tfe-push-vars-payload-$(junonia_randomish_int)"
 
   # Check for required standard options
   if ! check_required; then
     return 1
   fi
 
-  # Parse options
-
-  while [ -n "$1" ]; do
-    should_shift=1
-
-    # If this is a common option it has already been parsed. Skip it and
-    # its value.
-    if is_common_opt "$1"; then
-      shift
-      shift
-      continue
-    fi
-
-    case "$1" in
-      -dry-run)
-        dry_run="$(assign_bool "$1" "$2")"
-        should_shift=${?#0}
-        dry_run_set=1
-        ;;
-      -delete)
-        new_delete="$(assign_arg "$1" "$2")"
-        deletes="$(append "$deletes" "$new_delete")"
-        ;;
-      -delete-env)
-        new_delete="$(assign_arg "$1" "$2")"
-        env_deletes="$(append "$env_deletes" "$new_delete")"
-        ;;
-      -overwrite)
-        new_overwrite="$(assign_arg "$1" "$2")"
-        overwrites="$(append "$overwrites" "$new_overwrite")"
-        ;;
-      -overwrite-env)
-        new_overwrite="$(assign_arg "$1" "$2")"
-        envvar_overwrites="$(append "$envvar_overwrites" "$new_overwrite")"
-        ;;
-      -overwrite-all)
-        overwrite_all="$(assign_bool "$1" "$2")"
-        should_shift=${?#0}
-        ;;
-      -var)
-        new_var_arg="$(assign_arg "$1" "$2")"
-        new_var_name=${new_var_arg%%=*}
-        new_var_value=${new_var_arg#*=}
-        vars="$(append "$vars" "$new_var_name")"
-        vars_values="$(append "$vars_values" "$new_var_value")"
-        ;;
-      -svar)
-        new_var_arg="$(assign_arg "$1" "$2")"
-        new_var_name=${new_var_arg%%=*}
-        new_var_value=${new_var_arg#*=}
-        svars="$(append "$svars" "$new_var_name")"
-        svars_values="$(append "$svars_values" "$new_var_value")"
-        ;;
-      -hcl-var)
-        new_var_arg="$(assign_arg "$1" "$2")"
-        new_var_name=${new_var_arg%%=*}
-        new_var_value="$(escape_value "${new_var_arg#*=}")"
-        hclvars="$(append "$hclvars" "$new_var_name")"
-        hclvars_values="$(append "$hclvars_values" "$new_var_value")"
-        ;;
-      -shcl-var)
-        new_var_arg="$(assign_arg "$1" "$2")"
-        new_var_name=${new_var_arg%%=*}
-        new_var_value="$(escape_value "${new_var_arg#*=}")"
-        shclvars="$(append "$shclvars" "$new_var_name")"
-        shclvars_values="$(append "$shclvars_values" "$new_var_value")"
-        ;;
-      -env-var)
-        new_var_arg="$(assign_arg "$1" "$2")"
-        new_var_name=${new_var_arg%%=*}
-        new_var_value="$(escape_value "${new_var_arg#*=}")"
-        envvars="$(append "$envvars" "$new_var_name")"
-        envvars_values="$(append "$envvars_values" "$new_var_value")"
-        ;;
-      -senv-var)
-        new_var_arg="$(assign_arg "$1" "$2")"
-        new_var_name=${new_var_arg%%=*}
-        new_var_value="$(escape_value "${new_var_arg#*=}")"
-        senvvars="$(append "$senvvars" "$new_var_name")"
-        senvvars_values="$(append "$senvvars_values" "$new_var_value")"
-        ;;
-      -var-file)
-        var_file="$(assign_arg "$1" "$2")"
-        var_file_arg="-var-file=$var_file"
-        ;;
-      -hide-sensitive)
-        hide_sensitive="$(assign_bool "$1" "$2")"
-        should_shift=${?#0}
-        ;;
-      *)
-        # Shouldn't get here until the last option, the optional
-        # config directory
-        if [ $# -gt 1 ]; then
-          echoerr "Trailing options following config directory $1"
-          return 1
-        fi
-
-        config_dir="$1"
-        ;;
-    esac
-    # Shift the parameter
-    [ -n "$1" ] && shift
-
-    # Shift the argument. There may not be one if the parameter was a flag.
-    [ $should_shift ] && [ -n "$1" ] && shift
-  done
-
-  if [ $overwrite_all ] && [ ! $dry_run_set ] && [ ! $dry_run]; then
+  if [ $overwrite_all ] && [ ! $dry_run ] &&
+     ! echo "$TFH_CMDLINE" | grep -Eq -- '-dry-run (0|false)'; then
     echoerr "Option -overwrite-all requires -dry-run to be explicitly"
     echoerr "specified as false. Running with -dry-run true to preview operations."
     overwrite_all=1
@@ -361,14 +249,14 @@ tfe_pushvars () (
   fi
 
   # Get the variable listing for the workspace
-  url="$tfe_address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$tfe_org&filter%5Bworkspace%5D%5Bname%5D=$tfe_workspace"
+  url="$address/api/v2/vars?filter%5Borganization%5D%5Bname%5D=$org&filter%5Bworkspace%5D%5Bname%5D=$ws"
 
   echodebug "API list variables URL:"
   echodebug "$url"
 
   echodebug "API request for variable list:"
-  if ! var_get_resp="$(tfe_api_call $url)"; then
-    echoerr "Error listing variables"
+  if ! var_get_resp="$(tfh_api_call $url)"; then
+    echoerr "error listing variables"
     return 1
   fi
 
@@ -389,7 +277,6 @@ tfe_pushvars () (
     #   hcl my_var
     all_vars="$(awk '
       BEGIN {
-        VARS="\"[-_a-zA-Z0-9]*\""
         in_var = 0
         in_value = 0
         in_default = 0
@@ -433,12 +320,13 @@ tfe_pushvars () (
         # the variable keyword
         seen_variable = 1
       }
-      $0 ~ VARS && seen_variable == 1 {
+
+      $0 ~ /"[-_a-zA-Z0-9]*"/ && seen_variable == 1 {
         # get the variable name
         in_var = 1
-        match($0, /\"[a-zA-Z0-9]/)
+        match($0, /"[a-zA-Z0-9]/)
         l=RLENGTH
-        match($0, VARS)
+        match($0, /[-_a-zA-Z0-9]*"/)
         name = substr($0, RSTART+1, RLENGTH-l)
         seen_variable = 0
       }
@@ -546,7 +434,7 @@ tfe_pushvars () (
     # the terraform console command.
     tfvar_dir="$TMPDIR/tfe-push-vars-$(random_enough)"
     if ! mkdir "$tfvar_dir"; then
-      echoerr "Error creating temporary directory for tfvars."
+      echoerr "error creating temporary directory for tfvars."
       return 1
     fi
 
@@ -744,11 +632,13 @@ tfe_pushvars () (
       # list or map
       first="$(echo "$val" | cut -c 1-1 | head -1)"
       if [ "$first" = "{" ] || [ "$first" = "[" ]; then
-        defaulthclvars="$(append "$defaulthclvars" "$var")"
-        defaulthclvars_values="$(append "$defaulthclvars_values" "$val")"
+        defaulthclvars="$defaulthclvars$JUNONIA_UFS$var=$val"
+        #defaulthclvars="$(append "$defaulthclvars" "$var")"
+        #defaulthclvars_values="$(append "$defaulthclvars_values" "$val")"
       else
-        defaultvars="$(append "$defaultvars" "$var")"
-        defaultvars_values="$(append "$defaultvars_values" "$val")"
+        defaultvars="$defaultvars$JUNONIA_UFS$var=$val"
+        #defaultvars="$(append "$defaultvars" "$var")"
+        #defaultvars_values="$(append "$defaultvars_values" "$val")"
       fi
     done
   fi
@@ -760,14 +650,26 @@ tfe_pushvars () (
   # was added by the append function.
 
   #            variable list         value list                   type      hcl   sensitive
-  process_vars "${defaultvars%.}"    "${defaultvars_values%.}"    terraform false false
-  process_vars "${defaulthclvars%.}" "${defaulthclvars_values%.}" terraform true  false
-  process_vars "${vars%.}"           "${vars_values%.}"           terraform false false
-  process_vars "${hclvars%.}"        "${hclvars_values%.}"        terraform true  false
-  process_vars "${svars%.}"          "${svars_values%.}"          terraform false true
-  process_vars "${shclvars%.}"       "${shclvars_values%.}"       terraform true  true
-  process_vars "${envvars%.}"        "${envvars_values%.}"        env       false false
-  process_vars "${senvvars%.}"       "${senvvars_values%.}"       env       false true
-  process_vars "${deletes%.}"        "${deletes%.}"               terraform delete
-  process_vars "${env_deletes%.}"    "${env_deletes%.}"           env       delete
-)
+  #process_vars "${defaultvars%.}"    "${defaultvars_values%.}"    terraform false false
+  #process_vars "${defaulthclvars%.}" "${defaulthclvars_values%.}" terraform true  false
+  #process_vars "${vars%.}"           "${vars_values%.}"           terraform false false
+  #process_vars "${hclvars%.}"        "${hclvars_values%.}"        terraform true  false
+  #process_vars "${svars%.}"          "${svars_values%.}"          terraform false true
+  #process_vars "${shclvars%.}"       "${shclvars_values%.}"       terraform true  true
+  #process_vars "${envvars%.}"        "${envvars_values%.}"        env       false false
+  #process_vars "${senvvars%.}"       "${senvvars_values%.}"       env       false true
+  #process_vars "${deletes%.}"        "${deletes%.}"               terraform delete
+  #process_vars "${env_deletes%.}"    "${env_deletes%.}"           env       delete
+
+  #            variable list     type      hcl   sensitive
+  process_vars "$defaultvars"    terraform false false
+  process_vars "$defaulthclvars" terraform true  false
+  process_vars "$vars"           terraform false false
+  process_vars "$hclvars"        terraform true  false
+  process_vars "$svars"          terraform false true
+  process_vars "$shclvars"       terraform true  true
+  process_vars "$envvars"        env       false false
+  process_vars "$senvvars"       env       false true
+  process_vars "$deletes"        terraform delete
+  process_vars "$env_deletes"    env       delete
+}
