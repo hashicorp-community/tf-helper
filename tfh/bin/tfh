@@ -33,17 +33,6 @@
 # This is to help track empty list values that would otherwise be \n
 # special characters that will get stripped by command substitution.
 
-# Usage:
-#   my_str_list="$(append "$my_str_list" "line")"
-# This will facilitate a later iteration, such as:
-#   printf "%s" "${my_str_list%.}" | while read line; do <operations with "$line">; done
-# Note that the list variable should have the end-of-list marker, ".",
-# removed when used.
-append () {
-  [ -n "$1" ] && printf "%s" "${1%.}"
-  printf "%s\n." "$2"
-}
-
 # Remove specified files
 cleanup () {
   if [ -n "$1" ]; then

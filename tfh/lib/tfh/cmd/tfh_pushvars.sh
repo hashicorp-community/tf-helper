@@ -633,33 +633,14 @@ tfh_pushvars () {
       first="$(echo "$val" | cut -c 1-1 | head -1)"
       if [ "$first" = "{" ] || [ "$first" = "[" ]; then
         defaulthclvars="$defaulthclvars$JUNONIA_UFS$var=$val"
-        #defaulthclvars="$(append "$defaulthclvars" "$var")"
-        #defaulthclvars_values="$(append "$defaulthclvars_values" "$val")"
       else
         defaultvars="$defaultvars$JUNONIA_UFS$var=$val"
-        #defaultvars="$(append "$defaultvars" "$var")"
-        #defaultvars_values="$(append "$defaultvars_values" "$val")"
       fi
     done
   fi
 
   # Send each list of the different types of variables through to be created
   # or updated, along with the properties that that list should abide by.
-
-  # Note that the lists are sent with the end-of-list marker removed, which
-  # was added by the append function.
-
-  #            variable list         value list                   type      hcl   sensitive
-  #process_vars "${defaultvars%.}"    "${defaultvars_values%.}"    terraform false false
-  #process_vars "${defaulthclvars%.}" "${defaulthclvars_values%.}" terraform true  false
-  #process_vars "${vars%.}"           "${vars_values%.}"           terraform false false
-  #process_vars "${hclvars%.}"        "${hclvars_values%.}"        terraform true  false
-  #process_vars "${svars%.}"          "${svars_values%.}"          terraform false true
-  #process_vars "${shclvars%.}"       "${shclvars_values%.}"       terraform true  true
-  #process_vars "${envvars%.}"        "${envvars_values%.}"        env       false false
-  #process_vars "${senvvars%.}"       "${senvvars_values%.}"       env       false true
-  #process_vars "${deletes%.}"        "${deletes%.}"               terraform delete
-  #process_vars "${env_deletes%.}"    "${env_deletes%.}"           env       delete
 
   #            variable list     type      hcl   sensitive
   process_vars "$defaultvars"    terraform false false
