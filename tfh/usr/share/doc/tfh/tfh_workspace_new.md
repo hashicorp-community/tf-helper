@@ -1,4 +1,4 @@
-## `tfh workspace new`
+## `tfh workspace new, create`
 
 Create a new Terraform Enterprise workspace
 

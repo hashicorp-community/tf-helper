@@ -1,4 +1,4 @@
-## `tfh workspace`
+## `tfh workspace, ws`
 
 Perform operations on workspaces
 

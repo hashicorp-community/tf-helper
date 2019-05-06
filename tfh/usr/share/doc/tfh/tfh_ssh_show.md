@@ -1,4 +1,4 @@
-## `tfh ssh show`
+## `tfh ssh show, get`
 
 Show Terraform Enterprise workspace details
 
