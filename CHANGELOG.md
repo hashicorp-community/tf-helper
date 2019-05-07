@@ -3,4 +3,9 @@
 NOTES
 
 * Port of `tfe-cli` to [junonia](https://github.com/fprimex/junonia). Starting with a clean slate.
+* Please read the new documentation!
+* The `-name` parameter is now just the workspace name. Use `-org` with `-name`.
+* All positional parameters must come before options. This moves the configuration directories to after the `pushvars` and `pushconfig` commands.
+* It's now possible to use a curlrc configuration file to authenticate.
+* See the new `curl-config`, `config`, and `cache` commands as they are new.
 

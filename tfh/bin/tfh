@@ -214,8 +214,7 @@ tfh_junonia_filter () {
 junonia_bootstrap () {
   JUNONIA_TARGET="$0"
   while [ -h "$JUNONIA_TARGET" ]; do
-    JUNONIA_PATH="$(file -h "$JUNONIA_TARGET" | \
-                    sed 's/^.*symbolic link to //')"
+    JUNONIA_PATH=$(readlink "$JUNONIA_TARGET")
     if [ "$(echo "$JUNONIA_PATH" | cut -c -1)" = "/" ]; then
     JUNONIA_TARGET="$JUNONIA_PATH"
     else
@@ -236,6 +235,10 @@ tfh () {
   return 1
 }
 
+tfh_version () {
+  echo "0.2.0"
+}
+
 ##
 ## Program begins here
 ##
@@ -244,7 +247,7 @@ tfh () {
 # JUNONIA_CONFIG     # Path to script rc file
 # JUNONIA_CONFIGDIR  # Path to config directory
 # JUNONIA_CACHEDIR   # Path to cache directory
-JUNONIA_CACHE=0      # Flag to optionally disable (0) caching
+# JUNONIA_CACHE=0    # Flag to optionally disable (0) caching
 # JUNONIA_WRAP       # Width of two column output (option help listings)
 # JUNONIA_COL1       # Width of column one
 # JUNONIA_COL2       # Width of column two
