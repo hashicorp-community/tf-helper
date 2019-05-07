@@ -232,7 +232,8 @@ junonia_bootstrap () {
 
 # Top level invocation of the command.
 tfh () {
-  exec $0 help
+  $0 help
+  return 1
 }
 
 ##
@@ -273,3 +274,4 @@ echodebug "$PWD"
 echodebug "$0 $*"
 
 junonia_run "$@"
+exit $?

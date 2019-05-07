@@ -27,12 +27,12 @@
 make_update_workspace_payload () {
 cat > "$payload" << EOF
 {
-"data" : {
-  "attributes": {
-    $1
-  },
-  "type": "workspaces"
-}
+  "data": {
+    "attributes": {
+      $1
+    },
+    "type": "workspaces"
+  }
 }
 EOF
 
@@ -62,46 +62,46 @@ tfh_workspace_update () {
       echoerr 'tfh workspace update WORKSPACE_NAME'
       return 1
     else
-      show_ws="$ws"
+      up_ws="$ws"
     fi
   fi
 
-  if [ $auto_apply ]; then
+  if [ $auto_apply ] && echo "$TFH_CMDLINE" | grep -Eq -- '-auto-apply'; then
         [ "$attr_obj" ] && attr_obj="$attr_obj,"
         attr_obj="$attr_obj \"auto-apply\": \"$auto_apply\""
   fi
 
-  if [ $queue_all_runs ]; then
+  if [ $queue_all_runs ] && echo "$TFH_CMDLINE" | grep -Eq -- '-queue-all-runs'; then
         [ "$attr_obj" ] && attr_obj="$attr_obj,"
         attr_obj="$attr_obj \"queue-all-runs\": \"$queue_all_runs\""
   fi
 
-  if [ -n "$tf_version" ]; then
+  if [ -n "$tf_version" ] && echo "$TFH_CMDLINE" | grep -Eq -- '-terraform-version'; then
         [ "$attr_obj" ] && attr_obj="$attr_obj,"
         attr_obj="$attr_obj \"terraform-version\": \"$tf_version\""
   fi
 
-  if [ -n "$working_dir" ]; then
+  if [ -n "$working_dir" ] && echo "$TFH_CMDLINE" | grep -Eq -- '-working-dir'; then
         [ "$attr_obj" ] && attr_obj="$attr_obj,"
         attr_obj="$attr_obj \"working-directory\": \"$working_dir\""
   fi
 
-  if [ -n "$vcs_id" ]; then
+  if [ -n "$vcs_id" ] && echo "$TFH_CMDLINE" | grep -Eq -- '-vcs-id'; then
         [ "$vcs_obj" ] && vcs_obj="$vcs_obj,"
         vcs_obj="$vcs_obj \"identifier\": \"$vcs_id\""
   fi
 
-  if [ -n "$vcs_branch" ]; then
+  if [ -n "$vcs_branch" ] && echo "$TFH_CMDLINE" | grep -Eq -- '-vcs-branch'; then
         [ "$vcs_obj" ] && vcs_obj="$vcs_obj,"
         vcs_obj="$vcs_obj \"branch\": \"$vcs_branch\""
   fi
 
-  if [ -n "$vcs_submodules" ]; then
+  if [ -n "$vcs_submodules" ] && echo "$TFH_CMDLINE" | grep -Eq -- '-vcs-submodules'; then
         [ "$vcs_obj" ] && vcs_obj="$vcs_obj,"
         vcs_obj="$vcs_obj \"ingress-submodules\": \"$vcs_submodules\""
   fi
 
-  if [ -n "$oauth_id" ]; then
+  if [ -n "$oauth_id" ] && echo "$TFH_CMDLINE" | grep -Eq -- '-oauth-id'; then
         [ "$vcs_obj" ] && vcs_obj="$vcs_obj,"
         vcs_obj="$vcs_obj \"oauth-token-id\": \"$oauth_id\""
   fi

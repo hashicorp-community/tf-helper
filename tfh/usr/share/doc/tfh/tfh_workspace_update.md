@@ -28,7 +28,7 @@ The version of Terraform that the workspace should use to perform runs. Defaults
 
 * `-working-dir DIRECTORY`
 
-The directory relative to the root of the VCS repository where the 'terraform' command should be run. Defaults to the root of the VCS repository.
+The directory relative to the root of the VCS repository where the 'terraform' command should be run. Defaults to the root of the VCS repository. To set this to an empty string, it is easiest to use an empty variable, as passing any combination of quotes will be either wrong or fail to pass any value. For example, using `-working-dir $empty` correctly passes a null value / empty string.
 
 * `-vcs-id ID`
 

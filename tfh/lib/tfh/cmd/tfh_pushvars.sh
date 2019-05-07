@@ -87,6 +87,11 @@ process_vars () {
     unset IFS
     v="${var%%=*}"
     val="${var#*=}"
+
+    if [ "$3" = true ]; then
+      val="$(escape_value "$val")"
+    fi
+
     echodebug "$(printf "Processing %s type:%s hcl:%s sensitive:%s value:%s\n" "$v" "$2" "$3" "$4" "$val")"
 
     # Don't bother creating or updating if it's just going to be
@@ -208,26 +213,44 @@ process_vars () {
 
 tfh_pushvars () {
   config_dir="$1"
-  dry_run="$2"
-  vars="$3"
-  svars="$4"
-  hclvars="$5"
-  shclvars="$6"
-  envvars="$7"
-  senvvars="$8"
-  deletes="$9"
-  env_deletes="${10}"
-  overwrites="${11}"
-  envvar_overwrites="${12}"
-  overwrite_all="${13}"
-  var_file="${14}"
-  var_file_arg="${15}"
-  hide_sensitive="${16}"
+  shift
+  dry_run="$1"
+  shift
+  vars="$1"
+  shift
+  svars="$1"
+  shift
+  hclvars="$1"
+  shift
+  shclvars="$1"
+  shift
+  envvars="$1"
+  shift
+  senvvars="$1"
+  shift
+  deletes="$1"
+  shift
+  env_deletes="$1"
+  shift
+  overwrites="$1"
+  shift
+  envvar_overwrites="$1"
+  shift
+  overwrite_all="$1"
+  shift
+  var_file="$1"
+  shift
+  hide_sensitive="$1"
 
   defaultvars=
   defaultvars_values=
   defaulthclvars=
   defaulthclvars_values=
+  var_file_arg=
+
+  if [ -n "$var_file" ]; then
+    var_file_arg="$1"
+  fi
 
   payload="$TMPDIR/tfe-push-vars-payload-$(junonia_randomish_int)"
 

@@ -1,4 +1,4 @@
-## `tfe curl-config`
+## `tfh curl-config`
 
 Show and modify the curl configuration
 

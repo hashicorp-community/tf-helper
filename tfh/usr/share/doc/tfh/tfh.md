@@ -2,9 +2,13 @@
 
 Perform operations relating to HashiCorp Terraform
 
+### Synopsis
+
+    tfh [SUBCOMMANDS] [PARAMETERS] [OPTIONS]
+
 ### Description
 
-Details to come
+Perform operations relating to HashiCorp Terraform artifacts (configurations, states) and services (Terraform Enterprise).
 
 ### Options
 
