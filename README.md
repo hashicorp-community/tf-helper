@@ -94,7 +94,7 @@ Note that the hostname should _not_ start with `https://`. That will be prepende
 ## Subcommands
 
 Each subcommand is documented individually. See the [documentation
-directory](https://github.com/hashicorp-community/tf-helper/blob/release/usr/share/doc/tfh)
+directory](https://github.com/hashicorp-community/tf-helper/tree/master/tfh/usr/share/doc/tfh)
 for each subcommand's full description. Some subcommands are documented with
 extended descriptions and examples that are not included in the help output at
 the command line.
