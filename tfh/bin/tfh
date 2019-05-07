@@ -236,7 +236,7 @@ tfh () {
 }
 
 tfh_version () {
-  echo "0.2.0"
+  echo "0.3.0dev"
 }
 
 ##
@@ -247,7 +247,7 @@ tfh_version () {
 # JUNONIA_CONFIG     # Path to script rc file
 # JUNONIA_CONFIGDIR  # Path to config directory
 # JUNONIA_CACHEDIR   # Path to cache directory
-# JUNONIA_CACHE=0    # Flag to optionally disable (0) caching
+JUNONIA_CACHE=0      # Flag to optionally disable (0) caching
 # JUNONIA_WRAP       # Width of two column output (option help listings)
 # JUNONIA_COL1       # Width of column one
 # JUNONIA_COL2       # Width of column two
