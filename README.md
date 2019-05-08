@@ -7,8 +7,8 @@ reporting on and manipulating other Terraform artifacts.
 
 Terraform Enterprise API: https://www.terraform.io/docs/enterprise/api/index.html
 
-In particular, the `tfh pushconfig` and `tfh pushvars` commands replaces and
-extends the functionality of the deprecated `terraform push` command. You can
+In particular, the `tfh pushconfig` and `tfh pushvars` commands replace and
+extend the functionality of the deprecated `terraform push` command. You can
 use it to upload configurations, start runs, and change and retrieve variables
 using the new Terraform Enterprise API. These scripts are not necessary to use
 Terraform Enterprise's core workflows, but they offer a convenient interface
