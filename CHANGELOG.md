@@ -1,5 +1,11 @@
 ## 0.3.0 (unreleaed)
 
+## 0.2.2 (May 8, 2019
+
+* NOTES
+
+* Re-enabled caching, forgotten as part of the release process.
+
 ## 0.2.1 (May 8, 2019)
 
 BUG FIXES
