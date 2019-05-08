@@ -152,7 +152,7 @@ Documentation for boolean flag `-baz`, with default `1`, or true.
 
 ```
 
-The shell implementation file should contain a function with the subcommand name, `tfh_my_plugin`.
+The shell implementation file should contain a function with the subcommand name, `tfh_my_plugin`. The command line options are passed to the function in the order they were defined in the Markdown file.
 
 ```
 tfh_my_plugin () {
@@ -161,7 +161,7 @@ tfh_my_plugin () {
   baz="$3"
 
   # common options have been extracted by the tfh argument filter function
-  echo "org:      $name"
+  echo "org:      $org"
   echo "name:     $name"
   echo "token:    $token"
   echo "hostname: $hostname"
