@@ -7,7 +7,7 @@ reporting on and manipulating other Terraform artifacts.
 
 Terraform Enterprise API: https://www.terraform.io/docs/enterprise/api/index.html
 
-In particular, the `tfe pushconfig` and `tfe pushvars` commands replaces and
+In particular, the `tfh pushconfig` and `tfh pushvars` commands replaces and
 extends the functionality of the deprecated `terraform push` command. You can
 use it to upload configurations, start runs, and change and retrieve variables
 using the new Terraform Enterprise API. These scripts are not necessary to use
@@ -45,7 +45,7 @@ following:
   ln -s $PWD/tfh /usr/local/bin/tfh
   ```
 - Run the `tfh` command with its full path. (For example:
-  `/usr/local/src/tf-helper/tfh/bin/tfe pushconfig`)
+  `/usr/local/src/tf-helper/tfh/bin/tfh pushconfig`)
 
 The default branch of this repository is `release`. Development occurs in the
 non-default branch `master`. When a release is made, `release` will be updated
@@ -117,7 +117,7 @@ Output such as `tfh help` and other internally used artifacts are cached. Someti
 
 ## Plugins
 
-Plugin support is still under development, however at least simple plugins are functional and can allow for extending `tfe` locally, without the need to have subcommands merged into the main repository. To develop a plugin named `my_plugin`:
+Plugin support is still under development, however at least simple plugins are functional and can allow for extending `tfh` locally, without the need to have subcommands merged into the main repository. To develop a plugin named `my_plugin`:
 
 * Create the directory `~/.tfh/plugins/my_plugin`
 * Create the Markdown file for the command `~/.tfh/plugins/tfh_my_plugin.md`
@@ -203,8 +203,8 @@ OPTIONS
                   true.                                                       
 
 $ tfh my_plugin
-org:      tfe_demo
-name:     tfe_demo
+org:      tfh_demo
+name:     tfh_demo
 token:    
 hostname: app.terraform.io
 address:  https://app.terraform.io
