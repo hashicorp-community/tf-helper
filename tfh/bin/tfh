@@ -236,7 +236,7 @@ tfh () {
 }
 
 tfh_version () {
-  echo "0.2.2"
+  echo "0.2.3"
 }
 
 ##

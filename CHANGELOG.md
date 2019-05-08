@@ -1,5 +1,11 @@
 ## 0.3.0 (unreleaed)
 
+## 0.2.3 (May 8, 2019)
+
+BUG FIXES
+
+* Fix for One True AWK limitation by bumping junonia to 1.0.2, where it could not accept a multi-line string as a variable via `-v`. Instead, the value is passed as an argument, then read and deleted from the ARGV as is done in several other places.
+
 ## 0.2.2 (May 8, 2019
 
 * NOTES
