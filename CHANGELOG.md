@@ -1,6 +1,10 @@
-## 0.3.0 () (unreleaed)
+## 0.3.0 (unreleaed)
 
+## 0.2.1 (May 8, 2019)
 
+BUG FIXES
+
+* Update junonia to 1.0.1 to fix help output.
 
 ## 0.2.0 (May 7, 2019)
 
