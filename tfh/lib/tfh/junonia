@@ -615,6 +615,8 @@ junonia_update_config () {
 
 # Parse Markdown text into a program argument spec
 _junonia_md2spec () {
+  echodebug "begin md2spec"
+
   awk_prog='
     # Print the currently stored spec and reset for the next one.
     function spec () {
@@ -735,12 +737,14 @@ _junonia_md2spec () {
   '
 
   awk -v wrap="$JUNONIA_WRAP" -v col1="$JUNONIA_COL1" \
-            -v col2="$JUNONIA_COL2" -v cmd="$1" \
-            "$JUNONIA_AWKS $awk_prog" "$@"
+      -v col2="$JUNONIA_COL2" -v cmd="$1" \
+      "$JUNONIA_AWKS $awk_prog" "$@"
 }
 
 # Parse Markdown text into command line help
 _junonia_md2help () {
+  echodebug "begin md2help"
+
   awk_prog='
     BEGIN {
       # Split the supplied command into an array of parts
@@ -775,6 +779,8 @@ _junonia_md2help () {
       if(cmd_doc_start) {
         cmd_doc_end = 1
       }
+      split($0, header_parts)
+      header_subcmd = header_parts[i]
     }
 
     # Find the topmost level command title to bootstrap subcommand location.
@@ -796,7 +802,7 @@ _junonia_md2help () {
     # At this point i > 1
 
     # Keep looking at titles until the whole command is located
-    title && i <= n && $0 ~ "^" cmd_part " [-_A-Za-z0-9, ]*" cmda[i] "(,|$)" {
+    title && i <= n && cmda[i] == header_subcmd {
       cmd_part = $0
       sub(/,.*/, "", cmd_part)
 
@@ -1234,47 +1240,33 @@ junonia () {
 }
 
 _junonia_help () {
-  md="$1"
-  shift
+  echodebug "begin help"
 
-  spec_src_type="$1"
-  shift
-
-  spec="$1"
-  shift
-
-  helpfunc="$1"
-  shift
+  cmd="$1"
+  helpfunc="$(echo "$1" | sed 's/ /_/g; s/-/_/g')"
 
   if [ -f "$JUNONIA_CACHEDIR/help/$helpfunc" ]; then
     cat "$JUNONIA_CACHEDIR/help/$helpfunc"
     return 0
   fi
 
-  cmd="$(echo $helpfunc | sed 's/_/ /g;s/^ *//;s/ *$//')"
-
-  if helpfunc=$(_junonia_normalize_func "$helpfunc"); then
-    spec_src_type=md_string
-    md="$(${helpfunc}_md)"
-  fi
-
-  case "$spec_src_type" in
+  case "$JUNONIA_SPEC_TYPE" in
     dir)
-      mds="$(for f in "$md"/*.md; do cat "$f"; done;
+      mds="$(for f in "$JUNONIA_MD"/*.md; do cat "$f"; done;
              _junonia_mds)"
       helptext="$({ echo "$mds"; _junonia_plugin_docs; } | \
-                  _junonia_md2help "$helpfunc")"
+                  _junonia_md2help "$cmd")"
       ;;
     file)
-      helptext="$({ cat "$md"; _junonia_plugin_docs; _junonia_mds; } | \
+      helptext="$({ cat "$JUNONIA_MD"; _junonia_plugin_docs; _junonia_mds; } | \
                   _junonia_md2help "$cmd")"
       ;;
     md_string)
-      helptext="$({ echo "$md"; _junonia_plugin_docs; _junonia_mds; } | \
+      helptext="$({ echo "$JUNONIA_MD"; _junonia_plugin_docs; _junonia_mds; } | \
                   _junonia_md2help "$cmd")"
       ;;
     spec_string)
-      helptext="$(echo "$spec" | awk '{sub(/^# /, ""); print}')"
+      helptext="$(echo "$JUNONIA_SPEC" | awk '{sub(/^# /, ""); print}')"
       ;;
   esac
 
@@ -1283,6 +1275,8 @@ _junonia_help () {
 }
 
 _junonia_config () {
+  echodebug "begin config"
+
   if echo "$*" | grep -Eq '^ *$'; then
     if [ -f "$JUNONIA_CONFIG" ]; then
       cat "$JUNONIA_CONFIG"
@@ -1295,6 +1289,8 @@ _junonia_config () {
 }
 
 _junonia_cache () {
+  echodebug "begin cache"
+
   clear=$1
 
   echo "cache directory: $JUNONIA_CACHEDIR"
@@ -1490,6 +1486,8 @@ _junonia_version () {
 }
 
 _junonia_normalize_func () {
+  echodebug "begin normalize func"
+
   if [ "$1" = _junonia_help ]; then
     echo "$1"
     return 0
@@ -1518,6 +1516,8 @@ _junonia_normalize_func () {
 }
 
 junonia_cache_file () {
+  echodebug "begin cache file"
+
   cachepath="$1"
   contents="$2"
 
@@ -1568,6 +1568,8 @@ _junonia_plugin_docs () {
 }
 
 _junonia_func_search () {
+  echodebug "begin func search"
+
   searchpath="$1"
   i=0
 
@@ -1628,6 +1630,8 @@ junonia_setdebug () {
 # Configure the execution environment by setting global variables for names and
 # paths. Additionally configure debugging and temporary storage.
 junonia_init () {
+  echodebug "begin init"
+
   # Variables set by junonia_bootstrap:
   # JUNONIA_TARGET  Absolute path to the script
   # JUNONIA_PATH    Absolute path to the directory containing the script
@@ -1662,7 +1666,7 @@ junonia_init () {
   JUNONIA_COL2="${JUNONIA_COL2:-60}"
 
   #readonly JUNONIA_VERSION="unversioned"
-  readonly JUNONIA_VERSION="1.0.1"
+  readonly JUNONIA_VERSION="1.0.2"
 
   # Information Separator control characters (IS4 - IS1)
   readonly JUNONIA_FS="" # File   Separator (FS / IS4 / dec 28)
@@ -1781,6 +1785,8 @@ _junonia_get_envvars () {
 # $1      The full text of a program argument spec.
 # $2 - $N The program name and arguments from the command line.
 _junonia_set_args () {
+  echodebug "begin set args"
+
   # NOTE THAT THE CONFIG FILE IS *MEANT* TO BE AN RC FILE WHERE YOU CAN SET
   # ARGUMENT VARS AND RUN COMMANDS FOR SETUP TYPE THINGS. ARBITRARY COMMANDS
   # CAN BE EXECUTED. THIS IS BY DESIGN. THE SECURITY MODEL OF SHELL SCRIPTING
@@ -1840,7 +1846,7 @@ _junonia_set_args () {
   md="$1"
   shift
 
-  spec_src_type="$1"
+  spec_type="$1"
   shift
 
   spec="$1"
@@ -1942,7 +1948,7 @@ _junonia_set_args () {
             func_name = func_name " " ARGV[i+1]
           }
 
-          print "_junonia_help" JRS md JRS spec_src_type JRS spec JRS func_name
+          print "_junonia_help" JRS func_name
           e = 0
           exit
         }
@@ -2166,8 +2172,7 @@ _junonia_set_args () {
   }'
 
   echo "$spec" | awk -v JRS="$JUNONIA_RS" -v JUS="$JUNONIA_US" \
-                     -v md="$md" -v spec_src_type="$spec_src_type" \
-                     -v spec="$spec" "$JUNONIA_AWKS $awk_prog" - "$@"
+                     "$JUNONIA_AWKS $awk_prog" - "$@"
 }
 
 
@@ -2177,6 +2182,8 @@ _junonia_set_args () {
 
 # Perform a search for defaults and run with them if found.
 junonia_run () {
+  echodebug "begin run"
+
   # This file is the program being run, which is a special case.
   if [ "$JUNONIA_NAME" = junonia ]; then
     junonia_runmd "$(_junonia_md) $(_junonia_mds)" "$@"
@@ -2248,6 +2255,8 @@ junonia_run () {
 # Take a docs dir of md files, one md file, or md contents as a string, make
 # the spec, run the function with the parsed arg values.
 junonia_runmd () {
+  echodebug "begin runmd"
+
   junonia_runmd_filtered "" "$@"
 }
 
@@ -2256,6 +2265,8 @@ junonia_runmd () {
 # with the parsed arg values (which may have been changed by the filter
 # function).
 junonia_runmd_filtered () {
+  echodebug "begin runmd filtered"
+
   filter_func="$1"
   shift
 
@@ -2271,20 +2282,20 @@ junonia_runmd_filtered () {
   fi
 
   ret=1
-  spec_src_type=
+  spec_type=
   if [ -d "$md" ]; then
     readonly JUNONIA_DOCDIR="$md"
     spec="${spec:-"$(_junonia_plugin_docs | _junonia_md2spec "$md"/*.md -)"}"
     ret=$?
-    spec_src_type="dir"
+    spec_type="dir"
   elif [ -f "$md" ]; then
     spec="${spec:-"$(_junonia_plugin_docs | _junonia_md2spec "$md" -)"}"
     ret=$?
-    spec_src_type="file"
+    spec_type="file"
   elif [ "$(echo "$md" | wc -l)" -gt 1 ]; then
     spec="${spec:-"$({echo "$md"; _junonia_plugin_docs} | _junonia_md2spec "" -)"}"
     ret=$?
-    spec_src_type="md_string"
+    spec_type="md_string"
   fi
 
   if [ -z "$spec" ] || [ "$ret" -ne 0 ]; then
@@ -2294,11 +2305,13 @@ junonia_runmd_filtered () {
     return 1
   fi
 
-  _junonia_run_final "$filter_func" "$md" "$spec_src_type" "$spec" "$@"
+  _junonia_run_final "$filter_func" "$md" "$spec_type" "$spec" "$@"
 }
 
 # Take a spec string, run the function with the parsed args values.
 junonia_runspec () {
+  echodebug "begin runspec"
+
   junonia_runspec_filtered "" "$@"
 }
 
@@ -2306,6 +2319,8 @@ junonia_runspec () {
 # function with the parsed arg values (which may have been changed by the
 # filter function).
 junonia_runspec_filtered () {
+  echodebug "begin runspec filtered"
+
   filter_func="$1"
   shift
 
@@ -2318,13 +2333,15 @@ junonia_runspec_filtered () {
 ###
 
 _junonia_run_final () {
+  echodebug "begin run final"
+
   filter_func="$1"
   shift
 
   md="$1"
   shift
 
-  spec_src_type="$1"
+  spec_type="$1"
   shift
 
   spec="$1"
@@ -2334,43 +2351,47 @@ _junonia_run_final () {
   if [ ! -f "$spec_cache" ]; then
     # Insert the standard meta parameters.
     spec="$(
-      echo "$spec" | awk -v s="$_junonia_cmds" '
+      echo "$spec" | awk '
+        BEGIN {
+          s = ARGV[1]
+          delete ARGV[1]
+        }
         /^ *#/ {
           comments = comments $0 "\n"
         }
         /^[a-z]/ {
           insert_meta = 1
-          if(comments) print substr(comments, 1, length(comments) -1 )
+          if(comments) print substr(comments, 1, length(comments) - 1 )
           comments = ""
           print
           next
         }
         insert_meta && /^  [a-z]/ {
-          print s
-          if(comments) print substr(comments, 1, length(comments) -1 )
+          #print s
+          if(comments) print substr(comments, 1, length(comments) - 1 )
           comments = ""
           print
           insert_meta = 0
           next
         }
         ! /^ *#/ {
-          if(comments) print substr(comments, 1, length(comments) -1 )
+          if(comments) print substr(comments, 1, length(comments) - 1 )
           comments = ""
           print
         }
         END {
           if(insert_meta) {
-            print s
+            #print s
           }
         }
-      '
+      ' "$_junonia_cmds"
     )"
 
     junonia_cache_file spec "$spec"
   fi
 
   # Retrieve the argument values in the order defined in the spec.
-  if ! arg_vals="$(_junonia_set_args "$md" "$spec_src_type" "$spec" \
+  if ! arg_vals="$(_junonia_set_args "$md" "$spec_type" "$spec" \
                                      "$JUNONIA_NAME" "$@")"; then
     # An error should have been supplied on stderr
     return 1
@@ -2386,28 +2407,26 @@ _junonia_run_final () {
   # by the filter function. Using a user filter function is optional, and in
   # that case every function will receive every option; all common options in
   # the spec tree path.
-  _junonia_exec "$filter_func" "$md" "$spec_src_type" "$spec" $arg_vals
+  _junonia_exec "$filter_func" "$md" "$spec_type" "$spec" $arg_vals
 }
 
 # Receive function argument values, send them through the filter if needed,
 # then execute the specified function with the values.
 _junonia_exec () {
+  echodebug "begin exec"
+
   # Each value from the parsed args are now their own word, so the IFS can go
   # back to normal.
   unset IFS
 
   filter_func="$1"
   shift
-
   md="$1"
   shift
-
-  spec_src_type="$1"
+  spec_type="$1"
   shift
-
   spec="$1"
   shift
-
   func="$1"
   shift
 
@@ -2466,8 +2485,18 @@ _junonia_exec () {
     # it gets called.
   fi
 
-  readonly JUNONIA_CMD="$(echo "$func" | sed 's/_/ /g')"
-  readonly JUNONIA_FUNC="$(echo "$func" | sed 's/-/_/g')"
+  # At this point, all of the following are set and fixed.
+  export JUNONIA_CMD="$(echo "$func" | sed 's/_/ /g')"
+  export JUNONIA_FUNC="$(echo "$func" | sed 's/-/_/g')"
+  export JUNONIA_MD="$md"
+  export JUNONIA_SPEC_TYPE="$spec_type"
+  export JUNONIA_SPEC="$spec"
+
+  readonly JUNONIA_CMD
+  readonly JUNONIA_FUNC
+  readonly JUNONIA_MD
+  readonly JUNONIA_SPEC_TYPE
+  readonly JUNONIA_SPEC
 
   # If the command hasn't already been sourced or defined somewhere, try to
   # discover it by checking for files corresponding to the function name.
@@ -2487,10 +2516,15 @@ _junonia_exec () {
     return 1
   fi
 
+  echodebug "JUNONIA_CMD      : $JUNONIA_CMD"
+  echodebug "JUNONIA_FUNC     : $JUNONIA_FUNC"
+  echodebug "JUNONIA_SPEC_TYPE: $JUNONIA_SPEC_TYPE"
+  #echodebug JUNONIA_SPEC: JUNONIA_SPEC="$spec"
+  #echodebug JUNONIA_MD: JUNONIA_MD="$md"
+  echodebug "args: $*"
+
   # A function file was found and sourced, and the function was found. Execute
   # the function.
-  echodebug "function: $JUNONIA_FUNC"
-  echodebug "args: $*"
   $JUNONIA_FUNC "$@"
 }
 
