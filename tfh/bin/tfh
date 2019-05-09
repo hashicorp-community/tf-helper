@@ -112,7 +112,7 @@ tfh_api_call () {
               "\($k):",
               "\(leaf_print({"errors": $e[$k], "indent": $ni}))");
 
-        leaf_print({"errors": .errors[], "indent": ""})')"; then
+        leaf_print({"errors": .errors[], "indent": "  "})')"; then
         echoerr_raw "JSON-API details:"
         echoerr_raw "$jsonapi_err"
       else
