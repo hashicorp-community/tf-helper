@@ -234,14 +234,14 @@ tfh_pushconfig () {
     url="$address/api/v2/organizations/$org/workspaces/$ws"
     workspace_id_resp="$(tfh_api_call "$url")"
     echodebug "Workspace ID response:"
-    echodebug "$workspace_id_resp"
+    echodebug_raw "$workspace_id_resp"
 
     workspace_id="$(printf "%s" "$workspace_id_resp" | jq -r '.data.id')"
     echodebug "Workspace ID: $workspace_id"
 
     test -n "$workspace_id"
     echo "$workspace_id"
-  ) 2>&3 )"
+  ) )"
 
   if [ 0 -ne $? ]; then
     echoerr "Error obtaining workspace ID"

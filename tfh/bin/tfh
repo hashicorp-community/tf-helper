@@ -72,27 +72,64 @@ escape_value () {
 # Common options to curl. Fail on HTTP error codes.
 tfh_api_call () {
   echodebug "curl args: $@"
-  if resp="$(curl -f $curl_silent \
-         $curl_token_arg \
-         --header "Content-Type: application/vnd.api+json" \
-         $@)"; then
-    echodebug "API request succeeded with exit code $?. Response:"
-    echodebug "$resp"
+  resp="$(curl -l $curl_silent \
+            -w '\nhttp_code: %{http_code}\n' \
+            $curl_token_arg \
+            --header "Content-Type: application/vnd.api+json" \
+            $@)"
+  resp_body="$(echo "$resp" | awk '!/^http_code/; /^http_code/{next}')"
+  resp_code="$(echo "$resp" | awk '!/^http_code/{next} /^http_code/{print $2}')"
 
-    printf "%s" "$resp"
-    next_page="$(printf "%s" "$resp" | jq -r '.meta.pagination."next-page"')"
-    if [ -n "$next_page" ] && [ "$next_page" != null ]; then
-      echodebug "Next page: $next_page"
-      next_link="$(printf "%s" "$resp" | jq -r '.links.next')"
-      echodebug "Next link: $next_link"
-      tfh_api_call "$next_link"
-    fi
-  else
-    echodebug "API request failed with exit code $?. Response:"
-    echodebug "$resp"
+  echodebug "API request http code: $resp_code. Response:"
+  echodebug_raw "$resp_body"
 
-    return 1
-  fi
+  case "$resp_code" in
+    2*)
+      printf "%s" "$resp_body"
+      next_page="$(printf "%s" "$resp_body" | jq -r '.meta.pagination."next-page"')"
+      if [ -n "$next_page" ] && [ "$next_page" != null ]; then
+        echodebug "Next page: $next_page"
+        next_link="$(printf "%s" "$resp" | jq -r '.links.next')"
+        echodebug "Next link: $next_link"
+        tfh_api_call "$next_link"
+      fi
+      ;;
+    4*|5*)
+      echoerr "API request failed."
+      echoerr_raw "HTTP status code: $resp_code"
+      if jsonapi_err="$(echo "$resp_body" | jq -r '
+        def leaf_print(o):
+          o.indent as $i |
+          $i + "  " as $ni |
+          o.errors as $e |
+          $e | keys[] as $k |
+            (select(($e[$k] | type) != "array" and ($e[$k] | type) != "object") |
+              "\($k): \($e[$k])"),
+            (select(($e[$k] | type) == "object") |
+              "\($k):",
+              "\(leaf_print({"errors": $e[$k], "indent": $ni}))"),
+            (select(($e[$k] | type) == "array") |
+              "\($k):",
+              "\(leaf_print({"errors": $e[$k], "indent": $ni}))");
+
+        leaf_print({"errors": .errors[], "indent": ""})')"; then
+        echoerr_raw "JSON-API details:"
+        echoerr_raw "$jsonapi_err"
+      else
+        echoerr "Response:"
+        echoerr_raw "$resp_body"
+      fi
+
+      return 1
+      ;;
+    *)
+      echoerr "Unable to complete API request."
+      echoerr "HTTP status code: $resp_code."
+      echoerr "Response:"
+      echoerr "$resp_body"
+      return 1
+      ;;
+  esac
 }
 
 # Check the version of terraform in use. Commands can use this
