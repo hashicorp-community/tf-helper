@@ -2374,7 +2374,7 @@ _junonia_run_final () {
           next
         }
         insert_meta && /^  [a-z]/ {
-          #print s
+          print s
           if(comments) print substr(comments, 1, length(comments) - 1 )
           comments = ""
           print
@@ -2394,6 +2394,7 @@ _junonia_run_final () {
       ' "$_junonia_cmds"
     )"
 
+    echodebug "$spec"
     junonia_cache_file spec "$spec"
   fi
 
