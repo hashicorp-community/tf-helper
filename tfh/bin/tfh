@@ -69,16 +69,33 @@ escape_value () {
   }'
 }
 
-# Common options to curl. Fail on HTTP error codes.
 tfh_api_call () {
+  # $1: optional integer parameter for number of next-pages to retrieve
+  # $1 or $2 to $#: arguments to provide to curl
+
+  echodebug "tfh_api_call args: $@"
+
+	if ! [ "$1" -eq "$1" ] >/dev/null 2>&1; then
+    npages="10000"
+  else
+    npages="$1"
+    shift
+	fi
+
+  echodebug "npages: $npages"
   echodebug "curl args: $@"
-  resp="$(curl -l $curl_silent \
+ 
+  if [ "$npages" -lt 1 ]; then
+    return 0
+  fi
+
+  resp="$(curl $curl_silent \
             -w '\nhttp_code: %{http_code}\n' \
             $curl_token_arg \
             --header "Content-Type: application/vnd.api+json" \
             $@)"
-  resp_body="$(echo "$resp" | awk '!/^http_code/; /^http_code/{next}')"
-  resp_code="$(echo "$resp" | awk '!/^http_code/{next} /^http_code/{print $2}')"
+  resp_body="$(printf '%s' "$resp" | awk '!/^http_code/; /^http_code/{next}')"
+  resp_code="$(printf '%s' "$resp" | awk '!/^http_code/{next} /^http_code/{print $2}')"
 
   echodebug "API request http code: $resp_code. Response:"
   echodebug_raw "$resp_body"
@@ -86,12 +103,17 @@ tfh_api_call () {
   case "$resp_code" in
     2*)
       printf "%s" "$resp_body"
-      next_page="$(printf "%s" "$resp_body" | jq -r '.meta.pagination."next-page"')"
-      if [ -n "$next_page" ] && [ "$next_page" != null ]; then
-        echodebug "Next page: $next_page"
-        next_link="$(printf "%s" "$resp" | jq -r '.links.next')"
-        echodebug "Next link: $next_link"
-        tfh_api_call "$next_link"
+
+      next_page="$(printf "%s" "$resp_body" | \
+                   jq -r '.meta.pagination."next-page"' 2>&3)"
+
+      if [ -n "$next_page" ] && [ "$next_page" != null ] &&
+         ! [ "$npages" -le 1 ]; then
+        echodebug "next page: $next_page"
+        echodebug "npages: $npages"
+        next_link="$(printf "%s" "$resp_body" | jq -r '.links.next')"
+        echodebug "next link: $next_link"
+        tfh_api_call $((--npages)) "$next_link"
       fi
       ;;
     4*|5*)

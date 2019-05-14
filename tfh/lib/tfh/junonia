@@ -430,6 +430,16 @@ junonia_randomish_int () {
   fi
 }
 
+# Determine if an argument is an integer.
+junonia_is_int () {
+  test "$1" -eq "$1" >/dev/null 2>&1
+}
+
+# Determine if an argument is any kind of number.
+junonia_is_num () {
+  awk -v n="$1" 'BEGIN{if(n!=n+1-1){exit 1}}' >/dev/null 2>&1
+}
+
 # Shell entrypoint for hardwrapping a line.
 junonia_hardwrap () {
   awk_prog='BEGIN { printf "%s", hardwrap(s, w, p, f) }'
@@ -1665,8 +1675,8 @@ junonia_init () {
   JUNONIA_COL1="${JUNONIA_COL1:-18}"
   JUNONIA_COL2="${JUNONIA_COL2:-60}"
 
-  #readonly JUNONIA_VERSION="unversioned"
-  readonly JUNONIA_VERSION="1.0.2"
+  readonly JUNONIA_VERSION="unversioned"
+  #readonly JUNONIA_VERSION="1.0.2"
 
   # Information Separator control characters (IS4 - IS1)
   readonly JUNONIA_FS="" # File   Separator (FS / IS4 / dec 28)
@@ -1734,9 +1744,6 @@ junonia_init () {
 
   # Enable caching, but leave it available to be disabled later if need be.
   export JUNONIA_CACHE="${JUNONIA_CACHE:-1}"
-
-  # Configure if debug messages will be printed.
-  junonia_setdebug "$JUNONIA_DEBUG"
 
   # Indicate that init has happened
   readonly JUNONIA_INIT=1
@@ -2527,6 +2534,9 @@ _junonia_exec () {
   # the function.
   $JUNONIA_FUNC "$@"
 }
+
+# Configure if debug messages will be printed.
+junonia_setdebug "$JUNONIA_DEBUG"
 
 # Set up the execution environment. Init is always safe to rerun init as it has
 # a guard. If junonia is copied into the bottom of a scirpt for single-file

@@ -20,27 +20,38 @@
 ##
 ## -------------------------------------------------------------------
 
-tfh_workspace () {
-  exec $0 workspace help
-}
+tfh_run_list () {
+  ws_id="$1"
 
-
-# Gets the workspace ID given the organization name and workspace name
-_fetch_ws_id () {
-  echodebug "Requesting workspace information for $1/$2"
-
-  url="$address/api/v2/organizations/$1/workspaces/$2"
-  if ! ws_id_resp="$(tfh_api_call "$url")"; then
-    echoerr "unable to fetch workspace information for $1/$2"
+  if ! check_required org token address; then
     return 1
   fi
 
-  if ! ws_id="$(printf "%s" "$ws_id_resp" | jq -r '.data.id')"; then
-    echoerr "could not parse response for ID of workspace $1/$2"
+  if [ -z "$ws_id" ]; then
+    if ! check_required org ws; then
+      echoerr "no workspace specified to list runs for"
+      return 1
+    fi
+
+    . "$JUNONIA_PATH/lib/tfh/cmd/tfh_workspace.sh"
+    if ! ws_id="$(_fetch_ws_id "$org" "$ws")"; then
+      return 1
+    fi
+
+    ws_name="$ws"
+  else
+    ws_name="$ws_id"
+  fi
+
+  echodebug "API request to list runs:"
+  url="$address/api/v2/workspaces/$ws_id/runs"
+  if ! list_resp="$(tfh_api_call 1 "$url")"; then
+    echoerr "failed to list runs for $org/$ws_name"
     return 1
   fi
 
-  echodebug "Workspace ID: $ws_id"
+  listing="$(printf "%s" "$list_resp" |
+    jq -r '.data[] | .id + " " + .attributes.status')"
 
-  echo "$ws_id"
+  echo "$listing"
 }

@@ -184,19 +184,22 @@ tfh_pushconfig () {
   stream="$7"
   poll="$8"
 
+  if [ $stream ] && [ "$poll" -eq 0 ]; then
+    poll=0.25
+  fi
+
   config_id=
   run_payload="$TMPDIR/run-$(junonia_randomish_int).json"
   config_payload="$TMPDIR/content-$(junonia_randomish_int).tar.gz"
   tarlist="$TMPDIR/tarlist-$(junonia_randomish_int)"
 
-  if ! [ "$poll" -eq "$poll" ] >/dev/null 2>&1; then
-    echoerr "-poll must be an integer"
+  if ! junonia_is_num "$poll"; then
+    echoerr "-poll must be a number"
     return 1
   fi
 
   # Check for additional required commands.
-  if [ -z "$(command -v tar)" ]; then
-    echoerr "The tar command must be installed"
+  if ! junonia_require_cmds tar; then
     return 1
   fi
 
@@ -210,8 +213,7 @@ tfh_pushconfig () {
     # gzip command. It may not be strictly required under all
     # circumstances but it's probably better to error earlier rather
     # than later, considering how common the gzip command is.
-    if [ -z "$(command -v gzip)" ]; then
-      echoerr "The gzip command must be installed"
+    if ! junonia_require_cmds gzip; then
       return 1
     fi
   fi
@@ -226,32 +228,14 @@ tfh_pushconfig () {
     return 1
   fi
 
-  # Gets the workspace ID given the organization name and workspace name
-  workspace_id="$( (
-    set -e
-    echodebug "Requesting workspace information for $org/$ws"
-
-    url="$address/api/v2/organizations/$org/workspaces/$ws"
-    workspace_id_resp="$(tfh_api_call "$url")"
-    echodebug "Workspace ID response:"
-    echodebug_raw "$workspace_id_resp"
-
-    workspace_id="$(printf "%s" "$workspace_id_resp" | jq -r '.data.id')"
-    echodebug "Workspace ID: $workspace_id"
-
-    test -n "$workspace_id"
-    echo "$workspace_id"
-  ) )"
-
-  if [ 0 -ne $? ]; then
-    echoerr "Error obtaining workspace ID"
+  . "$JUNONIA_PATH/lib/tfh/cmd/tfh_workspace.sh"
+  if ! workspace_id="$(_fetch_ws_id "$org" "$ws")"; then
     return 1
   fi
 
   if [ ! $destroy ] && [ ! $current_config ]; then
     # Check for additional required commands.
-    if [ $vcs ] && [ -z "$(command -v git)" ]; then
-      echoerr "The git command is required for VCS detection"
+    if [ $vcs ] && ! junonia_require_cmds git; then
       return 1
     fi
 
@@ -395,6 +379,11 @@ tfh_pushconfig () {
     return 0
   fi
 
+  plan_id="$(printf "%s" "$run_create_resp" | \
+             jq -r '.data.relationships.plan.data.id')"
+  plan_url="$address/api/v2/plans/$plan_id"
+  run_url="$address/api/v2/runs/$run_id"
+
   # Repeatedly poll the system every N seconds specified with -poll to get
   # the run status until it reaches a non-active status. By default -poll is
   # 0 and there is no polling.
@@ -402,42 +391,80 @@ tfh_pushconfig () {
     set -e
     run_status=pending
     lock_id=
+    log_offset=0
+    stx=0
+    etx=0
 
     # Go until we don't see one of these states
     while [ pending = "$run_status"   ] ||
       [ planning = "$run_status"  ] ||
       [ applying = "$run_status"  ] ||
-      [ confirmed = "$run_status" ]; do
+      [ confirmed = "$run_status" ] ||
+      [ 1 -ne "$etx" ]; do
       # if the workspace was determined to be locked in the previous
       # poll, don't delay getting the final status and exiting.
-      if [ true != "$workspace_locked" ]; then
+      if [ true != "$ws_locked" ]; then
         sleep $poll
       fi
 
-      echodebug "API request to poll run:"
-      url=$address/api/v2/workspaces/$workspace_id/runs
-      poll_run_resp="$(tfh_api_call $url)"
+      echodebug "API request to poll plan:"
+      plan_resp="$(tfh_api_call "$plan_url")"
+      plan_status="$(printf "%s" "$plan_resp" | jq -r '.attributes.status')"
 
-      run_status="$(printf "%s" "$poll_run_resp" | jq -r '.data[] | select(.id == "'$run_id'") | .attributes.status')"
-      [ 0 -ne $? ] && continue
+      echodebug "API request for run info:"
+      run_resp="$(tfh_api_call "$run_url")"
+      run_status="$(printf "%s" "$run_resp" | jq -r '.data.attributes.status')"
+      echodebug "$run_status"
 
-      echo "$run_status"
+      if [ $stream ]; then
+        log_read_url="$(printf "%s" "$plan_resp" | jq -r '.data.attributes."log-read-url"')"
+
+        echodebug "Log read URL:"
+        echodebug "$log_read_url"
+
+        if [ -z "$log_read_url" ] || [ "$log_read_url" = null ]; then
+          # Loop and sleep
+          continue
+        fi
+
+        log_resp="$(tfh_api_call "$log_read_url""?limit=1000&offset=$log_offset")"
+        log_offset=$(( $log_offset + ${#log_resp} ))
+        #printf "%s" "$log_resp"
+        # STX: 
+        # ETX: 
+        logline="$(printf "%s" "$log_resp" | awk -v stx="$stx" '
+          BEGIN { ret = 0                }
+          //  { sub(//, ""); ret = 2 }
+          //  { sub(//, ""); ret = 3 }
+          stx   { print                  }
+          END   { exit ret               }')"
+        case $? in
+          1) echoerr "could not process log for printing"; return 1 ;;
+          2) stx=1 ;;
+          3) etx=1 ;;
+        esac
+        printf "%s" "$logline"
+      else
+        echo "$run_status"
+      fi
 
       echodebug "API Request for workspace info $org/$ws"
       url="$address/api/v2/organizations/$org/workspaces/$ws"
-      workspace_info_resp="$(tfh_api_call "$url")"
+      ws_info_resp="$(tfh_api_call "$url")"
 
-      workspace_locked="$(printf "%s" "$workspace_info_resp" | jq -r '.data.attributes.locked')"
+      ws_locked="$(printf "%s" "$ws_info_resp" | jq -r '.data.attributes.locked')"
 
-      if [ true = "$workspace_locked" ]; then
-        lock_id="$(printf "%s" "$workspace_info_resp" | jq -r '.data.relationships."locked-by".data.id')"
+      if [ true = "$ws_locked" ]; then
+        lock_id="$(printf "%s" "$ws_info_resp" | jq -r '.data.relationships."locked-by".data.id')"
         if [ "$lock_id" != "$run_id" ]; then
           echo "locked by $lock_id"
           return 0
         fi
       fi
     done
-  ) 2>&3; then
+    echo
+    echo "status: $run_status"
+  ); then
     echoerr "Error polling run"
     return 1
   fi

@@ -20,27 +20,6 @@
 ##
 ## -------------------------------------------------------------------
 
-tfh_workspace () {
-  exec $0 workspace help
-}
-
-
-# Gets the workspace ID given the organization name and workspace name
-_fetch_ws_id () {
-  echodebug "Requesting workspace information for $1/$2"
-
-  url="$address/api/v2/organizations/$1/workspaces/$2"
-  if ! ws_id_resp="$(tfh_api_call "$url")"; then
-    echoerr "unable to fetch workspace information for $1/$2"
-    return 1
-  fi
-
-  if ! ws_id="$(printf "%s" "$ws_id_resp" | jq -r '.data.id')"; then
-    echoerr "could not parse response for ID of workspace $1/$2"
-    return 1
-  fi
-
-  echodebug "Workspace ID: $ws_id"
-
-  echo "$ws_id"
+tfh_run () {
+  exec $0 run help
 }

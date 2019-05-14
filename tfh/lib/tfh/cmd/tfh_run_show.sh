@@ -20,27 +20,36 @@
 ##
 ## -------------------------------------------------------------------
 
-tfh_workspace () {
-  exec $0 workspace help
-}
+tfh_run_show () {
+  run_id="$2"
 
+  if [ -z $run_id ]; then
+    if ! check_required; then
+      echoerr "need org and workspace to locate latest run to show"
+      return 1
+    fi
 
-# Gets the workspace ID given the organization name and workspace name
-_fetch_ws_id () {
-  echodebug "Requesting workspace information for $1/$2"
+    # Use the list command to retrieve the latest runs
+    . "$JUNONIA_PATH/lib/tfh/cmd/tfh_run_list.sh"
 
-  url="$address/api/v2/organizations/$1/workspaces/$2"
-  if ! ws_id_resp="$(tfh_api_call "$url")"; then
-    echoerr "unable to fetch workspace information for $1/$2"
-    return 1
+    if ! listing="$(tfh_run_list)"; then
+      # The listing command will have printed error messages.
+      return 1
+    fi
+
+    if ! run_id="$(printf "%s" "$listing" | awk 'NR==1 {print $1; exit}')"; then
+      echoerr "could not parse run list from $org/$ws for latest run ID"
+      return 1
+    fi
   fi
 
-  if ! ws_id="$(printf "%s" "$ws_id_resp" | jq -r '.data.id')"; then
-    echoerr "could not parse response for ID of workspace $1/$2"
+  url="$address/api/v2/runs/$run_id"
+  run_show="$(tfh_api_call "$url")"
+
+  if [ -n "$run_show" ]; then
+    printf "%s" "$run_show" | jq '.'
+  else
+    echoerr "unable to get run details for $run_id"
     return 1
   fi
-
-  echodebug "Workspace ID: $ws_id"
-
-  echo "$ws_id"
 }
