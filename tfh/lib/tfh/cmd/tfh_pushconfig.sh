@@ -375,7 +375,8 @@ tfh_pushconfig () {
   fi
   printf "\n"
 
-  if [ 0 -eq "$poll" ]; then
+  # A literal, exact 0 means no polling, so a string comparison is sufficient.
+  if [ 0 = "$poll" ]; then
     return 0
   fi
 

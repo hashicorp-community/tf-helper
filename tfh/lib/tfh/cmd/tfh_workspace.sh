@@ -21,6 +21,7 @@
 ## -------------------------------------------------------------------
 
 tfh_workspace () {
+  echodebug "exec with help command"
   exec $0 workspace help
 }
 

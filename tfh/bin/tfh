@@ -89,11 +89,29 @@ tfh_api_call () {
     return 0
   fi
 
-  resp="$(curl $curl_silent \
-            -w '\nhttp_code: %{http_code}\n' \
-            $curl_token_arg \
-            --header "Content-Type: application/vnd.api+json" \
-            $@)"
+  case $curl_token_src in
+    curlrc)
+      echovvv "curl --header \"Content-Type: application/vnd.api+json\"" >&2
+      echovvv "     --config \"$curlrc\"" >&2
+      echovvv "     $*" >&2
+
+      resp="$(curl $curl_silent -w '\nhttp_code: %{http_code}\n' \
+                   --header "Content-Type: application/vnd.api+json" \
+                   --config "$curlrc" \
+                   $@)"
+      ;;
+    token)
+      echovvv "curl --header \"Content-Type: application/vnd.api+json\"" >&2
+      echovvv "     --header \"Authorization: Bearer \$TFH_token\"" >&2
+      echovvv "     $*" >&2
+
+      resp="$(curl $curl_silent -w '\nhttp_code: %{http_code}\n' \
+                   --header "Content-Type: application/vnd.api+json" \
+                   --header "Authorization: Bearer $token" \
+                   $@)"
+      ;;
+  esac
+
   resp_body="$(printf '%s' "$resp" | awk '!/^http_code/; /^http_code/{next}')"
   resp_code="$(printf '%s' "$resp" | awk '!/^http_code/{next} /^http_code/{print $2}')"
 
@@ -210,10 +228,10 @@ check_required () {
         fi
       ;;
       token)
-        if [ -z "$curl_token_arg" ]; then
+        if [ "$curl_token_src" = none ]; then
           missing=1
           echoerr 'TFE API token required.'
-          echoerr 'Set `tfh curl-config,  $TFH_token, or -token'
+          echoerr 'Set with `tfh curl-config`,  $TFH_token, or -token'
           echoerr
         fi
       ;;
@@ -234,37 +252,93 @@ check_required () {
 }
 
 tfh_junonia_filter () {
+  readonly TFH_DEFAULT_CURLRC="$JUNONIA_CONFIGDIR/curlrc"
+
   readonly org="$1"
   readonly name="$2"
   readonly prefix="$3"
   readonly token="$4"
-  readonly hostname="$5"
-  readonly verbose="$6"
+  readonly curlrc="${5:-"$TFH_DEFAULT_CURLRC"}"
+  readonly hostname="$6"
+
+  # Waterfall verbosity levels down
+  readonly vvverbose="$9"
+  readonly vverbose="${8:-$vvverbose}"
+  readonly verbose="${7:-$vverbose}"
 
   readonly address="https://$hostname"
   readonly ws="$prefix$name"
 
-  readonly default_curlrc="$JUNONIA_CONFIGDIR/curlrc"
-  curlrc="${TFH_CURLRC:-"$default_curlrc"}"
+  echov "org:       $org"
+  echov "prefix:    $prefix"
+  echov "workspace: $name"
+  echov "hostname:  $hostname"
+  echov "address:   $address"
+  echov "verbose:   $verbose"
+  echov "vverbose:  $vverbose"
+  echov "vvverbose: $vvverbose"
 
-  echodebug "org: $org"
-  echodebug "prefix: $prefix"
-  echodebug "workspace: $name"
-  if [ -z "$token" ]; then
-    echodebug "token: (empty)"
+  curl_token_src=
+
+  # curlrc argument at the command line takes highest precedence
+  if echo "$TFH_CMDLINE" | grep -qE -- '-curlrc'; then
+    echodebug "explicit -curlrc"
     if [ -f "$curlrc" ]; then
-      # Use the curlrc config file
-      curl_token_arg="--config $curlrc"
+      curl_token_src=curlrc
+    else
+      curl_token_src=curlrc_not_found
     fi
-  else
-    echodebug "token: (not empty)"
-    curl_token_arg="--header \"Authorization: Bearer $token\""
   fi
-  echodebug "hostname: $hostname"
-  echodebug "address: $address"
-  echodebug "verbose: $verbose"
 
-  return 6
+  # token at the command line takes second highest precedence
+  if [ -z "$curl_token_src" ] && [ -n "$token" ] &&
+     echo "$TFH_CMDLINE" | grep -qE -- '-token'; then
+    echodebug "explicit -token"
+    curl_token_src=token
+  fi
+
+  # curlrc from any source (default included) comes third
+  if [ -z "$curl_token_src" ] && [ -f "$curlrc" ]; then
+    echodebug "curlrc from env and config file"
+    curl_token_src=curlrc
+  fi
+
+  # token from the config file or environment var comes last
+  if [ -z "$curl_token_src" ] && [ -n "$token" ]; then
+    echodebug "token from env and config file"
+    curl_token_src=token
+  fi
+
+  if [ -z "$curl_token_src" ]; then
+    curl_token_src=none
+  fi
+
+  if [ -z "$token" ]; then
+    token_status="empty"
+  else
+    token_status="not empty"
+  fi
+
+  case $curl_token_src in
+    curlrc)
+      echov "token:     $token_status, unused"
+      echov "curlrc:    $curlrc"
+      ;;
+    token)
+      echov "token:     $token_status"
+      echov "curlrc:    $curlrc, unused"
+      ;;
+    curlrc_not_found)
+      echov "token:     $token_status, unused"
+      echov "curlrc:    $curlrc specified but not found"
+      ;;
+    none)
+      echov "token:     empty"
+      echov "curlrc:    $curlrc not found"
+      ;;
+  esac
+
+  return 9
 }
 
 # This is a compact version of junonia_bootstrap for easy copyhing into user
@@ -295,7 +369,7 @@ tfh () {
 }
 
 tfh_version () {
-  echo "0.2.3"
+  echo "0.2.4"
 }
 
 ##
@@ -306,20 +380,21 @@ tfh_version () {
 # JUNONIA_CONFIG     # Path to script rc file
 # JUNONIA_CONFIGDIR  # Path to config directory
 # JUNONIA_CACHEDIR   # Path to cache directory
-JUNONIA_CACHE=0      # Flag to optionally disable (0) caching
+# JUNONIA_CACHE      # Flag to optionally disable (0) caching
 # JUNONIA_WRAP       # Width of two column output (option help listings)
 # JUNONIA_COL1       # Width of column one
 # JUNONIA_COL2       # Width of column two
 # TMPDIR             # Temporary directory
 
 # Save the whole command line
-TFH_CMDLINE="$0 $*"
+readonly TFH_CMDLINE="$0 $*"
 
 if [ -n "$TF_LOG" ]; then
   # Debugging. Print command errors and make them verbose
   tar_verbose=v
   curl_silent=
-  JUNONIA_DEBUG=1
+  export JUNONIA_DEBUG=1
+  export TFH_vvverbose=1
   exec 3>&2
 else
   # Not debugging. Shut everyting up.

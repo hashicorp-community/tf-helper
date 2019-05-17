@@ -47,7 +47,13 @@ tfh_run_show () {
   run_show="$(tfh_api_call "$url")"
 
   if [ -n "$run_show" ]; then
-    printf "%s" "$run_show" | jq '.'
+    printf "%s" "$run_show" | jq -r '
+      [ .data.id,
+        .data.attributes.status,
+        (.data.attributes.status + "-at") as $sat |
+              .data.attributes."status-timestamps"[$sat],
+        .data.attributes.message
+      ] | join("  ")'
   else
     echoerr "unable to get run details for $run_id"
     return 1

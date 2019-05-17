@@ -61,6 +61,12 @@ The `tfh` program has some subcommands that can be used without any configuratio
 * Put the line `TFH_token=TOKEN` in the configuration file located at `~/.tfh/tfhrc`
 * Create a `curlrc` in the configuration directory located at `~/tfh/curlrc`
 
+Precedence is:
+* `-curlrc` argument on command line
+* `-token` argument on command line
+* Any valid `curlrc` source - environment variable, config file, default
+* Any valid `token` source - environment variable, config file
+
 The recommended method for setting the TFE token is to use a `curlrc` file. This way the token value will not be exposed in the process list. The `curlrc` file can be generated from the `~/.terraformrc` file using the command `tfh curl-config -tfrc`, or from a token value with `tfh curl-config -curltoken TOKEN`. If configuring access to a private TFE instance, then when generating the `curlrc` file from a `.terraformrc` file the `-hostname` common option needs to be set to the hostname of the private isntance. A file can also be manually created with the contents:
 
 ```

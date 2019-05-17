@@ -129,8 +129,10 @@ echoerr () { echoerr_raw "[ERROR] $@"; }
 echodebug_raw () { printf '%s\n' "$@" 1>&3; }
 echodebug () { echodebug_raw "[DEBUG] $@"; }
 
-# Convenience function for using a verbose level echo
-echov () { [ -n "$verbose" ] && printf '%s\n' "$@"; }
+# Convenience functions for using a verbose level echo
+echov   () { [ -n "$verbose"   ] && printf '%s\n' "$@"; }
+echovv  () { [ -n "$vverbose"  ] && printf '%s\n' "$@"; }
+echovvv () { [ -n "$vvverbose" ] && printf '%s\n' "$@"; }
 
 ###
 ### AWK utility functions
@@ -146,13 +148,13 @@ junonia_awk_echoerr_raw='function echoerr_raw(msg) {
 }'
 
 junonia_awk_echodebug='function echodebug(msg) {
-  if(JUNONIA_DEBUG) {
+  if(ENVIRON["JUNONIA_DEBUG"]) {
     echoerr_raw("[DEBUG] " msg)
   }
 }'
 
 junonia_awk_echodebug_raw='function echodebug_raw(msg) {
-  if(JUNONIA_DEBUG) {
+  if(ENVIRON["JUNONIA_DEBUG"]) {
     echoerr_raw(msg)
   }
 }'
@@ -452,7 +454,7 @@ junonia_hardwrap () {
 }
 
 # Shell entrypoint for printing two listings of text in 2 columns, separated by
-# a gutter string and prefixed by a string. 
+# a gutter string and prefixed by a string.
 junonia_twocol () {
   awk_prog='BEGIN { printf "%s", twocol(t1, t2, c1, c2, g, p, f1, f2) }'
   if ! awk -v t1="$1" -v t2="$2" -v c1="$3" -v c2="$4" \
@@ -510,11 +512,14 @@ junonia_require_cmds () {
 # value.
 junonia_update_config () {
   if [ -f "$1" ]; then
-    echodebug "Modifying $1"
+    echodebug "modifying $1"
   else
-    echodebug "Creating $1"
+    echodebug "creating $1"
+    if ! mkdir -p "$(dirname "$1")"; then
+      echoerr "could not create $(dirname "$1")"
+    fi
     if ! touch "$1"; then
-      echoerr "Could not create $1"
+      echoerr "could not create $1"
       return 1
     fi
   fi
@@ -662,13 +667,33 @@ _junonia_md2spec () {
         spec()
       }
 
-      gsub(/`/, "")
-      split($0, subcmda, ",")
+      # Strip everything around the title
+      gsub(/^## `|`$/, "")
+
+      # Empty the list first
+      split("", subcmds, ":")
+
+      # Split on commas to get the first part plus the aliases
+      sn = split($0, subcmda, ",")
+
+      # Split the first part and get the last item to get the primary subcmd
       pn = split(subcmda[1], primary_subcmd)
-      cmd = primary_subcmd[pn]
+
+      # Put that primary subcommand in the first command slot
+      cmd = primary_subcmd[pn] ","
+
+      # Add the command aliases
+      for(i=2; i<=sn; i++) {
+        # Normalize the entries to have a comma on the end
+        sub(/,+$/, ",", subcmda[i])
+        cmd = cmd subcmda[i]
+      }
+
+      # Strip the last trailing comma
+      sub(/,$/, "", cmd)
 
       indent = ""
-      for(i=0; i<pn-2; i++) {
+      for(i=1; i<pn; i++) {
         indent = indent "  "
       }
     }
@@ -757,6 +782,8 @@ _junonia_md2help () {
 
   awk_prog='
     BEGIN {
+      echodebug("cmd: " cmd)
+
       # Split the supplied command into an array of parts
       n = split(cmd, cmda)
       i = 1
@@ -784,23 +811,55 @@ _junonia_md2help () {
     # Top level "##" header
     # ## `command subcommand`
     /^## / {
+      echodebug("entering " $0)
+
+      # Strip everything around the title
       gsub(/^## `|`$/, "")
       title = 1
+
+      # If help docs have started, this signals the end of processing the
+      # non-subcommand documentation.
       if(cmd_doc_start) {
+        cmd_doc_start = 0
         cmd_doc_end = 1
+        echodebug("end command documentation")
       }
-      split($0, header_parts)
-      header_subcmd = header_parts[i]
+
+      # Extract the commands, subcommands, and aliases in this header
+      hn = split($0, header_parts)
+
+      # Extract only the subcommands and aliases starting at the current depth
+      # as keys (array indices) so it can be checked with an "in" expression
+      # later. Also, need to empty the array first.
+      split("", subcmds, ":")
+      for(j=i; j<=hn; j++) {
+        sub(/,/, "", header_parts[j])
+        subcmds[header_parts[j]] = ""
+      }
     }
 
     # Find the topmost level command title to bootstrap subcommand location.
     title && i == 1 && $0 == cmda[1] {
+      # The top level command; the name of the program.
       cmd_part = cmda[1]
-      if(i == n) {
-        txt = txt "  " cmd_part "\n"
-      }
+
+      echodebug("top level command: " cmd_part)
+
+      # Bootstrap an expression to find subcommands of this command.
       subcmd_re = "^" cmd_part " [-_A-Za-z0-9]+(,|$)"
-      i++
+      echodebug("  subcmd regex: " subcmd_re)
+
+      # Increment the level of subcommand we are interested in.
+      i = 2
+
+      # This is the only command given; help for the program itself. So
+      # actually we are done searching for the command to do help for.
+      if(n == 1) {
+        txt = txt "  " cmd_part "\n"
+        cmd_doc_start = 1
+        echodebug("start command documentation")
+      }
+
       next
     }
 
@@ -812,14 +871,26 @@ _junonia_md2help () {
     # At this point i > 1
 
     # Keep looking at titles until the whole command is located
-    title && i <= n && cmda[i] == header_subcmd {
-      cmd_part = $0
-      sub(/,.*/, "", cmd_part)
+    title && i < n && cmda[i] in subcmds {
+      i++
+      next
+    }
 
-      if(i == n) {
-        txt = txt "  " cmd_part "\n"
-        subcmd_re = "^" cmd_part " [-_A-Za-z0-9]+(,|$)"
-      }
+    # The whole command has been found, so document it and get set up to
+    # identify and document the subcommand summary
+    title && i == n && cmda[n] in subcmds {
+      # This is the header line with all Markdown stripped
+      cmd_part = $0
+      txt = txt "  " cmd_part "\n"
+
+      # Get the last primary subcommand (not the aliases) and build a regex to
+      # find this commands subcommands to document.
+      split($0, subcmda, ",")
+      subcmd_re = "^" subcmda[1] " [-_A-Za-z0-9]+"
+      echodebug("  subcmd regex: " subcmd_re)
+
+      cmd_doc_start = 1
+      echodebug("start command documentation")
       i++
       next
     }
@@ -832,7 +903,6 @@ _junonia_md2help () {
     # In the command description, so add it to the name line.
     title && ! cmd_doc_end && ! /^$/ {
       txt = substr(txt, 1, length(txt) - 1) " -- " $0 "\n"
-      cmd_doc_start = 1
       next
     }
 
@@ -1255,7 +1325,8 @@ _junonia_help () {
   cmd="$1"
   helpfunc="$(echo "$1" | sed 's/ /_/g; s/-/_/g')"
 
-  if [ -f "$JUNONIA_CACHEDIR/help/$helpfunc" ]; then
+  if [ -f "$JUNONIA_CACHEDIR/help/$helpfunc" ] &&
+     [ "$JUNONIA_CACHE" != 0                 ]; then
     cat "$JUNONIA_CACHEDIR/help/$helpfunc"
     return 0
   fi
@@ -1264,16 +1335,24 @@ _junonia_help () {
     dir)
       mds="$(for f in "$JUNONIA_MD"/*.md; do cat "$f"; done;
              _junonia_mds)"
-      helptext="$({ echo "$mds"; _junonia_plugin_docs; } | \
-                  _junonia_md2help "$cmd")"
+      helptext="$( {
+                     echo "$mds"
+                     _junonia_plugin_docs
+                   } | _junonia_md2help "$cmd")"
       ;;
     file)
-      helptext="$({ cat "$JUNONIA_MD"; _junonia_plugin_docs; _junonia_mds; } | \
-                  _junonia_md2help "$cmd")"
+      helptext="$( {
+                     cat "$JUNONIA_MD"
+                     _junonia_plugin_docs
+                     _junonia_mds
+                   } | _junonia_md2help "$cmd")"
       ;;
     md_string)
-      helptext="$({ echo "$JUNONIA_MD"; _junonia_plugin_docs; _junonia_mds; } | \
-                  _junonia_md2help "$cmd")"
+      helptext="$( {
+                     echo "$JUNONIA_MD"
+                     _junonia_plugin_docs
+                     _junonia_mds
+                   } | _junonia_md2help "$cmd")"
       ;;
     spec_string)
       helptext="$(echo "$JUNONIA_SPEC" | awk '{sub(/^# /, ""); print}')"
@@ -1312,20 +1391,33 @@ _junonia_cache () {
   fi
 
   if [ $clear ]; then
-    if [ -n "$JUNONIA_CONFIGDIR" ] &&
-       [ -d "$JUNONIA_CONFIGDIR/cache" ]; then
-      if rm -rf "$JUNONIA_CONFIGDIR/cache"; then
+    if ! cachedir_abspath="$((cd "$JUNONIA_CACHEDIR" &&
+                             pwd -P) 2>/dev/null)"; then
+      echoerr "unable to clear cache. could not enter directory:"
+      echoerr "$JUNONIA_CACHEDIR"
+      return 1
+    fi
+
+    if [ -n "$cachedir_abspath"         ] &&
+       [ -d "$cachedir_abspath"         ] &&
+       [ "$cachedir_abspath" != /       ] &&
+       [ "$cachedir_abspath" != "$HOME" ]; then
+      if rm -rf "$cachedir_abspath"; then
         echo "cache cleared"
       else
-        echoerr "failed to remove cache directory $JUNONIA_CONFIGDIR/cache"
+        echoerr "failed to remove cache directory:"
+        echoerr "$cachedir_abspath"
         return 1
       fi
     fi
   else
     if [ -d "$JUNONIA_CACHEDIR" ]; then
-      echo "cached files:"
-      cd "$JUNONIA_CACHEDIR"
-      find . -type f | cut -c 3-
+      # Do this in a subshell so we don't actually change directory.
+      (
+        echo "cached files:"
+        cd "$JUNONIA_CACHEDIR"
+        find . -type f | cut -c 3-
+      )
     fi
   fi
 }
@@ -1538,13 +1630,16 @@ junonia_cache_file () {
     fi
 
     echo "$contents" > "$JUNONIA_CACHEDIR/$cachepath"
+  else
+    echodebug "skipping, caching disabled"
   fi
 }
 
 _junonia_get_registry () {
   reg_file="$JUNONIA_CACHEDIR/${JUNONIA_NAME}_registry"
 
-  if [ -f "$reg_file" ]; then
+  if [ -f "$reg_file"        ] &&
+     [ "$JUNONIA_CACHE" != 0 ]; then
     cat "$reg_file"
   else
     if ! command -v curl >/dev/null 2>&1; then
@@ -1675,8 +1770,7 @@ junonia_init () {
   JUNONIA_COL1="${JUNONIA_COL1:-18}"
   JUNONIA_COL2="${JUNONIA_COL2:-60}"
 
-  readonly JUNONIA_VERSION="unversioned"
-  #readonly JUNONIA_VERSION="1.0.2"
+  readonly JUNONIA_VERSION="1.0.3"
 
   # Information Separator control characters (IS4 - IS1)
   readonly JUNONIA_FS="" # File   Separator (FS / IS4 / dec 28)
@@ -1732,18 +1826,44 @@ junonia_init () {
   # Path to the config dir and file
   readonly _JUNONIA_CONFIGDIR_DEF="$HOME/.$JUNONIA_NAME"
   readonly _JUNONIA_CONFIG_DEF="$_JUNONIA_CONFIGDIR_DEF/${JUNONIA_NAME}rc"
-  readonly _JUNONIA_CACHEDIR_DEF="$_JUNONIA_CONFIGDIR_DEF/cache"
 
   readonly JUNONIA_CONFIGDIR="${JUNONIA_CONFIGDIR:-"$_JUNONIA_CONFIGDIR_DEF"}"
   readonly JUNONIA_CONFIG="${JUNONIA_CONFIG:-"$_JUNONIA_CONFIG_DEF"}"
-  readonly JUNONIA_CACHEDIR="${JUNONIA_CACHEDIR:-"$_JUNONIA_CACHEDIR_DEF"}"
 
   export   JUNONIA_CONFIGDIR
   export   JUNONIA_CONFIG
-  export   JUNONIA_CACHEDIR
 
-  # Enable caching, but leave it available to be disabled later if need be.
-  export JUNONIA_CACHE="${JUNONIA_CACHE:-1}"
+  # Remove spaces and slashes from the program version to make a cache
+  # directory name.
+  prog_version="$(_junonia_version | sed 's/^ *//g; s/ *$//g; s/[\/ ]/_/g')"
+
+  # If the last character of the versioned directory name is a digit, then
+  # consider this a release version and enable caching. Otherwise, consider
+  # this a development version and disable caching.
+  if prog_version="$(_junonia_version | awk '
+      {
+        gsub(/^ *| *$/,"")
+        gsub(/[\/ ]/, "")
+        print
+        exit ($0 !~ /[0-9]$/)
+      }'
+    )"; then
+    # Enable caching unless explicitly disabled and version the cache
+    # directory. This ensures that things like the spec and help are
+    # regenerated when upgrading.
+    export JUNONIA_CACHE="${JUNONIA_CACHE:-1}"
+    cache_subpath="/cache/$prog_version"
+  else
+    # Turn off caching for unversioned, in-development programs unless caching
+    # is explicitly enabled. Still set a cache directory, as the program still
+    # may want access to an unversioned cache directory.
+    export JUNONIA_CACHE="${JUNONIA_CACHE:-0}"
+    cache_subpath=/cache
+  fi
+
+  readonly _JUNONIA_CACHEDIR_DEF="$_JUNONIA_CONFIGDIR_DEF$cache_subpath"
+  readonly JUNONIA_CACHEDIR="${JUNONIA_CACHEDIR:-"$_JUNONIA_CACHEDIR_DEF"}"
+  export   JUNONIA_CACHEDIR
 
   # Indicate that init has happened
   readonly JUNONIA_INIT=1
@@ -2281,7 +2401,8 @@ junonia_runmd_filtered () {
   shift
 
   spec_cache="$JUNONIA_CACHEDIR/spec"
-  if [ -f "$spec_cache" ]; then
+  if [ -f "$spec_cache"      ] &&
+     [ "$JUNONIA_CACHE" != 0 ]; then
     spec="$(cat "$spec_cache")"
     ret=$?
   else
@@ -2355,7 +2476,8 @@ _junonia_run_final () {
   shift
 
   spec_cache="$JUNONIA_CACHEDIR/spec"
-  if [ ! -f "$spec_cache" ]; then
+  if [ ! -f "$spec_cache"    ] ||
+     [ "$JUNONIA_CACHE" != 0 ]; then
     # Insert the standard meta parameters.
     spec="$(
       echo "$spec" | awk '
@@ -2460,8 +2582,15 @@ _junonia_exec () {
   else
     # If there is a filter function and it is not getting skipped, then run it.
     if [ -n "$filter_func" ] && command -v "$filter_func" >/dev/null 2>&1; then
-       $filter_func "$@"
-       shift_n=$?
+      $filter_func "$@"
+      shift_n=$?
+
+      # 64 is standard EX_USAGE, command used incorrectly. This is what filter
+      # functions should return to indicate a problem.
+      if [ $shift_n -eq 64 ]; then
+        # A program level error should be printed for this problem.
+        return 1
+      fi
     fi
   fi
 
@@ -2527,8 +2656,6 @@ _junonia_exec () {
   echodebug "JUNONIA_CMD      : $JUNONIA_CMD"
   echodebug "JUNONIA_FUNC     : $JUNONIA_FUNC"
   echodebug "JUNONIA_SPEC_TYPE: $JUNONIA_SPEC_TYPE"
-  #echodebug JUNONIA_SPEC: JUNONIA_SPEC="$spec"
-  #echodebug JUNONIA_MD: JUNONIA_MD="$md"
   echodebug "args: $*"
 
   # A function file was found and sourced, and the function was found. Execute

@@ -26,7 +26,11 @@ Terraform Enterprise workspace prefix. Used when working with multiple workspace
 
 * `-token TOKEN`
 
-Access token for Terraform Enterprise API requests. If unspecified, uses the ATLAS_TOKEN environment variable.
+Access token for Terraform Enterprise API requests. Use of a `curlrc` file is encouraged to keep tokens out of environment variables and the process list.
+
+* `-curlrc FILEPATH`
+
+Curl configuration file providing an access token for Terraform Enterprise API requests. This file can be managed using the `tfh curl-config` command.
 
 * `-hostname HOSTNAME=app.terraform.io`
 
@@ -35,3 +39,12 @@ The address of your Terraform Enterprise instance. Defaults to the SaaS hostname
 * `-v, -verbose`
 
 Enable verbose messages.
+
+* `-vv, -vverbose`
+
+Enable very verbose messages.
+
+* `-vvv, -vvverbose`
+
+Enable very, very verbose messages.
+

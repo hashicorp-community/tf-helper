@@ -20,6 +20,7 @@
 ##
 ## -------------------------------------------------------------------
 
+
 tfh_run_list () {
   ws_id="$1"
 
@@ -50,8 +51,27 @@ tfh_run_list () {
     return 1
   fi
 
-  listing="$(printf "%s" "$list_resp" |
-    jq -r '.data[] | .id + " " + .attributes.status')"
+  listing="$(printf "%s" "$list_resp" | jq -r '
+      .data[] |
+        [ .id,
+          .attributes.status,
+          if .attributes.status == "canceled" then
+            .attributes."status-timestamps"["force-canceled-at"]
+          else
+            (.attributes.status + "-at") as $sat |
+                  .attributes."status-timestamps"[$sat]
+          end,
+          .attributes.message
+        ] | join(" ")')"
 
-  echo "$listing"
+  echo "$listing" | awk '
+    {
+      $3 = substr($3, 1, 16) "Z"
+      printf "%s  %-10s %s  ", $1, $2, $3
+      $1 = ""
+      $2 = ""
+      $3 = ""
+      sub(/^ */, "")
+      print
+    }'
 }

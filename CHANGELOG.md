@@ -1,14 +1,35 @@
 ## 0.3.0 (unreleaed)
 
+## 0.2.4 (May 16, 2019)
+
+ENHANCEMENTS:
+
+* Always try to capture and show JSON-API errors for improved error reporting.
+* Run commands - cancel, discard, list, show
+* Cache is done by version, so each upgrade will not collide.
+* New `tfh` options:
+  - `-curlrc` to specify the curl config file to use
+  - `-vv` for more verbosity
+  - `-vvv` for even more verbosity, including outputting the `curl` commands used for API calls.
+* Implemented `pushconfig -stream` for streaming back plan logs.
+* Bump junonia to 1.0.3.
+
+BUG FIXES:
+
+* Token sources were not being properly handled as intended. Fixed that and documented the precendence.
+* Metacommands (`config`, `cache`...) were not being included in the program argument spec some times.
+* Subcommand aliases are always properly respected.
+* The mentioned fixes had positive effects on help generation, spec generation, and argument parsing.
+
 ## 0.2.3 (May 8, 2019)
 
-BUG FIXES
+BUG FIXES:
 
 * Fix for One True AWK limitation by bumping junonia to 1.0.2, where it could not accept a multi-line string as a variable via `-v`. Instead, the value is passed as an argument, then read and deleted from the ARGV as is done in several other places.
 
 ## 0.2.2 (May 8, 2019
 
-* NOTES
+NOTES:
 
 * Re-enabled caching, forgotten as part of the release process.
 
