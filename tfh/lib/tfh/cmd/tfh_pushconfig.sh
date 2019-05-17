@@ -185,7 +185,7 @@ tfh_pushconfig () {
   poll="$8"
 
   if [ $stream ] && [ "$poll" -eq 0 ]; then
-    poll=0.25
+    poll=0.5
   fi
 
   config_id=
@@ -388,85 +388,94 @@ tfh_pushconfig () {
   # Repeatedly poll the system every N seconds specified with -poll to get
   # the run status until it reaches a non-active status. By default -poll is
   # 0 and there is no polling.
-  if ! (
-    set -e
-    run_status=pending
-    lock_id=
-    log_offset=0
-    stx=0
-    etx=0
+  run_status=pending
+  lock_id=
+  log_offset=0
+  err=0
+  stx=0
+  etx=0
 
-    # Go until we don't see one of these states
-    while [ pending = "$run_status"   ] ||
-      [ planning = "$run_status"  ] ||
-      [ applying = "$run_status"  ] ||
-      [ confirmed = "$run_status" ] ||
-      [ 1 -ne "$etx" ]; do
-      # if the workspace was determined to be locked in the previous
-      # poll, don't delay getting the final status and exiting.
-      if [ true != "$ws_locked" ]; then
-        sleep $poll
+  # Go until we don't see one of these states
+  while [ "$run_status" = pending   ] ||
+        [ "$run_status" = planning  ] ||
+        [ "$run_status" = applying  ] ||
+        [ "$run_status" = confirmed ] ||
+        [ "$etx" -ne 1 ] ||
+        [ "$err" -eq 0  ]; do
+    # if the workspace was determined to be locked in the previous
+    # poll, don't delay getting the final status and exiting.
+    if [ true != "$ws_locked" ]; then
+      sleep $poll
+    fi
+
+    echodebug "API request to poll plan:"
+    plan_resp="$(tfh_api_call "$plan_url")"
+    err=$(( $err + $? ))
+    plan_status="$(printf "%s" "$plan_resp" | jq -r '.attributes.status')"
+    err=$(( $err + $? ))
+
+    echodebug "API request for run info:"
+    run_resp="$(tfh_api_call "$run_url")"
+    err=$(( $err + $? ))
+    run_status="$(printf "%s" "$run_resp" | jq -r '.data.attributes.status')"
+    err=$(( $err + $? ))
+    echodebug "$run_status"
+
+    if [ $stream ]; then
+      log_read_url="$(printf "%s" "$plan_resp" | jq -r '.data.attributes."log-read-url"')"
+      err=$(( $err + $? ))
+
+      echodebug "Log read URL:"
+      echodebug "$log_read_url"
+
+      if [ -z "$log_read_url" ] || [ "$log_read_url" = null ]; then
+        # Loop and sleep
+        continue
       fi
 
-      echodebug "API request to poll plan:"
-      plan_resp="$(tfh_api_call "$plan_url")"
-      plan_status="$(printf "%s" "$plan_resp" | jq -r '.attributes.status')"
+      log_resp="$(tfh_api_call "$log_read_url""?limit=1000&offset=$log_offset")"
+      err=$(( $err + $? ))
+      log_offset=$(( $log_offset + ${#log_resp} ))
+      #printf "%s" "$log_resp"
+      # STX: 
+      # ETX: 
+      logline="$(printf "%s" "$log_resp" | awk -v stx="$stx" '
+        BEGIN { ret = 0                }
+        //  { sub(//, ""); ret = 2 }
+        //  { sub(//, ""); ret = 3 }
+        stx   { print                  }
+        END   { exit ret               }')"
+      case $? in
+        1) echoerr "could not process log for printing"; return 1 ;;
+        2) stx=1 ;;
+        3) etx=1 ;;
+      esac
+      printf "%s" "$logline"
+    else
+      echo "$run_status"
+    fi
 
-      echodebug "API request for run info:"
-      run_resp="$(tfh_api_call "$run_url")"
-      run_status="$(printf "%s" "$run_resp" | jq -r '.data.attributes.status')"
-      echodebug "$run_status"
+    echodebug "API Request for workspace info $org/$ws"
+    url="$address/api/v2/organizations/$org/workspaces/$ws"
+    ws_info_resp="$(tfh_api_call "$url")"
+    err=$(( $err + $? ))
 
-      if [ $stream ]; then
-        log_read_url="$(printf "%s" "$plan_resp" | jq -r '.data.attributes."log-read-url"')"
+    ws_locked="$(printf "%s" "$ws_info_resp" | jq -r '.data.attributes.locked')"
+    err=$(( $err + $? ))
 
-        echodebug "Log read URL:"
-        echodebug "$log_read_url"
-
-        if [ -z "$log_read_url" ] || [ "$log_read_url" = null ]; then
-          # Loop and sleep
-          continue
-        fi
-
-        log_resp="$(tfh_api_call "$log_read_url""?limit=1000&offset=$log_offset")"
-        log_offset=$(( $log_offset + ${#log_resp} ))
-        #printf "%s" "$log_resp"
-        # STX: 
-        # ETX: 
-        logline="$(printf "%s" "$log_resp" | awk -v stx="$stx" '
-          BEGIN { ret = 0                }
-          //  { sub(//, ""); ret = 2 }
-          //  { sub(//, ""); ret = 3 }
-          stx   { print                  }
-          END   { exit ret               }')"
-        case $? in
-          1) echoerr "could not process log for printing"; return 1 ;;
-          2) stx=1 ;;
-          3) etx=1 ;;
-        esac
-        printf "%s" "$logline"
-      else
-        echo "$run_status"
+    if [ true = "$ws_locked" ]; then
+      lock_id="$(printf "%s" "$ws_info_resp" | jq -r '.data.relationships."locked-by".data.id')"
+      if [ "$lock_id" != "$run_id" ]; then
+        echo "locked by $lock_id"
+        return 0
       fi
+    fi
+  done
+  echo
+  echo "status: $run_status"
 
-      echodebug "API Request for workspace info $org/$ws"
-      url="$address/api/v2/organizations/$org/workspaces/$ws"
-      ws_info_resp="$(tfh_api_call "$url")"
-
-      ws_locked="$(printf "%s" "$ws_info_resp" | jq -r '.data.attributes.locked')"
-
-      if [ true = "$ws_locked" ]; then
-        lock_id="$(printf "%s" "$ws_info_resp" | jq -r '.data.relationships."locked-by".data.id')"
-        if [ "$lock_id" != "$run_id" ]; then
-          echo "locked by $lock_id"
-          return 0
-        fi
-      fi
-    done
-    echo
-    echo "status: $run_status"
-  ); then
-    echoerr "Error polling run"
+  if [ "$err" -gt 0 ]; then
+    echoerr "failed to poll run"
     return 1
   fi
 }

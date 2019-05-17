@@ -1,6 +1,6 @@
 ## 0.3.0 (unreleaed)
 
-## 0.2.4 (May 16, 2019)
+## 0.2.4 (May 17, 2019)
 
 ENHANCEMENTS:
 
@@ -11,7 +11,7 @@ ENHANCEMENTS:
   - `-curlrc` to specify the curl config file to use
   - `-vv` for more verbosity
   - `-vvv` for even more verbosity, including outputting the `curl` commands used for API calls.
-* Implemented `pushconfig -stream` for streaming back plan logs.
+* Implemented `pushconfig -stream` for streaming back plan logs. It works but could use some improvement.
 * Bump junonia to 1.0.3.
 
 BUG FIXES:

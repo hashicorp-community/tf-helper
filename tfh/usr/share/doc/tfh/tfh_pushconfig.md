@@ -18,9 +18,9 @@ Path to the configuration that should be uploaded. Defaults to the current worki
 
 ### Options
 
-* `-message MESSAGE=Queued via tfe-cli`
+* `-message MESSAGE=Queued via tfh`
 
-An optional message to associate with the run. Defaults to "Queued via tfe-cli".
+An optional message to associate with the run. Defaults to "Queued via tfh".
 
 * `-destroy`
 
