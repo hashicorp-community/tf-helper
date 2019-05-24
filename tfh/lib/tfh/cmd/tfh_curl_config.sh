@@ -58,7 +58,7 @@ tfh_curl_config () {
   tfrc="$1"
   curltoken="$2"
 
-  if [ -n "$curloken" ] && [ -n "$tfrc" ]; then
+  if [ -n "$curltoken" ] && [ -n "$tfrc" ]; then
     echoerr "only one of -curltoken or -tfrc can be specified"
     return 1
   fi
