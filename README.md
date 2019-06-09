@@ -117,6 +117,40 @@ A sample of commands that are available:
 - `tfh workspace` — Create, list, show, delete, and update workspaces
 - `tfh ssh` — Manage ssh keys for a TFE organization.
 
+As of version 0.2.5, the list of available commands are:
+
+```
+tfh
+  help
+  config
+  cache
+  version
+  curl-config
+  pullvars
+  pushconfig
+  pushvars
+  run
+    cancel
+    discard
+    list
+    show, get
+  ssh
+    assign
+    delete
+    list
+    new, create
+    show, get
+    unassign
+    update
+  workspace, ws
+    delete
+    list
+    new, create
+    select
+    show, get
+    update
+```
+
 ## Caching
 
 Output such as `tfh help` and other internally used artifacts are cached. Sometimes it may be necessary to view or clear the cache. To do this, use the `tfh cache` and `tfh cache -clear` commands.
