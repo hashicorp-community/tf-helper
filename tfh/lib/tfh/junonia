@@ -772,7 +772,7 @@ _junonia_md2spec () {
   '
 
   awk -v wrap="$JUNONIA_WRAP" -v col1="$JUNONIA_COL1" \
-      -v col2="$JUNONIA_COL2" -v cmd="$1" \
+      -v col2="$JUNONIA_COL2" \
       "$JUNONIA_AWKS $awk_prog" "$@"
 }
 
@@ -1391,7 +1391,7 @@ _junonia_cache () {
   fi
 
   if [ $clear ]; then
-    if ! cachedir_abspath="$((cd "$JUNONIA_CACHEDIR" &&
+    if ! cachedir_abspath="$( (cd "$JUNONIA_CACHEDIR" &&
                              pwd -P) 2>/dev/null)"; then
       echoerr "unable to clear cache. could not enter directory:"
       echoerr "$JUNONIA_CACHEDIR"
@@ -1770,7 +1770,7 @@ junonia_init () {
   JUNONIA_COL1="${JUNONIA_COL1:-18}"
   JUNONIA_COL2="${JUNONIA_COL2:-60}"
 
-  readonly JUNONIA_VERSION="1.0.3"
+  readonly JUNONIA_VERSION="1.0.4"
 
   # Information Separator control characters (IS4 - IS1)
   readonly JUNONIA_FS="" # File   Separator (FS / IS4 / dec 28)
@@ -2513,7 +2513,7 @@ _junonia_run_final () {
             #print s
           }
         }
-      ' "$_junonia_cmds"
+      ' "$_junonia_cmds" -
     )"
 
     echodebug "$spec"
@@ -2551,12 +2551,16 @@ _junonia_exec () {
 
   filter_func="$1"
   shift
+
   md="$1"
   shift
+
   spec_type="$1"
   shift
+
   spec="$1"
   shift
+
   func="$1"
   shift
 
@@ -2597,8 +2601,9 @@ _junonia_exec () {
   # The filter function might indicate via its return value, or the meta filter
   # by looking at the spec, that we should shift off some common (and possibly
   # other) values.
+  echodebug "Shifting $shift_n arguments"
   i=0
-  while [ $i -lt $shift_n ]; do
+  while [ $i -lt $# ] && [ $i -lt $shift_n ]; do
     shift
     i=$(( $i + 1 ))
   done
