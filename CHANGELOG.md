@@ -1,4 +1,14 @@
-## 0.3.0 (unreleaed)
+## 0.x.x (unreleaed)
+
+## 0.2.5 (June 8, 2019)
+
+BUG FIXES:
+
+* Fix `curl-config` parameter check [#2](https://github.com/hashicorp-community/tf-helper/pull/2)
+* Bump junonia to 1.0.4
+  - Fixes `dash` on Ubuntu issue whereby a bug in that shell believes junonia contains an arithmatic expansion where there is none [#3](https://github.com/hashicorp-community/tf-helper/issues/3)
+  - Fixes `tfh` reported as an unknown parameter issue [#4](https://github.com/hashicorp-community/tf-helper/issues/4)
+  - Fixes subcommand alias issues
 
 ## 0.2.4 (May 17, 2019)
 
