@@ -1331,7 +1331,7 @@ _junonia_help () {
     return 0
   fi
 
-  case "$JUNONIA_SPEC_TYPE" in
+  case "${JUNONIA_SPEC_TYPE#cached_}" in
     dir)
       mds="$(for f in "$JUNONIA_MD"/*.md; do cat "$f"; done;
              _junonia_mds)"
@@ -1770,7 +1770,7 @@ junonia_init () {
   JUNONIA_COL1="${JUNONIA_COL1:-18}"
   JUNONIA_COL2="${JUNONIA_COL2:-60}"
 
-  readonly JUNONIA_VERSION="1.0.4"
+  readonly JUNONIA_VERSION="1.0.5"
 
   # Information Separator control characters (IS4 - IS1)
   readonly JUNONIA_FS="" # File   Separator (FS / IS4 / dec 28)
@@ -1874,11 +1874,15 @@ junonia_init () {
 ### Argument parsing
 ###
 
-# Use _junonia_get_envvars to examine the current environment using env and
-# extract the names of variables of interest. These are the ones that start
-# with SCRIPT_. Unfortunately it is IMPOSSIBLE to determine from the output of
-# env what actually are variables just by inspection. It's possible to have a
-# multiline variable whose contents looks like a variable assignment:
+# Use junonia_envvars to examine the current environment using env and extract
+# the names of variables of interest. Options are to list all variables (a),
+# readonly variables (r), or variables that are writable / can be set (2) as
+# the first argument. A prefix can also be supplied as the second argument,
+# which junonia itself sets to SCRIPT_ mostly typically.
+#
+# Unfortunately it is IMPOSSIBLE to determine from the output of env what
+# actually are variables just by inspection. It's possible to have a multiline
+# variable whose contents looks like a variable assignment:
 #
 # foo="one=two
 # three=four"
@@ -1895,12 +1899,35 @@ junonia_init () {
 #
 # Eval is used very carefully by only sending it things from known sources.
 # The output of each line of env that is extracted must match the pattern
-# 'SCRIPT_<valid identifier chars>=', and the first field split on = is
-# evaluated. Therefore, what is being 'eval'ed is a potential variable name.
-_junonia_get_envvars () {
-  for v in $(env | awk -F= -v n="$JUNONIA_CAPNAME" \
-             '$0 ~ "^" n "_[_A-Za-z0-9]+=" {print $1}'); do
-    eval if [ \"'${'$v+set}\" = set ]\; then echo $v\; fi
+# given, which is most typically 'SCRIPT_<valid identifier chars>=', and the
+# first field split on = is evaluated. Therefore, what is being 'eval'ed is a
+# potential variable name.
+junonia_envvars () {
+  case "$1" in
+    a)
+      mode_fmt=
+      ;;
+    r)
+      mode_fmt='&& ! (unset %s 2>/dev/null)'
+      ;;
+    w)
+      mode_fmt='&& (unset %s 2>/dev/null)'
+      ;;
+    *)
+      echoerr "could not retrieve env vars. type must be one of:"
+      echoerr "a - get all environment variables"
+      echoerr "r - get all readonly environment variables"
+      echoerr "w - get all writable environment variables"
+      return 1
+      ;;
+  esac
+
+  for v in $(env | awk -F= -v prefix="$2" \
+             '$0 ~ "^" prefix "[_A-Za-z0-9]+=" {print $1}'); do
+    var_mode="$(printf "$mode_fmt" "$v")"
+    eval 'if [ "${'$v'+set}" = set ] '$var_mode'; then
+            echo $v
+          fi'
   done
 }
 
@@ -1933,7 +1960,7 @@ _junonia_set_args () {
   if [ -f "$JUNONIA_CONFIG" ]; then
 
     # Make a list of script related variables that are set.
-    set_vars="$(_junonia_get_envvars)"
+    set_vars="$(junonia_envvars w ${JUNONIA_CAPNAME}_)"
 
     # Once the list of known variables that are already set is made, execute a
     # subshell in a command substitution that outputs the text of some export
@@ -1953,7 +1980,7 @@ _junonia_set_args () {
     # export SCRIPT_bar='string value of bar from env var'
 
     evalcmds="$(
-      for v in $(_junonia_get_envvars); do
+      for v in $(junonia_envvars w ${JUNONIA_CAPNAME}_); do
         eval echo export $v=\\\'\"'$'$v\"\\\'
       done
     )"
@@ -2404,8 +2431,10 @@ junonia_runmd_filtered () {
   if [ -f "$spec_cache"      ] &&
      [ "$JUNONIA_CACHE" != 0 ]; then
     spec="$(cat "$spec_cache")"
+    cached=cached_
     ret=$?
   else
+    cached=
     spec=
   fi
 
@@ -2415,15 +2444,15 @@ junonia_runmd_filtered () {
     readonly JUNONIA_DOCDIR="$md"
     spec="${spec:-"$(_junonia_plugin_docs | _junonia_md2spec "$md"/*.md -)"}"
     ret=$?
-    spec_type="dir"
+    spec_type="${cached}dir"
   elif [ -f "$md" ]; then
     spec="${spec:-"$(_junonia_plugin_docs | _junonia_md2spec "$md" -)"}"
     ret=$?
-    spec_type="file"
+    spec_type="${cached}file"
   elif [ "$(echo "$md" | wc -l)" -gt 1 ]; then
-    spec="${spec:-"$({echo "$md"; _junonia_plugin_docs} | _junonia_md2spec "" -)"}"
+    spec="${spec:-"$( ( echo "$md"; _junonia_plugin_docs ) | _junonia_md2spec "" -)"}"
     ret=$?
-    spec_type="md_string"
+    spec_type="${cached}md_string"
   fi
 
   if [ -z "$spec" ] || [ "$ret" -ne 0 ]; then
@@ -2475,9 +2504,7 @@ _junonia_run_final () {
   spec="$1"
   shift
 
-  spec_cache="$JUNONIA_CACHEDIR/spec"
-  if [ ! -f "$spec_cache"    ] ||
-     [ "$JUNONIA_CACHE" != 0 ]; then
+  if [ "${spec_type%_*}" != cached ]; then
     # Insert the standard meta parameters.
     spec="$(
       echo "$spec" | awk '
@@ -2510,7 +2537,7 @@ _junonia_run_final () {
         }
         END {
           if(insert_meta) {
-            #print s
+            print s
           }
         }
       ' "$_junonia_cmds" -
