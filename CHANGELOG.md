@@ -1,3 +1,6 @@
+## 0.2.6dev (unreleased)
+
+
 ## 0.2.5 (June 9, 2019)
 
 BUG FIXES:
