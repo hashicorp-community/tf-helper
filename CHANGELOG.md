@@ -1,5 +1,10 @@
-## 0.2.6dev (unreleased)
+## 0.2.6 (June 10, 2019)
 
+BUG FIXES:
+
+* Replace last occurrence of `random_enough` with `junonia_randomish_int`
+* Bump junonia to 1.0.6
+  - Fixes AWK `substr` usage to be compatible with `mawk`
 
 ## 0.2.5 (June 9, 2019)
 
