@@ -1,3 +1,11 @@
+## 0.2.7 (June 11, 2019)
+
+BUG FIXES:
+
+* Small doc fix to `tfh workspace list` and hostname setting env vars
+* Bump junonia to 1.0.7
+  - Fixes config file values being appended to defaults instead of overwriting them
+
 ## 0.2.6 (June 10, 2019)
 
 BUG FIXES:
