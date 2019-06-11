@@ -242,7 +242,7 @@ check_required () {
         if [ -z "$address" ]; then
           missing=1
           echoerr 'TFE hostname required.'
-          echoerr 'Set with -hostname or $TFE_hostname'
+          echoerr 'Set with -hostname or $TFH_hostname'
           echoerr
         fi
       ;;

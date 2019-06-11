@@ -8,4 +8,4 @@ List Terraform Enterprise workspaces for an organization
 
 ### Description
 
-List Terraform Enterprise workspaces for an organization. An organization must be specified with the -name argument, the -tfe-org argument, or the TFE_ORG environment variable. Specifying a workspace is optional. If a workspace is specified with the -name argument, the -tfe-workspace argument, or the TFE_WORKSPACE environment variable it will be preceded by an asterisk.
+List Terraform Enterprise workspaces for an organization. An organization must be specified with the `-org` argument, or the `TFH_org` environment variable. Specifying a workspace is optional. If a workspace is specified with the `-name` argument or the `TFH_name` environment variable it will be preceded by an asterisk.
