@@ -1770,7 +1770,7 @@ junonia_init () {
   JUNONIA_COL1="${JUNONIA_COL1:-18}"
   JUNONIA_COL2="${JUNONIA_COL2:-60}"
 
-  readonly JUNONIA_VERSION="1.0.5"
+  readonly JUNONIA_VERSION="1.0.6"
 
   # Information Separator control characters (IS4 - IS1)
   readonly JUNONIA_FS="" # File   Separator (FS / IS4 / dec 28)
@@ -2035,13 +2035,13 @@ _junonia_set_args () {
     # arguments, which will be either positional (including subcommands),
     # options, or multi-options.
     for (i = 2; i < ARGC; i++) {
-      if(substr(ARGV[i], 0, 1) == "-") {
+      if(substr(ARGV[i], 1, 1) == "-") {
         # This is an option
 
         # How many times this option has been seen
         opt_num[ARGV[i]]++
 
-        if(substr(ARGV[i+1], 0, 1) == "-") {
+        if(substr(ARGV[i+1], 1, 1) == "-") {
 
           # If the next thing is an option instead of a value, then set the
           # value to empty and move on.
@@ -2156,7 +2156,7 @@ _junonia_set_args () {
   }
 
   # Spec entry starts with a "-", which indicates an option.
-  indented && substr($1, 0, 1) == "-" {
+  indented && substr($1, 1, 1) == "-" {
     split($1, a, "=")
     aliases = a[1]
     n_aliases = split(aliases, aliasa, ",")
