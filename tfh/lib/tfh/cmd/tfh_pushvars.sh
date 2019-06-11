@@ -455,7 +455,7 @@ tfh_pushvars () {
     # Will get the values by using the tfvars file and creating a
     # temporary config with just variable names in it for use with
     # the terraform console command.
-    tfvar_dir="$TMPDIR/tfe-push-vars-$(random_enough)"
+    tfvar_dir="$TMPDIR/tfe-push-vars-$(junonia_randomish_int)"
     if ! mkdir "$tfvar_dir"; then
       echoerr "error creating temporary directory for tfvars."
       return 1
