@@ -85,6 +85,10 @@ tfh_workspace_new () {
   oauth_id="$8"
   queue_all_runs="$9"
 
+  if [ -z "$vcs_submodules" ];then
+    vcs_submodules=false
+  fi
+  
   if [ -z "$new_ws" ]; then
     if ! check_required ws; then
       echoerr 'For workspace commands, a positional parameter is also accepted:'
