@@ -84,11 +84,33 @@ output="$(tfh pullvars -name "$ws_name" -env-var 'sevar' 2>&1)"
 assert_equal "tfh_pullvars_sevar_ret_0" 0 $?
 assert_contains "tfh_pullvars_sevar_output" 'sevar=' "$output"
 
-# TODO
-# Test pushing multiple vars at once
-# Test pushing tfvars files
-# Test pushing from a configuration
-# Test mixing and matching combinations for the right overrides
+# Pushing variables from a tf file should succeed
+output="$(tfh pushvars ./0020_config -name "$ws_name")"
+assert_equal "tfh_pushvars_tf_file_ret_0" 0 $?
+assert_contains "tfh_pushvars_tf1_file_output" "Creating var_int_0020 type:terraform hcl:false sensitive:false value:42" "$output"
+assert_contains "tfh_pushvars_tf2_file_output" "Creating var_str_0020 type:terraform hcl:false sensitive:false value:foo" "$output"
+assert_contains "tfh_pushvars_tf3_file_output" "Creating var_list_0020 type:terraform hcl:true sensitive:false" "$output"
+assert_contains "tfh_pushvars_tf4_file_output" "Creating var_map_0020 type:terraform hcl:true sensitive:false" "$output"
+
+# Pulling them should succeed and contain the names and values in tfvars format
+output="$(tfh pullvars -name "$ws_name" -var 'var_0020' 2>&1)"
+assert_equal "tfh_pullvars_tf_file_ret_0" 0 $?
+assert_contains "tfh_pullvars_tf1_file_output" 'var_int_0020 = "10"' "$output"
+assert_contains "tfh_pullvars_tf2_file_output" 'var_str_0020 = "foo"' "$output"
+assert_contains "tfh_pullvars_tf3_file_output" 'var_list_0020 = [' "$output"
+assert_contains "tfh_pullvars_tf4_file_output" 'var_map_0020 = {' "$output"
+
+# Pushing variables from a tfvars file should succeed
+output="$(tfh pushvars -name "$ws_name" -var-file 0020.tfvars)"
+assert_equal "tfh_pushvars_var_file_ret_0" 0 $?
+assert_contains "tfh_pushvars_var_file_output" "Creating var1_0020 type:terraform hcl:false sensitive:false value:0020" "$output"
+assert_contains "tfh_pushvars_var_file_output" "Creating var2_0020 type:terraform hcl:false sensitive:false value:0020" "$output"
+
+# Pulling them should succeed and contain the names and values in shell format
+output="$(tfh pullvars -name "$ws_name" -var 'var_0020' 2>&1)"
+assert_equal "tfh_pullvars_var_file_ret_0" 0 $?
+assert_contains "tfh_pullvars_var1_file_output" 'var1_0020="0020"' "$output"
+assert_contains "tfh_pullvars_var2_file_output" 'var2_0020="0020"' "$output"
 
 tfh workspace delete -name "$ws_name" >/dev/null 2>&1
 
