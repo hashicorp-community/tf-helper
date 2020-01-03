@@ -98,12 +98,12 @@ process_vars () {
     # deleted later.
     if [ "$3" != "delete" ]; then
       if [ "$2" = "terraform" ]; then
-        if echo "$deletes" | grep -E "$JUNONIA_UFS$v$JUNONIA_UFS" >/dev/null 2>&1; then
+        if echo "$deletes" | grep -E "$JUNONIA_US$v$JUNONIA_US" >/dev/null 2>&1; then
           echodebug "skipping $v due to later delete"
           continue
         fi
       else
-        if echo "$env_deletes" | grep -E "$JUNONIA_UFS$v$JUNONIA_UFS" >/dev/null 2>&1; then
+        if echo "$env_deletes" | grep -E "$JUNONIA_US$v$JUNONIA_US" >/dev/null 2>&1; then
           echodebug "skipping $v due to later delete"
           continue
         fi
@@ -178,8 +178,8 @@ process_vars () {
         # specified in the correct overwrite list or if -overwrite-all
         # is true.
         if [ $overwrite_all ] ||
-           ( [ "$2" = terraform ] && echo "$overwrites" | grep -Eq "$JUNONIA_UFS$v$JUNONIA_UFS" ) ||
-           ( [ "$2" = env ] && echo "$envvar_overwrites" | grep -Eq "$JUNONIA_UFS$v$JUNONIA_UFS" ); then
+           ( [ "$2" = terraform ] && echo "$overwrites" | grep -Eq "$JUNONIA_US$v$JUNONIA_US" ) ||
+           ( [ "$2" = env ] && echo "$envvar_overwrites" | grep -Eq "$JUNONIA_US$v$JUNONIA_US" ); then
 
           if [ $hide_sensitive ] && [ "$4" = true ]; then
             output_val=REDACTED
@@ -249,7 +249,8 @@ tfh_pushvars () {
   var_file_arg=
 
   if [ -n "$var_file" ]; then
-    var_file_arg="$1"
+    # Create an input argument for 'terraform console'
+    var_file_arg="-var-file=$var_file"
   fi
 
   payload="$TMPDIR/tfe-push-vars-payload-$(junonia_randomish_int)"
@@ -455,6 +456,7 @@ tfh_pushvars () {
     # Will get the values by using the tfvars file and creating a
     # temporary config with just variable names in it for use with
     # the terraform console command.
+    working_dir=`pwd`
     tfvar_dir="$TMPDIR/tfe-push-vars-$(junonia_randomish_int)"
     if ! mkdir "$tfvar_dir"; then
       echoerr "error creating temporary directory for tfvars."
@@ -561,11 +563,11 @@ tfh_pushvars () {
         # true/false are on the same line.
         sub(/[^=]*[ \t\r\n\v\f]*=[ \t\r\n\v\f]*/, "")
       }
-      in_var == 1 && in_value == 1 && /["{<\[tf]/ {
+      in_var == 1 && in_value == 1 && /["{<\[tf0-9]/ {
         # see if we are entering a map or heredoc so we can skip those
         # sections.
         # match all the things that are not Terraform variable values.
-        m = match($0, /[^"{<\[tf]*/)
+        m = match($0, /[^"{<\[tf0-9]*/)
         if(m != 0) {
           # Get the first character after all of the things that are not
           # Terraform variable values
@@ -619,6 +621,9 @@ tfh_pushvars () {
 
       echodebug "Temporary file contents:"
       echodebug "$(cat *)"
+
+      # Change back to the working directory
+      cd $working_dir
   fi
 
   echodebug "All variables:"
@@ -640,7 +645,8 @@ tfh_pushvars () {
       if [ -z "$var_file_arg" ]; then
         val_lines="$(echo "var.$var" | terraform console 2>&3)"
       else
-        val_lines="$(echo "var.$var" | terraform console "$var_file_arg" 2>&3)"
+        # Remove texts related to state lock from the output if present.
+        val_lines="$(echo "var.$var" | terraform console "$var_file_arg" | grep -vE "Acquiring state lock|Releasing state lock" 2>&3)"
       fi
 
       if [ 0 -ne $? ]; then
@@ -655,9 +661,17 @@ tfh_pushvars () {
       # list or map
       first="$(echo "$val" | cut -c 1-1 | head -1)"
       if [ "$first" = "{" ] || [ "$first" = "[" ]; then
-        defaulthclvars="$defaulthclvars$JUNONIA_UFS$var=$val"
+        if [ -z "$defaulthclvars" ]; then
+            defaulthclvars="$var=$val_lines"
+        else
+            defaulthclvars="$defaulthclvars$JUNONIA_US$var=$val_lines"
+        fi
       else
-        defaultvars="$defaultvars$JUNONIA_UFS$var=$val"
+        if [ -z "$defaultvars" ]; then
+            defaultvars="$var=$val"
+        else
+            defaultvars="$defaultvars$JUNONIA_US$var=$val"
+        fi
       fi
     done
   fi
