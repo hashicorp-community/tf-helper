@@ -349,9 +349,9 @@ tfh_pushvars () {
         # get the variable name
         in_var = 1
         match($0, /"[a-zA-Z0-9]/)
-        l=RLENGTH
-        match($0, /[-_a-zA-Z0-9]*"/)
-        name = substr($0, RSTART+1, RLENGTH-l)
+        s = RSTART
+        match($0, /[-_a-zA-Z0-9]"/)
+        name = substr($0, s + 1, RSTART - s)
         seen_variable = 0
       }
       in_heredoc == 1 && $0 !~ "^" heredoc_id "$" {
@@ -391,11 +391,11 @@ tfh_pushvars () {
         # true/false are on the same line.
         sub(/[^=]*[ \t\r\n\v\f]*=[ \t\r\n\v\f]*/, "")
       }
-      in_var == 1 && in_default == 1 && in_value == 1 && /["{<\[tf]/ {
+      in_var == 1 && in_default == 1 && in_value == 1 && /["{<\[tf0-9]/ {
         # inside the RHS and found something that looks like a value.
         # determine the variable type (hcl, non-hcl).
         # match all the things that are not Terraform variable values
-        m = match($0, /[^"{<\[tf]*/)
+        m = match($0, /[^"{<\[tf0-9]*/)
         if(m != 0) {
           # Get the first character after all of the things that are not
           # Terraform variable values
