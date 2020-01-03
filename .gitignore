@@ -96,3 +96,9 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
