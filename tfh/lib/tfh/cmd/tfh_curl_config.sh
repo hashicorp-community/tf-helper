@@ -70,18 +70,49 @@ tfh_curl_config () {
     return 0
   fi
 
+  tf_config_token=
   tf_config="${TERRAFORM_CONFIG:-"$HOME/.terraformrc"}"
   if [ -f "$tf_config" ]; then
     # This is simplified. It depends on the token keyword and value being
     # on the same line in the .terraformrc.
-    tf_config_token="$(awk -v url="$hostname" '
-      $0 ~ "\"" url "\"" { in_url=1 }
-      in_url && /token *= *"[A-Za-z0-9\.]+"/ {
+    tf_config_token="$(awk -v host="$hostname" '
+      # Skip commented lines
+      /^ *#/ {
+        next
+      }
+
+      # Get the host for this credentials entry
+      /credentials  *"/ {
+        cred_host = $2
+        gsub(/"/, "", cred_host)
+      }
+
+      # Extract the token and note if it matches the specified host
+      /token *= *"[A-Za-z0-9\.]+"/ {
+        tokens++
         match($0, /"[A-Za-z0-9\.]+"/)
-        print substr($0, RSTART+1, RLENGTH-2)
+        token = substr($0, RSTART+1, RLENGTH-2)
+
+        if(cred_host == host) {
+          host_token = token
+        }
+      }
+
+      END {
+        # There was only one token, use that regardless as to the host
+        if(tokens == 1) {
+          print token
+        }
+
+        # More than one token, use the specified host
+        if(tokens > 1 && host_token) {
+          print host_token
+        }
+
+        # Either did not find any tokens or found tokens, but did not find the
+        # token for the specified host. To avoid being ambiguous, do not output
+        # any tokens.
       }' "$tf_config")"
-  else
-    tf_config_token=
   fi
 
   if [ $tfrc ]; then
