@@ -662,7 +662,7 @@ _junonia_md2spec () {
 
     # Top level "##" header
     # ## `command subcommand`
-    /^## `[,-_A-Za-z0-9 ]+`/ {
+    /^## `[-,_A-Za-z0-9 ]+`/ {
       if(cmd) {
         spec()
       }
@@ -1770,7 +1770,7 @@ junonia_init () {
   JUNONIA_COL1="${JUNONIA_COL1:-18}"
   JUNONIA_COL2="${JUNONIA_COL2:-60}"
 
-  readonly JUNONIA_VERSION="1.0.7"
+  readonly JUNONIA_VERSION="1.0.8"
 
   # Information Separator control characters (IS4 - IS1)
   readonly JUNONIA_FS="" # File   Separator (FS / IS4 / dec 28)
