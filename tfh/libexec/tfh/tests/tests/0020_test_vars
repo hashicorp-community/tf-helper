@@ -85,6 +85,9 @@ assert_equal "tfh_pullvars_sevar_ret_0" 0 $?
 assert_contains "tfh_pullvars_sevar_output" 'sevar=' "$output"
 
 # Pushing variables from a tf file should succeed
+
+terraform init 0020_config > /dev/null 2>&1
+
 output="$(tfh pushvars ./0020_config -name "$ws_name")"
 assert_equal "tfh_pushvars_tf_file_ret_0" 0 $?
 assert_contains "tfh_pushvars_tf1_file_output" "Creating var_int_0020 type:terraform hcl:false sensitive:false value:42" "$output"
@@ -93,11 +96,11 @@ assert_contains "tfh_pushvars_tf3_file_output" "Creating var_list_0020 type:terr
 assert_contains "tfh_pushvars_tf4_file_output" "Creating var_map_0020 type:terraform hcl:true sensitive:false" "$output"
 
 # Pulling them should succeed and contain the names and values in tfvars format
-output="$(tfh pullvars -name "$ws_name" -var 'var_0020' 2>&1)"
+output="$(tfh pullvars -name "$ws_name" 2>&1)"
 assert_equal "tfh_pullvars_tf_file_ret_0" 0 $?
-assert_contains "tfh_pullvars_tf1_file_output" 'var_int_0020 = "10"' "$output"
+assert_contains "tfh_pullvars_tf1_file_output" 'var_int_0020 = "42"' "$output"
 assert_contains "tfh_pullvars_tf2_file_output" 'var_str_0020 = "foo"' "$output"
-assert_contains "tfh_pullvars_tf3_file_output" 'var_list_0020 = [' "$output"
+assert_contains "tfh_pullvars_tf3_file_output" 'var_list_0020 = \[' "$output"
 assert_contains "tfh_pullvars_tf4_file_output" 'var_map_0020 = {' "$output"
 
 # Pushing variables from a tfvars file should succeed
@@ -106,11 +109,36 @@ assert_equal "tfh_pushvars_var_file_ret_0" 0 $?
 assert_contains "tfh_pushvars_var_file_output" "Creating var1_0020 type:terraform hcl:false sensitive:false value:0020" "$output"
 assert_contains "tfh_pushvars_var_file_output" "Creating var2_0020 type:terraform hcl:false sensitive:false value:0020" "$output"
 
-# Pulling them should succeed and contain the names and values in shell format
-output="$(tfh pullvars -name "$ws_name" -var 'var_0020' 2>&1)"
+# Pulling them should succeed and contain the names and values in tfvars format
+output="$(tfh pullvars -name "$ws_name" 2>&1)"
 assert_equal "tfh_pullvars_var_file_ret_0" 0 $?
-assert_contains "tfh_pullvars_var1_file_output" 'var1_0020="0020"' "$output"
-assert_contains "tfh_pullvars_var2_file_output" 'var2_0020="0020"' "$output"
+assert_contains "tfh_pullvars_var1_file_output" 'var1_0020 = "0020"' "$output"
+assert_contains "tfh_pullvars_var2_file_output" 'var2_0020 = "0020"' "$output"
 
 tfh workspace delete -name "$ws_name" >/dev/null 2>&1
+
+ws_name="tfh-test-workspace-$(random_enough)"
+tfh workspace new -name "$ws_name" >/dev/null 2>&1
+
+# Pushing variables from both a tfvars and tf file should succeed
+output="$(tfh pushvars ./0020_config -name "$ws_name" -var-file 0020.tfvars)"
+assert_equal "tfh_pushvars_tf_tfvars_file_ret_0" 0 $?
+assert_contains "tfh_pushvars_tf_tfvars1_file_output" "Creating var_int_0020 type:terraform hcl:false sensitive:false value:42" "$output"
+assert_contains "tfh_pushvars_tf_tfvars2_file_output" "Creating var_str_0020 type:terraform hcl:false sensitive:false value:foo" "$output"
+assert_contains "tfh_pushvars_tf_tfvars3_file_output" "Creating var_list_0020 type:terraform hcl:true sensitive:false" "$output"
+assert_contains "tfh_pushvars_tf_tfvars4_file_output" "Creating var_map_0020 type:terraform hcl:true sensitive:false" "$output"
+assert_contains "tfh_pushvars_tf_tfvars5_file_output" "Creating var1_0020 type:terraform hcl:false sensitive:false value:0020" "$output"
+assert_contains "tfh_pushvars_tf_tfvars6_file_output" "Creating var2_0020 type:terraform hcl:false sensitive:false value:0020" "$output"
+
+# Pulling them should succeed and contain the names and values in tfvars format
+output="$(tfh pullvars -name "$ws_name" 2>&1)"
+assert_equal "tfh_pullvars_tf_tfvars_file_ret_0" 0 $?
+assert_contains "tfh_pullvars_tf_tfvars1_file_output" 'var_int_0020 = "42"' "$output"
+assert_contains "tfh_pullvars_tf_tfvars2_file_output" 'var_str_0020 = "foo"' "$output"
+assert_contains "tfh_pullvars_tf_tfvars3_file_output" 'var_list_0020 = \[' "$output"
+assert_contains "tfh_pullvars_tf_tfvars4_file_output" 'var_map_0020 = {' "$output"
+assert_contains "tfh_pullvars_tf_tfvars5_file_output" 'var1_0020 = "0020"' "$output"
+assert_contains "tfh_pullvars_tf_tfvars6_file_output" 'var2_0020 = "0020"' "$output"
+
+rm -rf .terraform
 

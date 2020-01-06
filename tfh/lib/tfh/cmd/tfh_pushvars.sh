@@ -242,6 +242,8 @@ tfh_pushvars () {
   shift
   hide_sensitive="$1"
 
+  working_dir="$PWD"
+
   defaultvars=
   defaultvars_values=
   defaulthclvars=
@@ -375,6 +377,7 @@ tfh_pushvars () {
       in_var_block == 1 && in_default == 0 && in_value == 0 && /}/ {
         # Variable block with no default. Its value may come from
         # a tfvars file loaded later.
+        print name
         in_var = 0
         in_var_block = 0
         in_default = 0
@@ -451,12 +454,12 @@ tfh_pushvars () {
           in_default_block = 0
         }
       } ' *.tf)"
+    cd "$working_dir"
   elif [ -n "$var_file" ]; then
     # Going to locate all of the variables from a tfvars file.
     # Will get the values by using the tfvars file and creating a
     # temporary config with just variable names in it for use with
     # the terraform console command.
-    working_dir=`pwd`
     tfvar_dir="$TMPDIR/tfe-push-vars-$(junonia_randomish_int)"
     if ! mkdir "$tfvar_dir"; then
       echoerr "error creating temporary directory for tfvars."
@@ -470,6 +473,8 @@ tfh_pushvars () {
       echoerr "Error copying variable file to temporary path."
       return 1
     fi
+
+    var_file_arg="-var-file=$(basename "$var_file")"
 
     if ! cd "$tfvar_dir"; then
       echoerr "Error entering variable file temporary path."
@@ -619,11 +624,8 @@ tfh_pushvars () {
       echodebug "Temporary directory contents:"
       echodebug "$(ls)"
 
-      echodebug "Temporary file contents:"
-      echodebug "$(cat *)"
-
-      # Change back to the working directory
-      cd $working_dir
+      echodebug "Temporary tf file contents:"
+      echodebug "$(cat vars.tf)"
   fi
 
   echodebug "All variables:"
@@ -636,17 +638,35 @@ tfh_pushvars () {
 
   if [ -n "$all_vars" ]; then
     if [ -n "$config_dir" ] && [ ! -d .terraform ]; then
-      echoerr "WARNING: Terraform configuration appears uninitialized!"
-      echoerr "When specifying a config directory run terraform init."
-      echoerr "Variables may be skipped or passed unintended values."
+      echoerr "Terraform configuration appears uninitialized!"
+      echoerr "No .terraform directory found in $PWD"
+      echoerr ""
+      echoerr "When specifying a config directory run terraform init with:"
+      echoerr "  # This directory is the config directory"
+      echoerr "  terraform init"
+      echoerr "or"
+      echoerr "  # Another directory is the config directory"
+      echoerr "  terraform init [config dir]"
+      return 1
     fi
 
+    echodebug "Current dir: $PWD"
+    echodebug "Config dir arg: $config_dir"
+    echodebug "Var file arg: $var_file_arg"
+
     for var in $all_vars; do
-      if [ -z "$var_file_arg" ]; then
-        val_lines="$(echo "var.$var" | terraform console 2>&3)"
+      if   [ -n "$var_file_arg" ] && [ -n "$config_dir" ]; then
+        val_lines="$(echo "var.$var" \
+                     | terraform console "$var_file_arg" "$config_dir" 2>&1)"
+      elif [ -n "$var_file_arg" ] && [ -z "$config_dir" ]; then
+        val_lines="$(echo "var.$var" \
+                     | terraform console "$var_file_arg" 2>&1)"
+      elif [ -z "$var_file_arg" ] && [ -n "$config_dir" ]; then
+        val_lines="$(echo "var.$var" \
+                     | terraform console "$config_dir" 2>&1)"
       else
-        # Remove texts related to state lock from the output if present.
-        val_lines="$(echo "var.$var" | terraform console "$var_file_arg" | grep -vE "Acquiring state lock|Releasing state lock" 2>&3)"
+        val_lines="$(echo "var.$var" \
+                     | terraform console 2>&1)"
       fi
 
       if [ 0 -ne $? ]; then
@@ -655,6 +675,11 @@ tfh_pushvars () {
         echodebug "$val_lines"
         continue
       fi
+
+      # Remove texts related to state lock from the output if present.
+      val_lines="$(echo "$val_lines" \
+                   | grep -vE "Acquiring state lock|Releasing state lock" 2>&3)"
+
       val="$(escape_value "$val_lines")"
 
       # Inspect the first character of the value to see if it is a
@@ -675,6 +700,8 @@ tfh_pushvars () {
       fi
     done
   fi
+
+  cd "$working_dir"
 
   # Send each list of the different types of variables through to be created
   # or updated, along with the properties that that list should abide by.

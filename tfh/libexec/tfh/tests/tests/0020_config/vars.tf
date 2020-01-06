@@ -1,3 +1,6 @@
+variable "var1_0020" {}
+variable "var2_0020" {}
+
 variable "var_int_0020" {
   default = 42 
 }
