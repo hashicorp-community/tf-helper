@@ -67,6 +67,27 @@ cat > "$payload" <<EOF
 EOF
 }
 
+# Very carefully extract the whitespace at the start of a string.
+pre_whitespace () {
+  echo "$1" | awk '
+    NR == 1 {
+    match($0, /^[ \t\n]*/)
+    pre=substr($0, 1, RLENGTH)
+    printf "%s", pre
+    exit
+  }'
+}
+
+# Very carefully extract the whitespace at the end of a string.
+post_whitespace () {
+  echo "$1" | awk '
+    END {
+      match($0, /[ \t\n]*$/)
+      post=substr($0, RSTART, RLENGTH)
+      printf "%s", post
+    }'
+}
+
 # Given a list of variables followed by the properties all of those variables
 # should have, either create or update them in TFE.
 # $1 variables list
@@ -86,7 +107,12 @@ process_vars () {
   for var in $1; do
     unset IFS
     v="${var%%=*}"
+    v="${v#"$(pre_whitespace "$v")"}"
+    v="${v%"$(post_whitespace "$v")"}"
+
     val="${var#*=}"
+    val="${val#"$(pre_whitespace "$val")"}"
+    val="${val%"$(post_whitespace "$val")"}"
 
     if [ "$3" = true ]; then
       val="$(escape_value "$val")"
@@ -174,12 +200,15 @@ process_vars () {
           fi
         fi
       else
-        # This existing variable should only be overwritten if it was
-        # specified in the correct overwrite list or if -overwrite-all
-        # is true.
+        # This existing variable should only be overwritten if it was specified
+        # in the correct overwrite list or if -overwrite-all is true. The
+        # overwrites variable is bookended with separators to make the grep
+        # simpler.
         if [ $overwrite_all ] ||
-           ( [ "$2" = terraform ] && echo "$overwrites" | grep -Eq "$JUNONIA_US$v$JUNONIA_US" ) ||
-           ( [ "$2" = env ] && echo "$envvar_overwrites" | grep -Eq "$JUNONIA_US$v$JUNONIA_US" ); then
+           ( [ "$2" = terraform ] && echo "$JUNONIA_US$overwrites$JUNONIA_US" \
+             | grep -Eq "$JUNONIA_US[ \t\n]*${v}[ \t\n]*$JUNONIA_US" ) ||
+           ( [ "$2" = env ] && echo "$JUNONIA_US$envvar_overwrites$JUNONIA_US" \
+             | grep -Eq "$JUNONIA_US[ \t\n]*$v[ \t\n]*$JUNONIA_US" ); then
 
           if [ $hide_sensitive ] && [ "$4" = true ]; then
             output_val=REDACTED
@@ -203,6 +232,8 @@ process_vars () {
 
             cleanup "$payload"
           fi
+        else
+          echodebug "Existing variable $v not specified to be overwritten"
         fi
       fi
     fi
