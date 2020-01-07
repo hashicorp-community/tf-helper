@@ -1,3 +1,18 @@
+## 0.2.8 (January 7, 2020)
+
+BUG FIXES:
+
+* Set `vcs_submodules` to `false` by default (flaviotorres)
+* Numerous `pushvars` fixes (sumitmaggo)
+* Fix config pushing logic in `pushconfig` so `-destroy` and `-current-config` work
+* Bump junonia to 1.0.8, fixing a regex problem for a particular version of `gawk`
+
+ENHANCEMENTS:
+
+* Support parsing integer values for `pushvars` and other `pushvars` fixes (sumitmaggo)
+* Support trimming whitespace around variables and values in `pushvars`
+* If `~/.terraformrc` only has one entry, `curl-config` will use that one even if `-hostname` is not specified in some manner, making it more user friendly.
+
 ## 0.2.7 (June 11, 2019)
 
 BUG FIXES:
