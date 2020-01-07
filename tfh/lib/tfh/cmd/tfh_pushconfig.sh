@@ -318,28 +318,28 @@ tfh_pushconfig () {
       return 1
     fi
     cleanup "$config_payload" "$tarlist"
-  fi
 
-  # Submission of the config version and upload of the archive does not mean
-  # that the config version is ready for use. It has a status, and it's
-  # necessary to poll on that status to make sure that the upload is
-  # "uploaded", even if the upload is complete on the client side.
-  url="$address/api/v2/configuration-versions/$config_id"
-  config_status=
-  retries=0
-  while [ "$config_status" != "uploaded" ] && [ $retries -lt 3 ]; do
-    # Initially don't sleep, and then back off linearly
-    sleep $retries
-    if config_get_resp="$(tfh_api_call $url)"; then
-      config_status="$(printf "%s" "$config_get_resp" | jq -r '.data.attributes.status')"
+    # Submission of the config version and upload of the archive does not mean
+    # that the config version is ready for use. It has a status, and it's
+    # necessary to poll on that status to make sure that the upload is
+    # "uploaded", even if the upload is complete on the client side.
+    url="$address/api/v2/configuration-versions/$config_id"
+    config_status=
+    retries=0
+    while [ "$config_status" != "uploaded" ] && [ $retries -lt 3 ]; do
+      # Initially don't sleep, and then back off linearly
+      sleep $retries
+      if config_get_resp="$(tfh_api_call $url)"; then
+        config_status="$(printf "%s" "$config_get_resp" | jq -r '.data.attributes.status')"
+      fi
+      echodebug "Config status: $config_status"
+      retries=$(( $retries + 1 ))
+    done
+
+    if [ "$config_status" != "uploaded" ]; then
+      echoerr "Error creating run. Config status is $config_status after $retries tries"
+      return 1
     fi
-    echodebug "Config status: $config_status"
-    retries=$(( $retries + 1 ))
-  done
-
-  if [ "$config_status" != "uploaded" ]; then
-    echoerr "Error creating run. Config status is $config_status after $retries tries"
-    return 1
   fi
 
   make_run_payload "$destroy" "$message" "$config_id" "$workspace_id"
