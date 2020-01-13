@@ -385,34 +385,36 @@ tfh_pushconfig () {
   plan_url="$address/api/v2/plans/$plan_id"
   run_url="$address/api/v2/runs/$run_id"
 
+  # Determine if the workspace will also perform an auto-apply
+  echodebug "API Request for workspace info $org/$ws"
+  url="$address/api/v2/organizations/$org/workspaces/$ws"
+  ws_info_resp="$(tfh_api_call "$url")"
+  ws_auto_apply="$(printf "%s" "$ws_info_resp" | jq -r '.data.attributes."auto-apply"')"
+
   # Repeatedly poll the system every N seconds specified with -poll to get
   # the run status until it reaches a non-active status. By default -poll is
   # 0 and there is no polling.
   run_status=pending
+  poll_url="$plan_url"
+  apply_started=
   lock_id=
   log_offset=0
   err=0
   stx=0
   etx=0
 
-  # Go until we don't see one of these states
-  while [ "$run_status" = pending   ] ||
-        [ "$run_status" = planning  ] ||
-        [ "$run_status" = applying  ] ||
-        [ "$run_status" = confirmed ] ||
-        [ "$etx" -ne 1 ] ||
-        [ "$err" -eq 0  ]; do
+  # Poll until an end state is encountered
+  while [ "$run_status" != applied ] &&
+        [ "$run_status" != canceled ] &&
+        [ "$run_status" != discarded ] &&
+        [ "$run_status" != errored ] &&
+        ( [ "$run_status" != planned ] || [ "$ws_auto_apply" = true ] ) &&
+        ( [ "$run_status" != planned_and_finished ] || [ "$ws_auto_apply" = true ] ); do
     # if the workspace was determined to be locked in the previous
     # poll, don't delay getting the final status and exiting.
     if [ true != "$ws_locked" ]; then
       sleep $poll
     fi
-
-    echodebug "API request to poll plan:"
-    plan_resp="$(tfh_api_call "$plan_url")"
-    err=$(( $err + $? ))
-    plan_status="$(printf "%s" "$plan_resp" | jq -r '.attributes.status')"
-    err=$(( $err + $? ))
 
     echodebug "API request for run info:"
     run_resp="$(tfh_api_call "$run_url")"
@@ -421,8 +423,12 @@ tfh_pushconfig () {
     err=$(( $err + $? ))
     echodebug "$run_status"
 
+    echodebug "API request to poll the plan or apply:"
+    poll_resp="$(tfh_api_call "$poll_url")"
+    err=$(( $err + $? ))
+
     if [ $stream ]; then
-      log_read_url="$(printf "%s" "$plan_resp" | jq -r '.data.attributes."log-read-url"')"
+      log_read_url="$(printf "%s" "$poll_resp" | jq -r '.data.attributes."log-read-url"')"
       err=$(( $err + $? ))
 
       echodebug "Log read URL:"
@@ -436,9 +442,10 @@ tfh_pushconfig () {
       log_resp="$(tfh_api_call "$log_read_url""?limit=1000&offset=$log_offset")"
       err=$(( $err + $? ))
       log_offset=$(( $log_offset + ${#log_resp} ))
-      #printf "%s" "$log_resp"
-      # STX: 
-      # ETX: 
+
+      # Start of text, STX: 
+      # End of text, ETX: 
+      # Don't print until STX, print until ETX
       logline="$(printf "%s" "$log_resp" | awk -v stx="$stx" '
         BEGIN { ret = 0                }
         //  { sub(//, ""); ret = 2 }
@@ -452,7 +459,22 @@ tfh_pushconfig () {
       esac
       printf "%s" "$logline"
     else
+      last_run_status="$run_status"
       echo "$run_status"
+    fi
+
+    # See if, on the last iteration, it was detected that the run went from
+    # plan to apply. If so, this last log read above should have finished out
+    # the plan log. Now switch to the apply and continue looping.
+    if [ "$apply_started" = 1 ]; then
+      echo
+      poll_url="$address/api/v2/applies/$apply_id"
+
+      log_offset=0
+      stx=0
+      etx=0
+      apply_started=2 # just needs to not be 0 or 1. we're done with it.
+      continue
     fi
 
     echodebug "API Request for workspace info $org/$ws"
@@ -470,12 +492,28 @@ tfh_pushconfig () {
         return 0
       fi
     fi
-  done
-  echo
-  echo "status: $run_status"
 
-  if [ "$err" -gt 0 ]; then
-    echoerr "failed to poll run"
-    return 1
+    if [ "$apply_started" != 1          ] &&
+       [ "$ws_auto_apply" =  true       ] &&
+       [ "$run_status"    =  "applying" ]; then
+      if apply_id="$(printf "%s" "$run_resp" | jq -r '.data.relationships.apply.data.id' 2>/dev/null)"; then
+        # Flag that the run has gone from plan to apply. The next iteration
+        # should finish reading and printing the remaining parts of the plan
+        # log, then switch to the apply url and log, then continue looping.
+        apply_started=1
+      fi
+    fi
+
+    if [ "$err" -gt 0 ]; then
+      echoerr "failed to poll run"
+      return 1
+    fi
+  done
+
+  if [ $stream ]; then
+    echo
+  elif [ "$run_status" != "$last_run_status" ]; then
+    # Don't report, e.g., planned twice
+    echo "$run_status"
   fi
 }
