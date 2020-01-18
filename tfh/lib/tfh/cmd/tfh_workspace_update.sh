@@ -108,7 +108,7 @@ tfh_workspace_update () {
 
   if [ "$vcs_obj" ]; then
     [ "$attr_obj" ] && attr_obj="$attr_obj,"
-    attr_obj="$attr_obj \"vcs-repo\" {$vcs_obj}"
+    attr_obj="$attr_obj \"vcs-repo\": {$vcs_obj}"
   fi
 
   make_update_workspace_payload "$attr_obj"
