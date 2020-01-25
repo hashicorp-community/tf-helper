@@ -20,31 +20,20 @@
 ##
 ## -------------------------------------------------------------------
 
-tfh_workspace_delete () {
-  # Positional workspace value
-  del_ws="$prefix$1"
-
-  if [ -z "$del_ws" ]; then
-    if ! check_required ws; then
-      echoerr 'For workspace commands, a positional parameter is also accepted:'
-      echoerr 'tfh workspace delete WORKSPACE_NAME'
-      return 1
-    else
-      del_ws="$ws"
-    fi
-  fi
-
-  # Ensure that the rest of the required items have values
-  if ! check_required org token address; then
+tfh_sv_list () {
+  if ! check_required; then
     return 1
   fi
 
-  echodebug "API request to delete workspace:"
-  url="$address/api/v2/organizations/$org/workspaces/$del_ws"
-  if ! tfh_api_call -X DELETE "$url" >/dev/null; then
-    echoerr "Error deleting workspace $org/$del_ws"
+  echodebug "API request to list state versions:"
+  url="$address/api/v2/state-versions?filter%5Bworkspace%5D%5Bname%5D=$ws&filter%5Borganization%5D%5Bname%5D=$org"
+  if ! list_resp="$(tfh_api_call "$url")"; then
+    echoerr "Error listing state versions for $org/$ws"
     return 1
   fi
 
-  echo "Deleted $org/$del_ws"
+  listing="$(printf "%s" "$list_resp" |
+    jq -r --arg ws "$ws" '.data[] | .id')"
+
+  echo "$listing"
 }

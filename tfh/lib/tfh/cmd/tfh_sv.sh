@@ -20,31 +20,8 @@
 ##
 ## -------------------------------------------------------------------
 
-tfh_workspace_delete () {
-  # Positional workspace value
-  del_ws="$prefix$1"
-
-  if [ -z "$del_ws" ]; then
-    if ! check_required ws; then
-      echoerr 'For workspace commands, a positional parameter is also accepted:'
-      echoerr 'tfh workspace delete WORKSPACE_NAME'
-      return 1
-    else
-      del_ws="$ws"
-    fi
-  fi
-
-  # Ensure that the rest of the required items have values
-  if ! check_required org token address; then
-    return 1
-  fi
-
-  echodebug "API request to delete workspace:"
-  url="$address/api/v2/organizations/$org/workspaces/$del_ws"
-  if ! tfh_api_call -X DELETE "$url" >/dev/null; then
-    echoerr "Error deleting workspace $org/$del_ws"
-    return 1
-  fi
-
-  echo "Deleted $org/$del_ws"
+tfh_sv () {
+  echodebug "exec with help command"
+  exec $0 sv help
 }
+

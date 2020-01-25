@@ -20,17 +20,35 @@
 ##
 ## -------------------------------------------------------------------
 
-tfh_workspace_delete () {
-  # Positional workspace value
-  del_ws="$prefix$1"
+##
+## Helper functions
+##
 
-  if [ -z "$del_ws" ]; then
+make_lock_workspace_payload () {
+# $1 locking reason message
+cat > "$payload" <<EOF
+{
+  "reason": "$1"
+}
+EOF
+}
+
+tfh_workspace_lock () {
+  # Positional workspace value
+  lock_ws="$prefix$1"
+
+  # Optional locking reason message
+  reason="$2"
+
+  payload="$TMPDIR/lock-ws-payload-$(junonia_randomish_int)"
+
+  if [ -z "$lock_ws" ]; then
     if ! check_required ws; then
       echoerr 'For workspace commands, a positional parameter is also accepted:'
-      echoerr 'tfh workspace delete WORKSPACE_NAME'
+      echoerr 'tfh workspace lock WORKSPACE_NAME'
       return 1
     else
-      del_ws="$ws"
+      lock_ws="$ws"
     fi
   fi
 
@@ -39,12 +57,17 @@ tfh_workspace_delete () {
     return 1
   fi
 
-  echodebug "API request to delete workspace:"
-  url="$address/api/v2/organizations/$org/workspaces/$del_ws"
-  if ! tfh_api_call -X DELETE "$url" >/dev/null; then
-    echoerr "Error deleting workspace $org/$del_ws"
+  . "$JUNONIA_PATH/lib/tfh/cmd/tfh_workspace.sh"
+  if ! workspace_id="$(_fetch_ws_id "$org" "$lock_ws")"; then
     return 1
   fi
 
-  echo "Deleted $org/$del_ws"
+  echodebug "API request to lock workspace:"
+  url="$address/api/v2/workspaces/$workspace_id/actions/lock"
+  if ! tfh_api_call -d @"$payload" "$url" >/dev/null; then
+    echoerr "Error locking workspace $org/$lock_ws"
+    return 1
+  fi
+
+  echo "Locked $org/$lock_ws"
 }
