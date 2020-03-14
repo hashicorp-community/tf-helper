@@ -18,7 +18,7 @@ Path to the configuration that should be uploaded. Defaults to the current worki
 
 ### Options
 
-* `-message MESSAGE=Queued via tfh`
+* `-message "Queued via tfh"`
 
 An optional message to associate with the run. Defaults to "Queued via tfh".
 
@@ -42,7 +42,7 @@ If true (default), push will upload only files committed to your VCS, if detecte
 
 After staring a plan, stream the logs back to the console.
 
-* `-poll SECONDS=0`
+* `-poll 0`
 
 Number of seconds to wait between polling the submitted run for a non-active status. Defaults to 0 (no polling). If streaming logs, controls the seconds between updates.
 
