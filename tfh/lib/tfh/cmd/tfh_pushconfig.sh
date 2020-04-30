@@ -141,7 +141,7 @@ cat > "$run_payload" <<EOF
 {
 "data": {
   "attributes": {
-    "is-destroy": ${1:-false},
+    "is-destroy": $1,
     "message": "$2"
   },
   "type":"runs",
@@ -342,7 +342,12 @@ tfh_pushconfig () {
     fi
   fi
 
-  make_run_payload "$destroy" "$message" "$config_id" "$workspace_id"
+  if [ $destroy ]; then
+      destroy_bool="true"
+  else
+      destroy_bool="false"
+  fi
+  make_run_payload "$destroy_bool" "$message" "$config_id" "$workspace_id"
   echodebug "Run payload contents:"
   echodebug "$(cat "$run_payload")"
 
