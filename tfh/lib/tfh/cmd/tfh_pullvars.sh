@@ -106,7 +106,7 @@ tfh_pullvars () (
     | [
       .attributes.key + " = ",
       (if .attributes.hcl == false then
-        if .attributes.value | contains("\n") then
+      if (.attributes.value != null) and (.attributes.value | contains("\n")) then
           "<<EOF\n"
         else
           "\""
@@ -114,7 +114,7 @@ tfh_pullvars () (
       else empty end),
       .attributes.value,
       (if .attributes.hcl == false then
-        if .attributes.value | contains("\n") then
+      if (.attributes.value != null) and (.attributes.value | contains("\n")) then
           "\nEOF"
         else
           "\""
