@@ -369,7 +369,7 @@ tfh () {
 }
 
 tfh_version () {
-  echo "0.2.8dev"
+  echo "0.2.9"
 }
 
 ##

@@ -1,3 +1,16 @@
+## 0.2.9 (November 24, 2020)
+
+BUG FIXES:
+
+* VCS JSON payload missing a colon
+* Add check for explicit JSON `null` in variable value response
+* Correctly supply `is-destroy` in `pushconfig`(TylerPinson)
+
+ENHANCEMENTS:
+
+* If a workspace is set to auto-apply, then a pushconfig will follow the apply when polling or streaming
+
+
 ## 0.2.8 (January 7, 2020)
 
 BUG FIXES:
