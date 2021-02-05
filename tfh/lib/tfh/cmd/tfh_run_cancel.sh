@@ -29,7 +29,7 @@ tfh_run_cancel () {
     return 1
   fi
 
-  if [ -z "$run_id" ]; then
+  if [ -z "$run_ids" ]; then
     # get the run ID of the last run in a cancelable state and use that
     if ! check_required org ws; then
       echoerr "need org and workspace to locate cancelable run"

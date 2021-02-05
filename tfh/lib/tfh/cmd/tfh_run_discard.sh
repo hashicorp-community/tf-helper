@@ -29,7 +29,7 @@ tfh_run_discard () {
     return 1
   fi
 
-  if [ -z "$run_id" ]; then
+  if [ -z "$run_ids" ]; then
     # get the run ID of the last run in a discardable state and use that
     if ! check_required org ws; then
       echoerr "need org and workspace to locate discardable run"
