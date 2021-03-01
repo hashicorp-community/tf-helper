@@ -54,3 +54,6 @@ Remove the VCS integration.
 
 If true, runs will be queued immediately after workspace creation. If false, runs will not queue until a run is manually queued first. Defaults to false.
 
+* `-execution-mode MODE`
+
+Which execution mode to use. Valid values are "remote", "local", and "agent".
