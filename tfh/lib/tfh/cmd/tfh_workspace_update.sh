@@ -131,7 +131,6 @@ tfh_workspace_update () {
     return 1
   fi
 
-  cat "$payload"
   cleanup "$payload"
 
   echo "Updated workspace $org/$up_ws"
