@@ -46,7 +46,14 @@ If true, when the configuration is ingressed from the VCS service VCS submodules
 
 The OAuth ID to be used with the VCS integration.
 
+* `-remove-vcs`
+
+Remove the VCS integration.
+
 * `-queue-all-runs`
 
 If true, runs will be queued immediately after workspace creation. If false, runs will not queue until a run is manually queued first. Defaults to false.
 
+* `-execution-mode MODE`
+
+Which execution mode to use. Valid values are "remote", "local", and "agent".

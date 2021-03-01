@@ -49,7 +49,9 @@ tfh_workspace_update () {
   vcs_branch="$6"
   vcs_submodules="$7"
   oauth_id="$8"
-  queue_all_runs="$9"
+  remove_vcs="$9"
+  queue_all_runs="${10}"
+  execution_mode="${11}"
 
   payload="$TMPDIR/tfe-migrate-payload-$(junonia_randomish_int)"
 
@@ -106,6 +108,17 @@ tfh_workspace_update () {
         vcs_obj="$vcs_obj \"oauth-token-id\": \"$oauth_id\""
   fi
 
+  if [ $remove_vcs ] && echo "$TFH_CMDLINE" | grep -Eq -- '-remove-vcs'; then
+    vcs_obj=
+    [ "$attr_obj" ] && attr_obj="$attr_obj,"
+    attr_obj="$attr_obj \"vcs-repo\": null"
+  fi
+
+  if [ -n "$execution_mode" ] && echo "$TFH_CMDLINE" | grep -Eq -- '-execution-mode'; then
+        [ "$attr_obj" ] && attr_obj="$attr_obj,"
+        attr_obj="$attr_obj \"execution-mode\": \"$execution_mode\""
+  fi
+
   if [ "$vcs_obj" ]; then
     [ "$attr_obj" ] && attr_obj="$attr_obj,"
     attr_obj="$attr_obj \"vcs-repo\": {$vcs_obj}"
@@ -123,6 +136,7 @@ tfh_workspace_update () {
     echoerr "Error updating workspace $org/$up_ws"
     return 1
   fi
+
 
   cleanup "$payload"
 
