@@ -76,9 +76,9 @@ Overwrite the existing value of every variable being operated on if that variabl
 
 Load Terraform variables from a tfvars file. Files can only set non-sensitive variables.
 
-* `-hide-sensitive=1`
+* `-hide-sensitive`
 
-Whether to hide sensitive values in output. Defaults to true.
+Whether to hide sensitive values in output. [default: `true`]
 
 ### Extended description
 

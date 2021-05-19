@@ -18,33 +18,33 @@ Path to the configuration that should be uploaded. Defaults to the current worki
 
 ### Options
 
-* `-message MESSAGE=Queued via tfh`
+* `-message MESSAGE`
 
-An optional message to associate with the run. Defaults to "Queued via tfh".
+An optional message to associate with the run. Defaults to "Queued via tfh". [default: `Queued via tfh`]
 
 * `-destroy`
 
 Queue a destroy plan. Defaults to false.
 
-* `-current-config BOOLEAN`
+* `-current-config`
 
 Do not push a local configuration. Instead, queue a plan with the latest configuration supplied.
 
-* `-upload-modules=1`
+* `-upload-modules`
 
-If true (default), then the modules are locked at their current checkout and uploaded completely. This prevents modules from being retrieved with "terraform init". This does not lock provider versions; use the "version" parameter in provider blocks in the configuration to accomplish that.
+If true (default), then the modules are locked at their current checkout and uploaded completely. This prevents modules from being retrieved with "terraform init". This does not lock provider versions; use the "version" parameter in provider blocks in the configuration to accomplish that. [default: `true`]
 
-* `-vcs=1`
+* `-vcs`
 
-If true (default), push will upload only files committed to your VCS, if detected. Currently supports git repositories.
+If true, push will upload only files committed to your VCS, if detected. Currently supports git repositories. [default: `true`]
 
 * `-stream`
 
 After staring a plan, stream the logs back to the console.
 
-* `-poll SECONDS=0`
+* `-poll SECONDS`
 
-Number of seconds to wait between polling the submitted run for a non-active status. Defaults to 0 (no polling). If streaming logs, controls the seconds between updates.
+Number of seconds to wait between polling the submitted run for a non-active status. Defaults to 0 (no polling). If streaming logs, controls the seconds between updates. [default: `0`]
 
 ### Extended description
 

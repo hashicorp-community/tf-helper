@@ -32,9 +32,9 @@ Access token for Terraform Enterprise API requests. Use of a `curlrc` file is en
 
 Curl configuration file providing an access token for Terraform Enterprise API requests. This file can be managed using the `tfh curl-config` command.
 
-* `-hostname HOSTNAME=app.terraform.io`
+* `-hostname HOSTNAME
 
-The address of your Terraform Enterprise instance. Defaults to the SaaS hostname at https://app.terraform.io
+The address of your Terraform Enterprise instance. Defaults to the SaaS hostname at https://app.terraform.io [default: `app.terraform.io`]
 
 * `-v, -verbose`
 

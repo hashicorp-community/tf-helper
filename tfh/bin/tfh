@@ -269,6 +269,27 @@ tfh_junonia_filter () {
   readonly address="https://$hostname"
   readonly ws="$prefix$name"
 
+  JW_CURL_AUTH_SRC=curlrc
+  JW_CURLRC="$JUNONIA_CONFIGDIR/curlrc"
+  JW_CONTENT_TYPE="application/vnd.api+json"
+
+  JW_ADDL_PARAMS="HOSTNAME=$hostname"
+  JW_ADDL_PARAMS="$JW_ADDL_PARAMS${JUNONIA_RS}ADDRESS=$address"
+
+  if [ -n "$org" ]; then
+    JW_ADDL_PARAMS="$JW_ADDL_PARAMS${JUNONIA_RS}ORG=$org"
+  fi
+  if [ -n "$prefix" ]; then
+    JW_ADDL_PARAMS="$JW_ADDL_PARAMS${JUNONIA_RS}PREFIX=$prefix"
+  fi
+  if [ -n "$name" ]; then
+    JW_ADDL_PARAMS="$JW_ADDL_PARAMS${JUNONIA_RS}NAME=$name"
+  fi
+  if [ -n "$ws" ]; then
+    JW_ADDL_PARAMS="$JW_ADDL_PARAMS${JUNONIA_RS}WORKSPACE=$ws"
+  fi
+  #readonly JW_ADDL_OPTIONS=
+
   echov "org:       $org"
   echov "prefix:    $prefix"
   echov "workspace: $name"
@@ -393,8 +414,8 @@ if [ -n "$TF_LOG" ]; then
   # Debugging. Print command errors and make them verbose
   tar_verbose=v
   curl_silent=
-  export JUNONIA_DEBUG=1
-  export TFH_vvverbose=1
+  JUNONIA_DEBUG=1
+  TFH_vvverbose=1
   exec 3>&2
 else
   # Not debugging. Shut everyting up.
@@ -406,6 +427,7 @@ fi
 junonia_bootstrap
 
 . "$JUNONIA_PATH"/lib/tfh/junonia
+. "$JUNONIA_PATH"/lib/tfh/junonia_web.sh
 
 echodebug "$PWD"
 echodebug "$0 $*"

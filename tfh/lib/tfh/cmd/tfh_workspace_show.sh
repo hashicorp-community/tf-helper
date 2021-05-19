@@ -21,26 +21,9 @@
 ## -------------------------------------------------------------------
 
 tfh_workspace_show () {
-  show_ws="$1"
+  resp="$1"
 
-  if [ -z "$show_ws" ]; then
-    if ! check_required ws; then
-      echoerr 'For workspace commands, a positional parameter is also accepted:'
-      echoerr 'tfh workspace show WORKSPACE_NAME'
-      return 1
-    else
-      show_ws="$ws"
-    fi
-  fi
-
-  echodebug "API request to show workspace:"
-  url="$address/api/v2/organizations/$org/workspaces/$show_ws"
-  if ! show_resp="$(tfh_api_call "$url")"; then
-    echoerr "Error showing workspace information for $show_ws"
-    return 1
-  fi
-
-  printf "%s" "$show_resp" | jq -r '
+  printf "%s" "$resp" | jq -r '
     "name              = " + .data.attributes.name,
     "id                = " + .data.id,
     "auto-apply        = " + (.data.attributes."auto-apply"|tostring),
