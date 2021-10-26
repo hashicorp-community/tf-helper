@@ -688,13 +688,13 @@ tfh_pushvars () {
     for var in $all_vars; do
       if   [ -n "$var_file_arg" ] && [ -n "$config_dir" ]; then
         val_lines="$(echo "var.$var" \
-                     | terraform console "$var_file_arg" "$config_dir" 2>&1)"
+                     | terraform console -chdir="$config_dir" "$var_file_arg" 2>&1)"
       elif [ -n "$var_file_arg" ] && [ -z "$config_dir" ]; then
         val_lines="$(echo "var.$var" \
                      | terraform console "$var_file_arg" 2>&1)"
       elif [ -z "$var_file_arg" ] && [ -n "$config_dir" ]; then
         val_lines="$(echo "var.$var" \
-                     | terraform console "$config_dir" 2>&1)"
+                     | terraform console -chdir="$config_dir" 2>&1)"
       else
         val_lines="$(echo "var.$var" \
                      | terraform console 2>&1)"
@@ -710,6 +710,8 @@ tfh_pushvars () {
       # Remove texts related to state lock from the output if present.
       val_lines="$(echo "$val_lines" \
                    | grep -vE "Acquiring state lock|Releasing state lock" 2>&3)"
+
+      val_lines="$(echo "$val_lines" | sed -e 's/^"//; s/"$//' 2>&3)"
 
       val="$(escape_value "$val_lines")"
 
