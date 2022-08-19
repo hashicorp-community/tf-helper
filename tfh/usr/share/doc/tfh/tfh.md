@@ -1,50 +1,37 @@
 ## `tfh`
 
-Perform operations relating to HashiCorp Terraform
+Command line interface for Terraform Cloud and Enterprise
 
 ### Synopsis
 
-    tfh [SUBCOMMANDS] [PARAMETERS] [OPTIONS]
+    tfh SUBCOMMAND [ ... ]
 
 ### Description
 
-Perform operations relating to HashiCorp Terraform artifacts (configurations, states) and services (Terraform Enterprise).
+https://www.terraform.io/cloud-docs/api-docs
 
 ### Options
 
-* `-org ORGANIZATION`
+* `-hostname HOSTNAME`
 
-The name of the Terraform Enterprise organization.
+TFE host (e.g. tfe.example.com)
 
-* `-name WORKSPACE_NAME`
+* `-oauth OAUTH_TOKEN`
 
-The name of the Terraform Enterprise workspace.
-
-* `-prefix WORKSPACE_PREFIX`
-
-Terraform Enterprise workspace prefix. Used when working with multiple workspaces in a single configuration.
-
-* `-token TOKEN`
-
-Access token for Terraform Enterprise API requests. Use of a `curlrc` file is encouraged to keep tokens out of environment variables and the process list.
+TFC / TFE OAuth token
 
 * `-curlrc FILEPATH`
 
-Curl configuration file providing an access token for Terraform Enterprise API requests. This file can be managed using the `tfh curl-config` command.
-
-* `-hostname HOSTNAME=app.terraform.io`
-
-The address of your Terraform Enterprise instance. Defaults to the SaaS hostname at https://app.terraform.io
+Curl configuration file providing an access token for API requests
 
 * `-v, -verbose`
 
-Enable verbose messages.
+Enable verbose messages
 
 * `-vv, -vverbose`
 
-Enable very verbose messages.
+Enable very verbose messages
 
 * `-vvv, -vvverbose`
 
-Enable very, very verbose messages.
-
+Enable very very verbose messages

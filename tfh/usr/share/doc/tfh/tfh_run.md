@@ -1,11 +1,12 @@
 ## `tfh run`
 
-Perform operations on TFE runs
+Run run subcommands
 
 ### Synopsis
 
-    tfh run SUBCOMMAND
+    tfh run COMMAND[ ... ]
 
 ### Description
 
-Perform a variety of operations on TFE runs, where subcommand is one of the following.
+Run run subcommands
+

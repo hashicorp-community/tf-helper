@@ -1,0 +1,1047 @@
+#!/bin/sh
+
+_junonia_web_cmds='  jpath
+    JSON_TEXT=-
+    -r, -root ROOT_SELECTOR=.
+  jtable
+    JSON_TEXT=-
+    -r, -root ROOT_SELECTOR=.
+    -t, -transpose=
+  jtree
+    JSON_TEXT=-
+    -r, -root ROOT_SELECTOR=.
+  request
+    METHOD
+    PAYLOAD
+    CONTENT_TYPE
+    URL
+    NPAGES
+    SELECTOR
+    CALLBACK
+    CURL_OPTIONS'
+
+_junonia_jtree_md () {
+cat << EOF
+## \`$JUNONIA_NAME jtree\`
+
+Print JSON in a tree format
+
+### Synopsis
+
+    $JUNONIA_NAME jtree [JSON_TEXT] [ROOT_SELECTOR]
+
+### Description
+
+Prints JSON supplied on \`stdin\` or as a positional parameter in an indented tree-like format with no brackets or other formatting.
+
+### Positional parameters
+
+* \`JSON_TEXT\`
+
+JSON formatted text to print as a tree. If \`-\` is given input will be read from \`stdin\`. [default: \`-\`]
+
+### Options
+
+* -r, -root \`ROOT_SELECTOR\`
+
+Provide a \`jq\` style selector that should be an array of objects. [default: \`.\`]
+
+EOF
+}
+
+_junonia_jpath_md () {
+cat << EOF
+## \`$JUNONIA_NAME jpath\`
+
+Print flattened JSON
+
+### Synopsis
+
+    $JUNONIA_NAME jpath [JSON_TEXT] [ROOT_SELECTOR]
+
+### Description
+
+Prints JSON supplied on \`stdin\` or as a positional parameter in a flat, \`SELECTOR VALUE\` format.
+
+### Positional parameters
+
+* \`JSON_TEXT\`
+
+JSON formatted text to print as a tree. If \`-\` is given input will be read from \`stdin\`. [default: \`-\`]
+
+### Options
+
+* -r, -root \`ROOT_SELECTOR\`
+
+Provide a \`jq\` style selector that should be an array of objects. [default: \`.\`]
+
+EOF
+}
+
+_junonia_jtable_md () {
+cat << EOF
+## \`$JUNONIA_NAME jtable\`
+
+Print JSON values from an array of objects in a table format
+
+### Synopsis
+
+    $JUNONIA_NAME jtable [JSON_TEXT] [-r ROOT_SELECTOR] [-t] [COLUMNS]
+
+### Description
+
+Prints JSON supplied on \`stdin\` or as a positional parameter in a table format, where the columns are \`jq\` selector values.
+
+### Positional parameters
+
+* \`JSON_TEXT\`
+
+JSON formatted text to print as a table. If \`-\` is given input will be read from \`stdin\`. [default: \`-\`]
+
+### Options
+
+* -r, -root \`ROOT_SELECTOR\`
+
+Provide a \`jq\` style selector that should be an array of objects. [default: \`.\`]
+
+* -t, -transpose
+
+If the table should be transposed. [default: \`true\`]
+
+### JSON options
+
+* \`COLUMNS\`
+
+Provide space separated \`jq\` style selectors, beginning with \`.\`, that specify the columns of the table.
+
+EOF
+}
+
+_junonia_request_md () {
+cat << EOF
+## \`$JUNONIA_NAME request\`
+
+Perform an HTTP request
+
+### Synopsis
+
+    $JUNONIA_NAME request [METHOD [PAYLOAD]] [CONTENT_TYPE] URL
+                          [NPAGES] [SELECTOR] [CALLBACK] [CURL_OPTIONS]
+
+### Description
+
+Perform an HTTP request using \`curl\` that can optionally retrieve multiple pages using either a \`jq\` style selector or a callback function or program.
+
+### Positional parameters
+
+* \`METHOD\`
+
+HTTP method.
+
+* \`PAYLOAD\`
+
+If the HTTP method is a \`POST\`, \`PUT\`, or \`PATCH\`, then a payload should be supplied as well.
+
+* \`CONTENT_TYPE\`
+
+Set the MIME type for the request.
+
+* \`URL\`
+
+The URL to request with \`curl\`. Required.
+
+* \`NPAGES\`
+
+How many pages of a paginated request to retrieve if a selector or callback is given. Defaults to all pages.
+
+* \`SELECTOR\`
+
+A \`jq\` style selector that contains the next page to request in a paginated response.
+
+* \`CALLBACK\`
+
+A callback function or program that will retceive the response, and should return the next page that should be requested.
+
+* \`CURL_OPTIONS\`
+
+Any additional options to \`curl\`.
+
+EOF
+}
+
+_junonia_web_mds () {
+_junonia_request_md
+_junonia_jtree_md
+_junonia_jpath_md
+_junonia_jtable_md
+}
+
+_junonia_web_func_names="
+${JUNONIA_NAME}_jtree
+${JUNONIA_NAME}_jtable
+${JUNONIA_NAME}_jpath
+${JUNONIA_NAME}_request"
+
+###
+### Execution environment setup and management
+###
+
+junonia_webinit () {
+  echodebug "begin junonia_webinit"
+
+  if [ -n "$JW_INIT" ]; then
+    # init has already been run
+    return
+  fi
+
+  if ! junonia_require_cmds jq curl; then
+    return 1
+  fi
+
+  _junonia_cmds="$_junonia_cmds
+$_junonia_web_cmds"
+
+  if [ -z "$JUNONIA_DEBUG" ]; then
+    JW_CURL_SILENT="-s"
+  fi
+
+  junonia_auth_config
+
+  readonly JW_DEFAULT_CURLRC="$JUNONIA_CONFIGDIR/curlrc"
+  readonly JW_CURLRC="${JW_CURLRC:-"$JW_DEFAULT_CURLRC"}"
+  # Indicate that init has happened
+  readonly JW_INIT=1
+}
+
+
+junonia_auth_config () {
+  JW_AUTH_SRC=
+  if [ -n "$JW_AUTH" ]; then
+    JW_AUTH_SRC=env
+    echodebug "explicit curl auth provided: $JW_AUTH"
+  else
+    if [ -f "$JW_CURLRC" ]; then
+      JW_AUTH_SRC=curlrc
+      echodebug "authenticating curl with curlrc $JW_CURLRC"
+      JW_AUTH="--config $JW_CURLRC"
+    elif [ -n "$JW_OAUTH" ]; then
+      JW_AUTH_SRC=oauth
+      echodebug "authenticating curl with oauth token"
+      JW_AUTH="--oauth2-bearer $JW_OAUTH"
+    elif [ -n "$JW_BASIC" ]; then
+      JW_AUTH_SRC=basic
+      echodebug "authenticating curl with basic login info"
+      JW_AUTH="--user $JW_BASIC"
+    fi
+  fi
+}
+
+
+###
+### jq utility functions
+###
+
+# Recursively print a JSON object as indented plain text.
+# Call by including in a jq program and sending an object and starting indent:
+# jleaf({"element": .any_attr, "indent": "  "})
+junonia_jq_jleaf='
+  def jleaf(json):
+    json.indent  as $i  |
+    $i + "  "    as $ni |
+    json.element as $e  |
+      (select(($e | type) != "array" and ($e | type) != "object") |
+        "\($e)"),
+      (select(($e | type) == "object" or ($e | type) == "array") |
+        $e | keys[] as $k |
+        "\($k):",
+        "\(jleaf({"element": $e[$k], "indent": $ni}))");
+'
+
+# Recursively print the leaves of a JSON object as plain text.
+# Call by including in a jq program and sending an object:
+# jpath({"element": .any_attr, "indent": "  "})
+junonia_jq_jpath='
+  def jpath(json):
+    json.path    as $p  |
+    json.element as $e  |
+      (select(($e | type) != "array" and ($e | type) != "object") |
+        "\($p) \($e)"),
+      (select(($e | type) == "array") |
+        $e | keys[] as $k |
+        "\(jpath({"element": $e[$k],
+                 "path":    "\($p).[\($k)]"}))"),
+      (select(($e | type) == "object") |
+        $e | keys[] as $k |
+        "\(jpath({"element": $e[$k],
+                 "path":    "\($p).\($k)"}))");
+'
+
+junonia_jq_jtable='
+  def jtable(json):
+      json.transpose as $t
+      | [
+          json.element[]
+          | [
+              json.columns[] as $c
+              | getpath($c | split(".")[1:])
+            ]
+        ] 
+        | if $t then transpose else . end
+        | .[]
+        | join($jfs);
+'
+
+readonly JUNONIA_JQS="
+$junonia_jq_jleaf
+$junonia_jq_jpath
+$junonia_jq_jtable
+"
+
+junonia_jprint () {
+  echodebug "junonia_jprint"
+  echodebug_raw "$@"
+
+  # A printing program is always required
+  jq_prog="$1"
+  shift
+
+  if [ -z "$jq_prog" ]; then
+    echoerr 'a jq program is required in order to jprint'
+    return 1
+  fi
+
+  echodebug "jq_prog: $jq_prog"
+  
+  # Now, with the program shifted
+  # $1: JSON body
+  # $2: Optional selector for jq to make the root
+
+  # no args, or both args empty
+  if [ $# -eq 0 ] || ( [ "$1" = "" ] && [ "$2" = "" ] ); then
+    _body="$(cat)"
+    _selector=
+  # explicit read from stdin or first arg is json arg (start with ".")
+  elif [ "$1" = "-" ] || [ "$(echo "$1" | cut -c 1)" = "." ]; then
+    _body="$(cat)"
+    _selector="$2"
+    shift
+    shift
+  # 1 or more args, arg 1 is not - or starts with .
+  # take $1 and $2, with $2 potentially empty
+  else
+    _body="$1"
+    _selector="$2"
+    shift
+    shift
+  fi
+
+  # This provides $ARGS.positional
+  _jqargs=
+  if [ -n "$1" ]; then
+    _jqargs="--args $@"
+  fi
+
+  # TODO: consider coming back to this. it caused issues with consolidating
+  #       arguments on the command line.
+  #
+  # no explicit selector in the function call, but a json arg at the CLI
+  #if [ -z "$_selector" ]; then
+  #  if [ -n "$JW_JQARGS" ]; then
+  #    _selector=$(echo "$JW_JQARGS" | head -n 1)
+  #  fi
+  #fi
+
+  echodebug "initial body:"
+  echodebug_raw "$_body"
+  echodebug "selector: $_selector"
+  echodebug "positional arguments: $_jqargs"
+
+  # If a selector was given, select that as the root, otherwise take everything
+  if [ -n "$_selector" ]; then
+    if ! _tree_root="$(printf '%s' "$_body" | jq -r "$_selector")"; then
+      echo "unable to select object(s) using $_selector"
+    fi
+  else
+    _tree_root="$_body"
+  fi
+
+  echodebug "jprint body"
+  echodebug_raw "$_tree_root"
+
+  if _jprinted="$(printf '%s' "$_tree_root" | \
+                     jq -r --arg jfs $JFS \
+                        "$JUNONIA_JQS $jq_prog" \
+                        $_jqargs 2>&3)"; then
+    echo "$_jprinted"
+  else
+    echoerr "failed to select valid JSON with selector or not a JSON object:"
+    echoerr "root selector: $_selector"
+    echoerr "body:"
+    echoerr_raw "$_body"
+    return 1
+  fi
+}
+
+# $1: JSON body
+# $2: Optional selector for jq to make the root
+
+# Pretty print JSON as text with each key/value on a single line and no
+# brackets, quotes, or other formatting.
+junonia_jtree () {
+  echodebug 'junonia_jtree'
+  jq_prog='jleaf({"element":.,"indent":""})'
+  echodebug 'jtree jqprog'
+  echodebug_raw "$jq_prog"
+  junonia_jprint "$jq_prog" "$1" "$2"
+}
+
+# Print JSON paths and values on a single line in the format:
+# <path> <value>
+junonia_jpath () {
+  jq_prog='jpath({"element":.,"path":""})'
+  echodebug 'jpath jqprog'
+  echodebug_raw "$jq_prog"
+  junonia_jprint "$jq_prog" "$1" "$2"
+}
+
+# Print selected JSON paths and values in a table
+junonia_jtable () {
+  text="$1"
+  root="$2"
+  transpose="$3"
+
+  if [ $transpose ]; then
+    jq_prog='jtable({"element":.,"columns":$ARGS.positional,"transpose":true})'
+  else
+    jq_prog='jtable({"element":.,"columns":$ARGS.positional})'
+  fi
+
+  # Columns are jq args and so are collected in JW_JQARGS
+
+  echodebug 'jtable jqprog'
+  echodebug_raw "$jq_prog"
+
+  table="$(junonia_jprint "$jq_prog" "$text" "$root" \
+                          $(echo $JW_JQARGS | xargs))"
+
+  echodebug "jtable result:"
+  echodebug_raw "$table"
+
+  junonia_format_jtable "$table"
+}
+
+junonia_format_jtable () {
+  table="$1"
+  headers="$2"
+
+  echodebug "headers"
+  echodebug_raw "$headers"
+  echodebug "table"
+  echodebug_raw "$table"
+
+  n_cols="$(echo "$table" | awk -v jfs=$JFS '{
+                              n = gsub(jfs, "") + 1
+                              print n
+                              exit
+                            }')"
+  echodebug "number of cols: $n_cols"
+
+  colw="$(  echo "$table" | awk -v w="$JUNONIA_WRAP" -v jfs=$JFS '{
+                              c = w / (gsub(jfs, "") + 1)
+                              print c
+                              exit
+                            }')"
+  echodebug "column width: $colw"
+
+  colws="$(echo "$headers" | awk -v jfs=$JFS -v w=$colw '{
+    n = split($0, a, jfs)
+    for(i=1; i<=n; i++) {
+      if(substr(a[i], length(a[i])) == " ") {
+        colws = colws jfs length(a[i])
+      } else {
+        colws = colws jfs w
+      }
+    }
+    sub(jfs, "", colws)
+    print colws
+  }')"
+  echodebug "column widths: $colws"
+
+  if ! table_txt="$(junonia_ncol "$headers" "$colws")"; then
+    echoerr "Could not format table"
+    echoerr_raw "$table_txt"
+    return 1
+  fi
+  printf '%s\n' "$table_txt"
+
+  # iterate over the lines provided from jq, formatting into the columns
+  printf "%s\n" "$table" | while read -r record; do
+    # If there is an error we do not want to repeat that for every row
+    if ! table_txt="$(junonia_ncol "$record" "$colws")"; then
+      echoerr "Could not format table"
+      echoerr_raw "$table_txt"
+      return 1
+    fi
+    printf '%s\n' "$table_txt"
+  done
+}
+
+junonia_web () {
+  func_name="$1"
+  shift
+  method="$1"
+  shift
+  content_t="$1"
+  shift
+  url="$1"
+  shift
+  output="$1"
+  shift
+
+  echodebug "junonia_web"
+  echodebug "  func_name: $func_name"
+  echodebug "  method: $method"
+  echodebug "  content_t: $content_t"
+  echodebug "  url: $url"
+  echodebug "  output: $url"
+
+  # Determine how many upper case parameters there are to replace in the url
+  echodebug "url: $url"
+  n_opts="$(echo "$url" | awk '{print gsub(/{[-_\.A-Z]+}/,"")}')"
+  echodebug "url opts: $n_opts"
+
+  # See if there are additional parameters coming from elsewhere.
+  if [ -n "$JW_ADDL_PARAMS" ]; then
+    echodebug "addl params: $JW_ADDL_PARAMS"
+    url="$(echo "$url" | awk -v "JRS=$JRS" -v "params=$JW_ADDL_PARAMS" '{
+      split(params, addl_params, JRS)
+      for(p in addl_params) {
+        split(addl_params[p], a, "=")
+        did_sub = sub("{" a[1] "}", a[2])
+        subs = subs + did_sub
+      }
+      print
+      exit subs
+    }')"
+    addl_subs=$?
+  else
+    addl_subs=0
+  fi
+
+  # Remove the number of upper case parameters replaced by addl parameters
+  n_opts=$(( $n_opts - $addl_subs ))
+  echodebug "url opts - add_opts: $n_opts"
+  echodebug "addl subs done: $addl_subs"
+
+  # For that many options, shift off values and substitute the parameter.
+  # Parameters are of the form FOO=bar, where FOO is always uppercase.
+  i=0
+  n_subs=0
+  while [ $i -lt $# ] && [ $i -lt $n_opts ]; do
+    if [ -z "${1#*=}" ]; then
+      echoerr "Missing value for required parameter $1"
+      shift
+    fi
+
+    echodebug "sub($1)"
+    url="$(echo "$url" | awk -v "param=$1" '{
+      split(param, a, "=")
+      did_sub = sub("{" a[1] "}", a[2])
+      print
+      exit did_sub
+    }')"
+    n_subs=$(( $n_subs + $? ))
+    i=$(( $i+1 ))
+    shift
+  done
+  echodebug "arg subs done: $n_subs"
+
+  if [ "$n_subs" -lt "$n_opts" ]; then
+    echoerr "Mismatch on number of parameters and url"
+    echoerr "Cannot continue with $url"
+    return 1
+  fi
+
+  echodebug "final url: $url"
+
+  json="$1"
+  shift
+  echodebug "  json: $json"
+
+  echodebug "remaining arguments ($#):"
+  echodebug_raw $@
+  i=0
+  query=
+  while [ $i -le $# ]; do
+    query="$query&$1"
+    i=$(( $i+1 ))
+    shift
+  done
+  echodebug "remaining arguments ($#):"
+  echodebug_raw $@
+
+  if [ -n "$JW_ADDL_OPTIONS" ]; then
+    query="$query&$JW_ADDL_OPTIONS"
+  fi
+
+  if [ -n "$query" ]; then
+    query="?${query#?}"
+  fi
+
+  echodebug "final query: $query"
+
+  if _junonia_load_func $func_name; then
+    echodebug "located callback $func_name"
+    cb=$func_name
+  elif command -v ${JUNONIA_NAME}_web_callback >/dev/null 2>&1; then
+    echodebug "global callback ${JUNONIA_NAME}_web_callback present"
+    cb=${JUNONIA_NAME}_web_callback
+  else
+    echodebug "no callback found"
+    cb=
+  fi
+
+  echodebug "JW_JSON:"
+  echodebug_raw "$JW_JSON"
+
+  case "$method" in
+    POST|PUT|PATCH)
+      if [ -n "$cb" ]; then
+        echodebug "making $method request with callback $cb"
+        resp="$($cb "$(junonia_request "$method" "$JW_JSON" "$content_t" "$url$query")")"
+      else
+        echodebug "making $method request without callback"
+        resp="$(junonia_request "$method" "$JW_JSON" "$content_t" "$url$query")"
+      fi
+      ;;
+    *)
+      if [ -n "$cb" ]; then
+        echodebug "making $method request with callback $cb"
+        resp="$($cb "$(junonia_request "$method" "$content_t" "$url$query")")"
+      else
+        echodebug "making $method request without callback"
+        resp="$(junonia_request "$method" "$content_t" "$url$query")"
+      fi
+      ;;
+    esac
+
+    echodebug "return json flag: $json"
+    echodebug "output:"
+    echodebug_raw "$output"
+
+    if ( [ -n "$output" ] && [ "$JSOH" != "$output" ] ) && [ -z "$json" ]; then
+      set --
+      printf "%s" "$resp" | \
+      jq -r --arg jfs $JFS "$JUNONIA_JQS \"$output\"" | \
+      while read -r line; do
+        case "$line" in
+          $JSOH)
+            tpl_cmd=
+            tpl_arg=
+            output_tpl=1
+            get_tpl="cmd"
+            #echodebug "SOH"
+            #echodebug "cmd: $tpl_cmd"
+            #echodebug "arg: $tpl_arg"
+            ;;
+          $JEOT)
+            #echodebug "EOT"
+            #echodebug "cmd: $tpl_cmd"
+            #echodebug "arg: $tpl_arg"
+
+            #echodebug "tpl_cmd: $tpl_cmd $@"
+            $tpl_cmd "$@"
+
+            output_tpl=
+            get_tpl=
+            ;;
+          $JSTX)
+            get_tpl="newarg"
+            #echodebug "STX"
+            #echodebug "cmd: $tpl_cmd"
+            #echodebug "arg: $tpl_arg"
+            ;;
+          $JETX)
+            set "$@" "$tpl_arg"
+            tpl_arg=
+            get_tpl=
+            #echodebug "ETX"
+            #echodebug "cmd: $tpl_cmd"
+            #echodebug "arg: $tpl_arg"
+            ;;
+          *)
+            if [ $output_tpl ]; then
+              case "$get_tpl" in
+                cmd)
+                  tpl_cmd="$line"
+                  get_tpl=
+                  #echodebug "* cmd"
+                  #echodebug "cmd: $tpl_cmd"
+                  #echodebug "arg: $tpl_arg"
+                  ;;
+                newarg)
+                  if [ "$line" != "" ]; then
+                    tpl_arg="$tpl_arg$line"
+                    #echodebug "* arg1"
+                    #echodebug "cmd: $tpl_cmd"
+                    #echodebug "arg: $tpl_arg"
+                    get_tpl=arg
+                  fi
+                  ;;
+                arg)
+                  tpl_arg="$(printf "%s\n%s" "$tpl_arg" "$line")"
+                  #echodebug "* arg2"
+                  #echodebug "cmd: $tpl_cmd"
+                  #echodebug "arg: $tpl_arg"
+                  ;;
+                *)
+                  tpl_cmd="$tpl_cmd\n$line"
+                  get_tpl=""
+                  #echodebug "* cmd2"
+                  #echodebug "cmd: $tpl_cmd"
+                  #echodebug "arg: $tpl_arg"
+                  ;;
+                esac
+            else
+              printf "%s\n" "$line"
+              #echodebug "*"
+            fi
+            ;;
+        esac
+      done
+    else
+      printf "%s\n" "$resp"
+    fi
+}
+
+# Perform a curl using the configured authentication and given options.
+# Optionally supply a number and jq selector to retrieve additional pages.
+# Usage:
+#
+# Perform one page request and return the result
+# junonia_request <method> <method specific options> <curl url and options>
+#
+# Perform a page request and get pages using the selected url up to a default
+# junonia_request <jq selector> <method> <method specific options> \
+#                 <curl url and options>
+#
+# Perform a page request and get pages using the selected url up to a limit
+# junonia_request <integer pages to retrieve> <jq selector> <method> \
+#                 <method specific options> <curl url and options>
+#
+# Perform a page request and get next pages using a callback
+# junonia_request <paging function name> <method> <method specific options> \
+#                 <curl url and options>
+#
+# npages                         = error
+#           selector             = use selector, get all pages 
+#                       callback = use callback
+# npages && selector             = use selector, get exactly npages
+# npages &&             callback = error
+#           selector && callback = error
+# 
+# junonia_request [method [payload]] [content_t] url
+#                 [npages] [selector] [callback] [curl options]
+junonia_request () {
+  echodebug "junonia_request args: $@"
+
+  if [ $# -eq 7 ]; then
+    _method="$1"
+    _url="$2"
+    _content_t="$3"
+    _payload="$4"
+    _npages="$5"
+    _selector="$6"
+    _callback="$7"
+
+    if [ -z "$_url" ]; then
+      echoerr "a URL was not specified"
+      return 1
+    fi
+  else
+    _method=
+    _url=
+    _content_t=
+    _payload=
+    _npages=
+    _selector=
+    _callback=
+
+    case "$1" in
+      GET|HEAD|DELETE|CONNECT|OPTIONS|TRACE)
+        _method="$1"
+        shift
+        echodebug "no special processing required for method $_method"
+        ;;
+      POST|PUT|PATCH)
+        _method="$1"
+        shift
+        _payload="$1"
+        shift
+        if [ -z "$_payload" ]; then
+          echodebug "WARNING: EMPTY PAYLOAD"
+          # Not going to error. I have seen weirder things than requiring
+          # an empty payload on a POST.
+        fi
+        ;;
+      http*)
+        _method=GET
+        _url="$1"
+        shift
+        ;;
+    esac
+
+    if [ -z "$_url" ]; then
+      _content_t="$1"
+      shift
+
+      if [ -z "$1" ]; then
+        echoerr "no url was provided"
+        return 1
+      else
+        _url="$1"
+        shift
+      fi
+    fi
+
+    if [ -z "$_content_t" ]; then
+      if [ "$_method" = POST ]; then
+        echodebug "set default content type to application/json"
+        _content_t="application/json"
+      else
+        echodebug "set default content type to application/octet-stream"
+        _content_t="${JW_CONTENT_TYPE:-"application/octet-stream"}"
+      fi
+    fi
+
+    # Was a page limit provided?
+    if [ "$1" -eq "$1" ] >/dev/null 2>&1; then
+      echodebug "page limit is $1"
+      _npages="$1"
+      shift
+
+      # If 0 was supplied get all the pages using a very large number
+      if [ $_npages = 0 ]; then
+        echodebug "getting all pages due to page limit 0"
+        _npages=100000
+      fi
+    fi
+
+    # Was a _selector provided?
+    if [ -z "${1##.*}" ]; then
+      echodebug "selector provided for paging: $1"
+      _selector="$1"
+      shift
+    fi
+
+    # Was a _callback supplied?
+    echodebug "checking to see if callback was supplied: $1"
+    if [ junonia_require_cmds "$1" 2>/dev/null ]; then
+      echodebug "found callback command $1"
+      _callback="$1"
+      shift
+    else
+      echodebug "no callback command found"
+    fi
+  fi
+
+  echodebug "method:    $_method"
+  echodebug "url:       $_url"
+  echodebug "content_t: $_content_t"
+  echodebug "npages:    $_npages"
+  echodebug "selector:  $_selector"
+  echodebug "callback:  $_callback"
+  echodebug "remaining args to curl: $@"
+  echodebug "payload:"
+  echodebug_raw "$_payload"
+
+  case -$_npages:$_selector:$_callback- in
+  -::-)
+    echodebug "no page limit, no selector, no callback"
+    echodebug "will make the single request"
+    ;;
+  -?*::-)
+    echodebug "npages"
+    echoerr "page limit given but no selector or callback for request"
+    return 1
+    ;;
+  -:?*:-)
+    echodebug "selector only, will get all pages"
+    _npages=100000
+    echodebug "updated npages:   $_npages"
+    ;;
+  -::?*-)
+    echodebug "callback only, will get all pages"
+    _npages=100000
+    echodebug "updated npages:   $_npages"
+    ;;
+  -?*:?*:-)
+    echodebug "npages, selector, will get exact pages"
+    ;;
+  -?*::?*-)
+    echodebug "npages, callback"
+    echoerr "when using a callback it has explicit control over pagination"
+    echoerr "page limit given, which conflicts with callback"
+    return 1
+    ;;
+  -:?*:?*-|-?*:?*:?*-)
+    echodebug "selector, callback"
+    echoerr "selector and callback both specified for request"
+    return 1
+    ;;
+  esac
+
+  if [ -n "$_npages" ] && [ "$_npages" -lt 1 ]; then
+    return 0
+  fi
+
+  case "$JW_AUTH_SRC" in
+    curl)
+      _autharg="$JW_AUTH"
+      _autharg_debug='$JW_AUTH_REDACTED (curl)'
+      ;;
+    oauth)
+      _autharg="--oauth2-bearer $JW_OAUTH"
+      _autharg_debug='--oauth2-bearer $JW_OAUTH_REDACTED'
+      ;;
+    env)
+      _autharg="$JW_AUTH"
+      _autharg_debug='$JW_AUTH_REDACTED (env)'
+      ;;
+  esac
+
+  echovvv "curl --header \"Content-Type: $_content_t\"" >&2
+  if [ -n "$_autharg_debug" ]; then
+    echovvv "$_autharg_debug"
+  fi
+  if [ -n "$_payload" ]; then
+    echovvv "--data \"$_payload\""
+  fi
+  echovvv "     $*" >&2
+
+  if [ -z "$_payload" ]; then
+    _resp="$(curl $JW_CURL_SILENT -w '\nhttp_code: %{http_code}\n' \
+                  $_autharg \
+                  "$_url" \
+                  -H "Content-Type: $_content_t" \
+                  $@)"
+  else
+    _resp="$(curl $JW_CURL_SILENT "$_url" -w '\nhttp_code: %{http_code}\n' \
+                  $_autharg \
+                  -X "$_method" \
+                  -d "$_payload" \
+                  -H "Content-Type: $_content_t" \
+                  $@)"
+  fi
+
+  echodebug "curl output:"
+  echodebug_raw "$_resp"
+
+  _resp_body="$(printf '%s' "$_resp" | awk '!/^http_code/; /^http_code/{next}')"
+  _resp_code="$(printf '%s' "$_resp" | awk '!/^http_code/{next} /^http_code/{print $2}')"
+
+  JW_LAST_RESP_CODE="$_resp_code"
+
+  echodebug "extracted response code: $_resp_code"
+  echodebug "extracted response:"
+  echodebug_raw "$_resp_body"
+
+  case "$_resp_code" in
+    2*)
+      # Output the response here
+      printf "%s" "$_resp_body"
+
+      if [ -n "$_selector" ]; then
+        echodebug "selector"
+        _next_page="$(printf "%s" "$_resp_body" | \
+                      jq -r "$_selector" 2>&3)"
+        echodebug "next page: $next_page"
+      elif [ -n "$_callback" ]; then
+        echodebug "callback"
+        _next_page="$($_callback "$_resp_code" "$_resp_body")"
+      else
+        echodebug "no callback, no selector in jq_request"
+      fi
+
+      if [ -n "$_next_page" ] && [ "$_next_page" != null ] &&
+         ! [ "$_npages" -le 1 ]; then
+        echodebug "next link: $_next_link"
+        echodebug "_npages: $_npages (will be decremented by 1)"
+        junonia_request $((--_npages)) "$_selector" "$_next_page"
+      fi
+      ;;
+    4*|5*)
+      echoerr "API request failed."
+      echoerr_raw "HTTP status code: $_resp_code"
+      if [ -n "$_resp_body" ]; then
+        if _json_err="$(junonia_jtree "$_resp_body" "$JW_ERR_SELECTOR")"; then
+          echoerr_raw "Details:"
+          echoerr_raw "$_json_err"
+        fi
+      else
+        echoerr "Response:"
+        echoerr_raw "$_resp_body"
+      fi
+
+      return 1
+      ;;
+    *)
+      echoerr "Unable to complete API request."
+      echoerr "HTTP status code: $_resp_code."
+      echoerr "Response:"
+      echoerr "$_resp_body"
+      return 1
+      ;;
+  esac
+}
+
+# Copy of junonia_bootstrap for executing this script directly
+junonia_web_bootstrap () {
+  JUNONIA_TARGET="$0"
+  while [ -h "$JUNONIA_TARGET" ]; do
+    JUNONIA_PATH="$(file -h "$JUNONIA_TARGET" | \
+                    sed 's/^.*symbolic link to //')"
+    if [ "$(echo "$JUNONIA_PATH" | cut -c -1)" = "/" ]; then
+      JUNONIA_TARGET="$JUNONIA_PATH"
+    else
+      JUNONIA_TARGET="$(dirname $JUNONIA_TARGET)"
+      JUNONIA_TARGET="$JUNONIA_TARGET/$JUNONIA_PATH"
+    fi
+  done
+  JUNONIA_PATH="$(cd "$(dirname "$JUNONIA_TARGET")" && pwd -P)"
+  JUNONIA_TARGET="$JUNONIA_PATH/$(basename $JUNONIA_TARGET)"
+  if [ "$(basename "$JUNONIA_PATH")" = bin ]; then
+    JUNONIA_PATH="$(dirname "$JUNONIA_PATH")"
+  fi
+}
+
+if [ -z "$JUNONIA_INIT" ]; then
+  # junonia_web was not sourced from junonia
+  junonia_web_bootstrap
+
+  if [ "$(basename "$JUNONIA_TARGET" .sh)" != "junonia_web" ]; then
+    # junonia_web has been renamed and is being executed, which is a mode that
+    # allows users/devs to write Markdown docs for their REST endpoints and use
+    # this renamed script as their client.
+
+    if ! junonia_init > /dev/null 2>&1; then
+      # try to find junonia and source it 
+      for f in $JUNONIA_PATH/junonia \
+              $JUNONIA_PATH/bin/junonia \
+              $JUNONIA_PATH/lib/junonia \
+              $JUNONIA_PATH/lib/$JUNONIA_NAME/junonia; do
+        if [ -f "$f" ]; then
+          . "$f"
+          junonia_init
+          break
+        fi
+      done
+    fi
+
+    if [ -z "$JUNONIA_INIT" ]; then
+      echo "unable to initialize junonia" 1>&2
+      exit 1
+    fi
+    junonia_run "$@" 
+  fi
+fi

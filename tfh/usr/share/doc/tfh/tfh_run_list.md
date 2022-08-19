@@ -1,17 +1,20 @@
 ## `tfh run list`
 
-List runs for a workspace
+/runs/{RUN_ID}
 
 ### Synopsis
 
-    tfh run list [OPTIONS]
+    tfh run list [ ... ]
+
+### REST endpoint
+
+    GET https://{HOSTNAME}/api/v2/runs/{RUN_ID}
 
 ### Description
 
-List Terraform Enterprise runs for a workspace.
+https://www.terraform.io/enterprise/api-docs/run
 
-### Options
+### Positional parameters
 
-* `-id WORKSPACE_ID`
+* `RUN_ID`
 
-The ID of the workspace to list runs for. The ID can be specified directly using `-id`, or the workspace name can be specified using the common options `-name` and, if desired, `-prefix`.

@@ -1,17 +1,20 @@
 ## `tfh workspace delete`
 
-Delete a Terraform Enterprise workspace
+/workspaces/{WORKSPACE_ID}
 
 ### Synopsis
 
-    tfh workspace delete [OPTIONS]
+    tfh workspace delete [ ... ]
+
+### REST endpoint
+
+    DELETE https://{HOSTNAME}/api/v2/workspaces/{WORKSPACE_ID}
 
 ### Description
 
-Delete a Terraform Enterprise workspace.
+https://www.terraform.io/enterprise/api-docs/workspaces
 
 ### Positional parameters
 
-* `NAME`
+* `WORKSPACE_ID`
 
-Workspace name to show. Overrides the `-name` common option.

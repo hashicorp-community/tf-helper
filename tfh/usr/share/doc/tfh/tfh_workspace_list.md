@@ -1,11 +1,20 @@
 ## `tfh workspace list`
 
-List Terraform Enterprise workspaces for an organization
+/workspaces/{WORKSPACE_ID}
 
 ### Synopsis
 
-    tfh workspace list [OPTIONS]
+    tfh workspace list [ ... ]
+
+### REST endpoint
+
+    GET https://{HOSTNAME}/api/v2/workspaces/{WORKSPACE_ID}
 
 ### Description
 
-List Terraform Enterprise workspaces for an organization. An organization must be specified with the `-org` argument, or the `TFH_org` environment variable. Specifying a workspace is optional. If a workspace is specified with the `-name` argument or the `TFH_name` environment variable it will be preceded by an asterisk.
+https://www.terraform.io/enterprise/api-docs/workspaces
+
+### Positional parameters
+
+* `WORKSPACE_ID`
+

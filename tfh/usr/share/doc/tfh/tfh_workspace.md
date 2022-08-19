@@ -1,11 +1,12 @@
-## `tfh workspace, ws`
+## `tfh workspace`
 
-Perform operations on workspaces
+Run workspace subcommands
 
 ### Synopsis
 
-    tfh workspace SUBCOMMAND
+    tfh workspace COMMAND[ ... ]
 
 ### Description
 
-Perform a variety of operations on workspaces, where subcommand is one of the following.
+Run workspace subcommands
+
