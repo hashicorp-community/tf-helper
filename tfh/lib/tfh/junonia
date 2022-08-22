@@ -2296,7 +2296,7 @@ junonia_init () {
     return
   fi
 
-  readonly JUNONIA_VERSION="1.2.2"
+  readonly JUNONIA_VERSION="1.2.4"
 
   # Communication control characters (TC1 - TC4
   readonly JSOH="" # Start of heading    (SOH / TC1 / dec 1)

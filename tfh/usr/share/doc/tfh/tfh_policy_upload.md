@@ -1,20 +1,12 @@
 ## `tfh policy upload`
 
-/policies/{POLICY_ID}/upload
+Run policy upload subcommands
 
 ### Synopsis
 
-    tfh policy upload [ ... ]
-
-### REST endpoint
-
-    PUT https://{HOSTNAME}/api/v2/policies/{POLICY_ID}/upload
+    tfh policy upload COMMAND[ ... ]
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/policies
-
-### Positional parameters
-
-* `POLICY_ID`
+Run policy upload subcommands
 

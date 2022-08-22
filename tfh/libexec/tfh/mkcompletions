@@ -1,0 +1,40 @@
+#!/bin/sh
+
+cat << 'EOT'
+_tfh_completion()
+{
+  local cmd cur
+
+  cur=${COMP_WORDS[COMP_CWORD]}
+  cmd="${COMP_WORDS[@]: 0:$((${#COMP_WORDS[@]}-1))}"
+
+  case "$cmd" in
+EOT
+
+awk '
+  /^## `/ && NF > 2 {
+    sub(/^## /, "")
+    gsub(/`/, "")
+
+    # zdesk tickets list 
+    match($0, / [-_a-zA-Z0-0\.]+$/)
+    cmds = substr($0, 1, RSTART-1)
+    subcmd = substr($0, RSTART+1, RLENGTH)
+    if(! cmds) {
+      print $0
+    }
+    complete[cmds] = complete[cmds] " " subcmd
+  }
+  END {
+    for(a in complete) {
+      printf("    \"%s\") COMPREPLY=($(compgen -W \"%s\" -- ${cur})) ;;\n", a, substr(complete[a], 2))
+    }
+  } ' ../../usr/share/doc/tfh/*.md | sort
+
+cat << 'EOT'
+    *) COMPREPLY=() ;;
+	esac
+}
+
+complete -F _tfh_completion tfh
+EOT

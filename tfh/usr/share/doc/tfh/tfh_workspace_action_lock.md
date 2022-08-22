@@ -1,20 +1,12 @@
 ## `tfh workspace action lock`
 
-/workspaces/{WORKSPACE_ID}/actions/lock
+Run workspace action lock subcommands
 
 ### Synopsis
 
-    tfh workspace action lock [ ... ]
-
-### REST endpoint
-
-    POST https://{HOSTNAME}/api/v2/workspaces/{WORKSPACE_ID}/actions/lock
+    tfh workspace action lock COMMAND[ ... ]
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/workspaces
-
-### Positional parameters
-
-* `WORKSPACE_ID`
+Run workspace action lock subcommands
 

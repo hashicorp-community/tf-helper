@@ -1,10 +1,10 @@
-## `tfh admin organization relationship module-consumer create`
+## `tfh admin organization relationship module-consumer update`
 
 /admin/organizations/{NAME}/relationships/module-consumers
 
 ### Synopsis
 
-    tfh admin organization relationship module-consumer create [ ... ]
+    tfh admin organization relationship module-consumer update [ ... ]
 
 ### REST endpoint
 

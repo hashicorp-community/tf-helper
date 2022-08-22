@@ -8,7 +8,7 @@
 
 ### REST endpoint
 
-    None https://{HOSTNAME}/api/v2/workspaces/{WORKSPACE_ID}/relationships/remote_state_consumers
+    POST https://{HOSTNAME}/api/v2/workspaces/{WORKSPACE_ID}/relationships/remote_state_consumers
 
 ### Description
 

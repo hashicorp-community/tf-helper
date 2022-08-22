@@ -1,10 +1,10 @@
-## `tfh agent-pool create`
+## `tfh agent-pool update`
 
 /agent-pools/{ID}
 
 ### Synopsis
 
-    tfh agent-pool create [ ... ]
+    tfh agent-pool update [ ... ]
 
 ### REST endpoint
 

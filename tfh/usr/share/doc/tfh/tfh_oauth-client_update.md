@@ -1,10 +1,10 @@
-## `tfh oauth-client create`
+## `tfh oauth-client update`
 
 /oauth-clients/{ID}
 
 ### Synopsis
 
-    tfh oauth-client create [ ... ]
+    tfh oauth-client update [ ... ]
 
 ### REST endpoint
 

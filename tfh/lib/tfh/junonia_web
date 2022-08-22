@@ -804,6 +804,10 @@ junonia_request () {
       fi
     fi
 
+    if [ -n "$JW_CONTENT_TYPE" ]; then
+      _content_t="$JW_CONTENT_TYPE"
+    fi
+
     if [ -z "$_content_t" ]; then
       if [ "$_method" = POST ]; then
         echodebug "set default content type to application/json"
@@ -904,6 +908,10 @@ junonia_request () {
       _autharg="--oauth2-bearer $JW_OAUTH"
       _autharg_debug='--oauth2-bearer $JW_OAUTH_REDACTED'
       ;;
+    basic)
+      _autharg="--basic --user $JW_BASIC"
+      _autharg_debug='--basic --user $JW_BASIC_REDACTED'
+      ;;
     env)
       _autharg="$JW_AUTH"
       _autharg_debug='$JW_AUTH_REDACTED (env)'
@@ -979,8 +987,7 @@ junonia_request () {
           echoerr_raw "$_json_err"
         fi
       else
-        echoerr "Response:"
-        echoerr_raw "$_resp_body"
+        echoerr "Empty response body"
       fi
 
       return 1

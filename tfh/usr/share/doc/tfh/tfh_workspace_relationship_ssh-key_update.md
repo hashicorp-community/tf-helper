@@ -1,10 +1,10 @@
-## `tfh workspace relationship ssh-key create`
+## `tfh workspace relationship ssh-key update`
 
 /workspaces/{WORKSPACE_ID}/relationships/ssh-key
 
 ### Synopsis
 
-    tfh workspace relationship ssh-key create [ ... ]
+    tfh workspace relationship ssh-key update [ ... ]
 
 ### REST endpoint
 

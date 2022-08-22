@@ -1,10 +1,10 @@
-## `tfh team create`
+## `tfh team update`
 
 /teams/{TEAM_ID}
 
 ### Synopsis
 
-    tfh team create [ ... ]
+    tfh team update [ ... ]
 
 ### REST endpoint
 

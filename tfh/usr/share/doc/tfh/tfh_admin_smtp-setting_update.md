@@ -1,10 +1,10 @@
-## `tfh admin smtp-setting create`
+## `tfh admin smtp-setting update`
 
 /admin/smtp-settings
 
 ### Synopsis
 
-    tfh admin smtp-setting create [ ... ]
+    tfh admin smtp-setting update [ ... ]
 
 ### REST endpoint
 

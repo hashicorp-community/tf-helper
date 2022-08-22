@@ -1,10 +1,10 @@
-## `tfh admin customization-setting create`
+## `tfh admin customization-setting update`
 
 /admin/customization-settings
 
 ### Synopsis
 
-    tfh admin customization-setting create [ ... ]
+    tfh admin customization-setting update [ ... ]
 
 ### REST endpoint
 

@@ -1,10 +1,10 @@
-## `tfh notification-configuration create`
+## `tfh notification-configuration update`
 
 /notification-configurations/{NOTIFICATION-CONFIGURATION-ID}
 
 ### Synopsis
 
-    tfh notification-configuration create [ ... ]
+    tfh notification-configuration update [ ... ]
 
 ### REST endpoint
 

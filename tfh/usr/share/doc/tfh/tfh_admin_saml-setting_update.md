@@ -1,10 +1,10 @@
-## `tfh admin saml-setting create`
+## `tfh admin saml-setting update`
 
 /admin/saml-settings
 
 ### Synopsis
 
-    tfh admin saml-setting create [ ... ]
+    tfh admin saml-setting update [ ... ]
 
 ### REST endpoint
 

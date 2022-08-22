@@ -1,10 +1,10 @@
-## `tfh task create`
+## `tfh task update`
 
 /tasks/{ID}
 
 ### Synopsis
 
-    tfh task create [ ... ]
+    tfh task update [ ... ]
 
 ### REST endpoint
 

@@ -1,10 +1,10 @@
-## `tfh ssh-key create`
+## `tfh ssh-key update`
 
 /ssh-keys/{SSH_KEY_ID}
 
 ### Synopsis
 
-    tfh ssh-key create [ ... ]
+    tfh ssh-key update [ ... ]
 
 ### REST endpoint
 

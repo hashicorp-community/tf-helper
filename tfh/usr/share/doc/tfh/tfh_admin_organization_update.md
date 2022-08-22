@@ -1,10 +1,10 @@
-## `tfh admin organization create`
+## `tfh admin organization update`
 
 /admin/organizations/{NAME}
 
 ### Synopsis
 
-    tfh admin organization create [ ... ]
+    tfh admin organization update [ ... ]
 
 ### REST endpoint
 

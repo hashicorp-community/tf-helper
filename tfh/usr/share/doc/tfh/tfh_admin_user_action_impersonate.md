@@ -1,20 +1,12 @@
 ## `tfh admin user action impersonate`
 
-/admin/users/{ID}/actions/impersonate
+Run admin user action impersonate subcommands
 
 ### Synopsis
 
-    tfh admin user action impersonate [ ... ]
-
-### REST endpoint
-
-    POST https://{HOSTNAME}/api/v2/admin/users/{ID}/actions/impersonate
+    tfh admin user action impersonate COMMAND[ ... ]
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/admin_users
-
-### Positional parameters
-
-* `ID`
+Run admin user action impersonate subcommands
 

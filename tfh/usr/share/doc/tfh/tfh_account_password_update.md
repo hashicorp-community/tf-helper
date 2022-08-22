@@ -1,10 +1,10 @@
-## `tfh account password create`
+## `tfh account password update`
 
 /account/password
 
 ### Synopsis
 
-    tfh account password create [ ... ]
+    tfh account password update [ ... ]
 
 ### REST endpoint
 

@@ -1,10 +1,10 @@
-## `tfh oauth-token create`
+## `tfh oauth-token update`
 
 /oauth-tokens/{ID}
 
 ### Synopsis
 
-    tfh oauth-token create [ ... ]
+    tfh oauth-token update [ ... ]
 
 ### REST endpoint
 

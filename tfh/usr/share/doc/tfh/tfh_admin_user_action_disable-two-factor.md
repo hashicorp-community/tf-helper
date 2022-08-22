@@ -1,20 +1,12 @@
 ## `tfh admin user action disable-two-factor`
 
-/admin/users/{ID}/actions/disable_two_factor
+Run admin user action disable-two-factor subcommands
 
 ### Synopsis
 
-    tfh admin user action disable-two-factor [ ... ]
-
-### REST endpoint
-
-    POST https://{HOSTNAME}/api/v2/admin/users/{ID}/actions/disable_two_factor
+    tfh admin user action disable-two-factor COMMAND[ ... ]
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/admin_users
-
-### Positional parameters
-
-* `ID`
+Run admin user action disable-two-factor subcommands
 

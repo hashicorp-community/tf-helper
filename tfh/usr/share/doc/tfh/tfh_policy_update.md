@@ -1,10 +1,10 @@
-## `tfh policy create`
+## `tfh policy update`
 
 /policies/{POLICY_ID}
 
 ### Synopsis
 
-    tfh policy create [ ... ]
+    tfh policy update [ ... ]
 
 ### REST endpoint
 

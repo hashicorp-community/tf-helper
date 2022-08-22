@@ -1,10 +1,10 @@
-## `tfh admin cost-estimation-setting create`
+## `tfh admin cost-estimation-setting update`
 
 /admin/cost-estimation-settings
 
 ### Synopsis
 
-    tfh admin cost-estimation-setting create [ ... ]
+    tfh admin cost-estimation-setting update [ ... ]
 
 ### REST endpoint
 

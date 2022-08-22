@@ -1,10 +1,10 @@
-## `tfh admin twilio-setting create`
+## `tfh admin twilio-setting update`
 
 /admin/twilio-settings
 
 ### Synopsis
 
-    tfh admin twilio-setting create [ ... ]
+    tfh admin twilio-setting update [ ... ]
 
 ### REST endpoint
 

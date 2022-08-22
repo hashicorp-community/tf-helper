@@ -1,10 +1,10 @@
-## `tfh workspace create`
+## `tfh workspace update`
 
 /workspaces/{WORKSPACE_ID}
 
 ### Synopsis
 
-    tfh workspace create [ ... ]
+    tfh workspace update [ ... ]
 
 ### REST endpoint
 

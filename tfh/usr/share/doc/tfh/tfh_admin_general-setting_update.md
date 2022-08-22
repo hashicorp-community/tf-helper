@@ -1,10 +1,10 @@
-## `tfh admin general-setting create`
+## `tfh admin general-setting update`
 
 /admin/general-settings
 
 ### Synopsis
 
-    tfh admin general-setting create [ ... ]
+    tfh admin general-setting update [ ... ]
 
 ### REST endpoint
 
