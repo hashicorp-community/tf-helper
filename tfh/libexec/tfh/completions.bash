@@ -170,8 +170,6 @@ _tfh_completion()
     "tfh workspace varset") COMPREPLY=($(compgen -W "list" -- ${cur})) ;;
     "tfh workspace") COMPREPLY=($(compgen -W "action configuration-version current-state-version-output current-state-version delete list notification-configuration relationship resource run-trigger run select state-version task update var varset" -- ${cur})) ;;
     "tfh") COMPREPLY=($(compgen -W "account admin agent-pool agent api apply assessment-result authentication-token comment configuration-version cost-estimate create curl-config feature-set notification-configuration oauth-client oauth-token organization-membership organization plan-export plan policy-check policy-set policy pullvars pushconfig pushvars registry-module run-trigger run ssh-key state-version-output state-version subscription tag task-result task-stage task team-workspace team update user var varset workspace" -- ${cur})) ;;
-tfh api registry v2
-tfh organization registry-provider version 
     *) COMPREPLY=() ;;
 	esac
 }

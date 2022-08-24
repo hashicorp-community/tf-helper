@@ -2296,7 +2296,7 @@ junonia_init () {
     return
   fi
 
-  readonly JUNONIA_VERSION="1.2.4"
+  readonly JUNONIA_VERSION="1.2.5"
 
   # Communication control characters (TC1 - TC4
   readonly JSOH="" # Start of heading    (SOH / TC1 / dec 1)
@@ -3050,7 +3050,7 @@ _junonia_set_args () {
         # Add any extra options to the query string
         for(opt in opts) {
           value = substr(opt, 2, length(opt)) "=" opts[opt]
-          args = args value
+          args = args "&" value
         }
       } else {
         # There are leftover parameters so something was invalid.
