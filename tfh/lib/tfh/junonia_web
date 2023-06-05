@@ -208,7 +208,7 @@ $_junonia_web_cmds"
   junonia_auth_config
 
   readonly JW_DEFAULT_CURLRC="$JUNONIA_CONFIGDIR/curlrc"
-  readonly JW_CURLRC="${JW_CURLRC:-"$JW_DEFAULT_CURLRC"}"
+  JW_CURLRC="${JW_CURLRC:-"$JW_DEFAULT_CURLRC"}"
   # Indicate that init has happened
   readonly JW_INIT=1
 }
@@ -799,7 +799,9 @@ junonia_request () {
         echoerr "no url was provided"
         return 1
       else
-        _url="$1"
+        # If the query string ? is present, but there is no actual
+        # query string, remove the ?
+        _url="${1%\?}"
         shift
       fi
     fi
@@ -925,19 +927,30 @@ junonia_request () {
   if [ -n "$_payload" ]; then
     echovvv "--data \"$_payload\""
   fi
-  echovvv "     $*" >&2
+  #echovvv "     $*" >&2
 
-  if [ -z "$_payload" ]; then
+  if [ -n "$_payload" ]; then
+    echovvv "curl $JW_CURL_SILENT -w '\\nhttp_code: %{http_code}\\n'
+                  $_autharg
+                  --data \"$_payload\"
+                  \"$_url\"
+                  -H \"Content-Type: $_content_t\"
+                  $@"
     _resp="$(curl $JW_CURL_SILENT -w '\nhttp_code: %{http_code}\n' \
                   $_autharg \
+                  -d "$_payload" \
                   "$_url" \
                   -H "Content-Type: $_content_t" \
                   $@)"
   else
+    echovvv "curl $JW_CURL_SILENT \"$_url\" -w '\\nhttp_code: %{http_code}\\n'
+                  $_autharg
+                  -X \"$_method\"
+                  -H \"Content-Type: $_content_t\"
+                  $@"
     _resp="$(curl $JW_CURL_SILENT "$_url" -w '\nhttp_code: %{http_code}\n' \
                   $_autharg \
                   -X "$_method" \
-                  -d "$_payload" \
                   -H "Content-Type: $_content_t" \
                   $@)"
   fi
