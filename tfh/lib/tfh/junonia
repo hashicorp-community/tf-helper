@@ -2296,7 +2296,7 @@ junonia_init () {
     return
   fi
 
-  readonly JUNONIA_VERSION="1.2.5"
+  readonly JUNONIA_VERSION="1.1.2"
 
   # Communication control characters (TC1 - TC4
   readonly JSOH="" # Start of heading    (SOH / TC1 / dec 1)
@@ -2815,6 +2815,7 @@ _junonia_set_args () {
 
       if(a[1] == "-JUNONIA_OUTPUT") {
         j_output = substr($0, index($0, "=") + 1, length($0))
+        echodebug("  j_output = " j_output)
         next
       }
 
@@ -3050,7 +3051,7 @@ _junonia_set_args () {
         # Add any extra options to the query string
         for(opt in opts) {
           value = substr(opt, 2, length(opt)) "=" opts[opt]
-          args = args "&" value
+          args = args value
         }
       } else {
         # There are leftover parameters so something was invalid.
@@ -3082,7 +3083,7 @@ _junonia_set_args () {
         args = j_output JRS args
       } else {
         if(junonia_web) {
-          args = "" JRS args
+          args = JRS args
         }
       }
 
@@ -3099,7 +3100,6 @@ _junonia_set_args () {
   printf "%s\n" "$spec" | awk -v "JGS=$JGS" \
                      -v "JRS=$JRS" \
                      -v "JUS=$JUS" \
-                     -v "JEOT=$JEOT" \
                      "$JUNONIA_AWKS $awk_prog" - "$JUNONIA_NAME" "$@"
 }
 
@@ -3344,8 +3344,8 @@ _junonia_run_final () {
     )"
 
     # The spec is usually quite long, so suppress the printing here unless needed.
-    echodebug "final spec"
-    echodebug_raw "$spec"
+    #echodebug "final spec"
+    #echodebug_raw "$spec"
 
     junonia_cache_file spec "$spec"
   fi

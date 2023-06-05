@@ -208,7 +208,7 @@ $_junonia_web_cmds"
   junonia_auth_config
 
   readonly JW_DEFAULT_CURLRC="$JUNONIA_CONFIGDIR/curlrc"
-  JW_CURLRC="${JW_CURLRC:-"$JW_DEFAULT_CURLRC"}"
+  readonly JW_CURLRC="${JW_CURLRC:-"$JW_DEFAULT_CURLRC"}"
   # Indicate that init has happened
   readonly JW_INIT=1
 }
@@ -498,17 +498,10 @@ junonia_web () {
   output="$1"
   shift
 
-  echodebug "junonia_web"
-  echodebug "  func_name: $func_name"
-  echodebug "  method: $method"
-  echodebug "  content_t: $content_t"
-  echodebug "  url: $url"
-  echodebug "  output: $url"
+  echodebug "junonia_web $func_name $method $url"
 
   # Determine how many upper case parameters there are to replace in the url
-  echodebug "url: $url"
   n_opts="$(echo "$url" | awk '{print gsub(/{[-_\.A-Z]+}/,"")}')"
-  echodebug "url opts: $n_opts"
 
   # See if there are additional parameters coming from elsewhere.
   if [ -n "$JW_ADDL_PARAMS" ]; then
@@ -530,20 +523,14 @@ junonia_web () {
 
   # Remove the number of upper case parameters replaced by addl parameters
   n_opts=$(( $n_opts - $addl_subs ))
-  echodebug "url opts - add_opts: $n_opts"
-  echodebug "addl subs done: $addl_subs"
+  echodebug "n_opts:$n_opts addl_subs:$addl_subs #args:$#"
 
   # For that many options, shift off values and substitute the parameter.
   # Parameters are of the form FOO=bar, where FOO is always uppercase.
   i=0
   n_subs=0
   while [ $i -lt $# ] && [ $i -lt $n_opts ]; do
-    if [ -z "${1#*=}" ]; then
-      echoerr "Missing value for required parameter $1"
-      shift
-    fi
-
-    echodebug "sub($1)"
+    echodebug "substituting $1"
     url="$(echo "$url" | awk -v "param=$1" '{
       split(param, a, "=")
       did_sub = sub("{" a[1] "}", a[2])
@@ -552,10 +539,11 @@ junonia_web () {
     }')"
     n_subs=$(( $n_subs + $? ))
     i=$(( $i+1 ))
+    echodebug "n_subs:$n_subs"
     shift
   done
-  echodebug "arg subs done: $n_subs"
 
+  echodebug "n_subs:$n_subs n_opts:$n_opts"
   if [ "$n_subs" -lt "$n_opts" ]; then
     echoerr "Mismatch on number of parameters and url"
     echoerr "Cannot continue with $url"
@@ -563,10 +551,6 @@ junonia_web () {
   fi
 
   echodebug "final url: $url"
-
-  json="$1"
-  shift
-  echodebug "  json: $json"
 
   echodebug "remaining arguments ($#):"
   echodebug_raw $@
@@ -640,16 +624,16 @@ junonia_web () {
             tpl_arg=
             output_tpl=1
             get_tpl="cmd"
-            #echodebug "SOH"
-            #echodebug "cmd: $tpl_cmd"
-            #echodebug "arg: $tpl_arg"
+            echodebug "SOH"
+            echodebug "cmd: $tpl_cmd"
+            echodebug "arg: $tpl_arg"
             ;;
           $JEOT)
-            #echodebug "EOT"
-            #echodebug "cmd: $tpl_cmd"
-            #echodebug "arg: $tpl_arg"
+            echodebug "EOT"
+            echodebug "cmd: $tpl_cmd"
+            echodebug "arg: $tpl_arg"
 
-            #echodebug "tpl_cmd: $tpl_cmd $@"
+            echodebug "tpl_cmd: $tpl_cmd $@"
             $tpl_cmd "$@"
 
             output_tpl=
@@ -657,17 +641,17 @@ junonia_web () {
             ;;
           $JSTX)
             get_tpl="newarg"
-            #echodebug "STX"
-            #echodebug "cmd: $tpl_cmd"
-            #echodebug "arg: $tpl_arg"
+            echodebug "STX"
+            echodebug "cmd: $tpl_cmd"
+            echodebug "arg: $tpl_arg"
             ;;
           $JETX)
             set "$@" "$tpl_arg"
             tpl_arg=
             get_tpl=
-            #echodebug "ETX"
-            #echodebug "cmd: $tpl_cmd"
-            #echodebug "arg: $tpl_arg"
+            echodebug "ETX"
+            echodebug "cmd: $tpl_cmd"
+            echodebug "arg: $tpl_arg"
             ;;
           *)
             if [ $output_tpl ]; then
@@ -675,36 +659,36 @@ junonia_web () {
                 cmd)
                   tpl_cmd="$line"
                   get_tpl=
-                  #echodebug "* cmd"
-                  #echodebug "cmd: $tpl_cmd"
-                  #echodebug "arg: $tpl_arg"
+                  echodebug "* cmd"
+                  echodebug "cmd: $tpl_cmd"
+                  echodebug "arg: $tpl_arg"
                   ;;
                 newarg)
                   if [ "$line" != "" ]; then
                     tpl_arg="$tpl_arg$line"
-                    #echodebug "* arg1"
-                    #echodebug "cmd: $tpl_cmd"
-                    #echodebug "arg: $tpl_arg"
+                    echodebug "* arg1"
+                    echodebug "cmd: $tpl_cmd"
+                    echodebug "arg: $tpl_arg"
                     get_tpl=arg
                   fi
                   ;;
                 arg)
                   tpl_arg="$(printf "%s\n%s" "$tpl_arg" "$line")"
-                  #echodebug "* arg2"
-                  #echodebug "cmd: $tpl_cmd"
-                  #echodebug "arg: $tpl_arg"
+                  echodebug "* arg2"
+                  echodebug "cmd: $tpl_cmd"
+                  echodebug "arg: $tpl_arg"
                   ;;
                 *)
                   tpl_cmd="$tpl_cmd\n$line"
                   get_tpl=""
-                  #echodebug "* cmd2"
-                  #echodebug "cmd: $tpl_cmd"
-                  #echodebug "arg: $tpl_arg"
+                  echodebug "* cmd2"
+                  echodebug "cmd: $tpl_cmd"
+                  echodebug "arg: $tpl_arg"
                   ;;
                 esac
             else
               printf "%s\n" "$line"
-              #echodebug "*"
+              echodebug "*"
             fi
             ;;
         esac
@@ -799,15 +783,9 @@ junonia_request () {
         echoerr "no url was provided"
         return 1
       else
-        # If the query string ? is present, but there is no actual
-        # query string, remove the ?
-        _url="${1%\?}"
+        _url="$1"
         shift
       fi
-    fi
-
-    if [ -n "$JW_CONTENT_TYPE" ]; then
-      _content_t="$JW_CONTENT_TYPE"
     fi
 
     if [ -z "$_content_t" ]; then
@@ -927,30 +905,19 @@ junonia_request () {
   if [ -n "$_payload" ]; then
     echovvv "--data \"$_payload\""
   fi
-  #echovvv "     $*" >&2
+  echovvv "     $*" >&2
 
-  if [ -n "$_payload" ]; then
-    echovvv "curl $JW_CURL_SILENT -w '\\nhttp_code: %{http_code}\\n'
-                  $_autharg
-                  --data \"$_payload\"
-                  \"$_url\"
-                  -H \"Content-Type: $_content_t\"
-                  $@"
+  if [ -z "$_payload" ]; then
     _resp="$(curl $JW_CURL_SILENT -w '\nhttp_code: %{http_code}\n' \
                   $_autharg \
-                  -d "$_payload" \
                   "$_url" \
-                  -H "Content-Type: $_content_t" \
+                  -H "Content-Type: $_content_t\"" \
                   $@)"
   else
-    echovvv "curl $JW_CURL_SILENT \"$_url\" -w '\\nhttp_code: %{http_code}\\n'
-                  $_autharg
-                  -X \"$_method\"
-                  -H \"Content-Type: $_content_t\"
-                  $@"
     _resp="$(curl $JW_CURL_SILENT "$_url" -w '\nhttp_code: %{http_code}\n' \
                   $_autharg \
                   -X "$_method" \
+                  -d "$_payload" \
                   -H "Content-Type: $_content_t" \
                   $@)"
   fi
@@ -994,13 +961,12 @@ junonia_request () {
     4*|5*)
       echoerr "API request failed."
       echoerr_raw "HTTP status code: $_resp_code"
-      if [ -n "$_resp_body" ]; then
-        if _json_err="$(junonia_jtree "$_resp_body" "$JW_ERR_SELECTOR")"; then
-          echoerr_raw "Details:"
-          echoerr_raw "$_json_err"
-        fi
+      if _json_err="$(junonia_jtree "$_resp_body" "$JW_ERR_SELECTOR")"; then
+        echoerr_raw "Details:"
+        echoerr_raw "$_json_err"
       else
-        echoerr "Empty response body"
+        echoerr "Response:"
+        echoerr_raw "$_resp_body"
       fi
 
       return 1
