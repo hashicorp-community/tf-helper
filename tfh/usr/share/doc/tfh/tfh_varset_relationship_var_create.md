@@ -12,7 +12,7 @@ varsets/{VARSET_EXTERNAL_ID}/relationships/vars
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/variable-sets
+https://developer.hashicorp.com/terraform/enterprise/api-docs/variable-sets
 
 ### Positional parameters
 

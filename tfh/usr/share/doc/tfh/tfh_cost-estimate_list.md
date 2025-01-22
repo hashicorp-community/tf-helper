@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/cost-estimates
+https://developer.hashicorp.com/terraform/enterprise/api-docs/cost-estimates
 
 ### Positional parameters
 

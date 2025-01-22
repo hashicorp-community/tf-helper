@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/state-versions
+https://developer.hashicorp.com/terraform/enterprise/api-docs/state-versions
 
 ### Positional parameters
 

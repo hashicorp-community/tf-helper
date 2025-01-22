@@ -12,5 +12,5 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/variables
+https://developer.hashicorp.com/terraform/enterprise/api-docs/variables
 

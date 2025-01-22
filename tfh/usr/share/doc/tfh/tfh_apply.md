@@ -1,12 +1,20 @@
 ## `tfh apply`
 
-Run apply subcommands
+/applies/{ID}
 
 ### Synopsis
 
-    tfh apply COMMAND[ ... ]
+    tfh apply [ ... ]
+
+### REST endpoint
+
+    GET https://{HOSTNAME}/api/v2/applies/{ID}
 
 ### Description
 
-Run apply subcommands
+https://developer.hashicorp.com/terraform/enterprise/api-docs/applies
+
+### Positional parameters
+
+* `ID`
 

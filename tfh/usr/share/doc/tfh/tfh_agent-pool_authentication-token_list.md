@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/agent-tokens
+https://developer.hashicorp.com/terraform/enterprise/api-docs/agent-tokens
 
 ### Positional parameters
 

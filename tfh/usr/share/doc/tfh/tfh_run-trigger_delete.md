@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/run-triggers
+https://developer.hashicorp.com/terraform/enterprise/api-docs/run-triggers
 
 ### Positional parameters
 

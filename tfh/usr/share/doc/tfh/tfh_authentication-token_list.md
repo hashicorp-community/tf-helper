@@ -1,6 +1,6 @@
 ## `tfh authentication-token list`
 
-/authentication-tokens/{ID}
+/authentication-tokens/{ID_OR_TOKEN-ID_OR_ID}
 
 ### Synopsis
 
@@ -8,13 +8,13 @@
 
 ### REST endpoint
 
-    GET https://{HOSTNAME}/api/v2/authentication-tokens/{ID}
+    GET https://{HOSTNAME}/api/v2/authentication-tokens/{ID_OR_TOKEN-ID_OR_ID}
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/agent-tokens
+https://developer.hashicorp.com/terraform/enterprise/api-docs/agent-tokens
 
 ### Positional parameters
 
-* `ID`
+* `ID_OR_TOKEN-ID_OR_ID`
 

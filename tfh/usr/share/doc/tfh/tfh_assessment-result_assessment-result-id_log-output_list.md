@@ -12,5 +12,5 @@ api/v2/assessment-results/assessment_result_id/log-output
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/assessment-results
+https://developer.hashicorp.com/terraform/enterprise/api-docs/assessment-results
 

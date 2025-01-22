@@ -1,12 +1,20 @@
 ## `tfh run action cancel`
 
-Run run action cancel subcommands
+/runs/{RUN_ID}/actions/cancel
 
 ### Synopsis
 
-    tfh run action cancel COMMAND[ ... ]
+    tfh run action cancel [ ... ]
+
+### REST endpoint
+
+    POST https://{HOSTNAME}/api/v2/runs/{RUN_ID}/actions/cancel
 
 ### Description
 
-Run run action cancel subcommands
+https://developer.hashicorp.com/terraform/enterprise/api-docs/run
+
+### Positional parameters
+
+* `RUN_ID`
 

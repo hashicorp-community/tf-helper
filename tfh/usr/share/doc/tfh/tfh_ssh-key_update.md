@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/ssh-keys
+https://developer.hashicorp.com/terraform/enterprise/api-docs/ssh-keys
 
 ### Positional parameters
 

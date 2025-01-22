@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/users
+https://developer.hashicorp.com/terraform/enterprise/api-docs/users
 
 ### Positional parameters
 

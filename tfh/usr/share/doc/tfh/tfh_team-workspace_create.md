@@ -12,5 +12,5 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/team-access
+https://developer.hashicorp.com/terraform/enterprise/api-docs/team-access
 

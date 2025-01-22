@@ -1,12 +1,16 @@
 ## `tfh account update`
 
-Run account update subcommands
+/account/update
 
 ### Synopsis
 
-    tfh account update COMMAND[ ... ]
+    tfh account update [ ... ]
+
+### REST endpoint
+
+    PATCH https://{HOSTNAME}/api/v2/account/update
 
 ### Description
 
-Run account update subcommands
+https://developer.hashicorp.com/terraform/enterprise/api-docs/account
 

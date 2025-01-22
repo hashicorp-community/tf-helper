@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/oauth-tokens
+https://developer.hashicorp.com/terraform/enterprise/api-docs/oauth-tokens
 
 ### Positional parameters
 

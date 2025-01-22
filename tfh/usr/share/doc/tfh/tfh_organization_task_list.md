@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/run-tasks_run-tasks
+https://developer.hashicorp.com/terraform/enterprise/api-docs/run-tasks_run-tasks
 
 ### Positional parameters
 

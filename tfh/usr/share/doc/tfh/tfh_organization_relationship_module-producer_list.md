@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/organizations
+https://developer.hashicorp.com/terraform/enterprise/api-docs/organizations
 
 ### Positional parameters
 

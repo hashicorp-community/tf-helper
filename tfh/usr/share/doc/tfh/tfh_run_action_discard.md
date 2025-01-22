@@ -1,12 +1,20 @@
 ## `tfh run action discard`
 
-Run run action discard subcommands
+/runs/{RUN_ID}/actions/discard
 
 ### Synopsis
 
-    tfh run action discard COMMAND[ ... ]
+    tfh run action discard [ ... ]
+
+### REST endpoint
+
+    POST https://{HOSTNAME}/api/v2/runs/{RUN_ID}/actions/discard
 
 ### Description
 
-Run run action discard subcommands
+https://developer.hashicorp.com/terraform/enterprise/api-docs/run
+
+### Positional parameters
+
+* `RUN_ID`
 

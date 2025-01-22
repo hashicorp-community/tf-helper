@@ -26,6 +26,7 @@
 
 
 tfh_junonia_filter () {
+  echodebug "begin tfh filter function"
   readonly TFH_DEFAULT_CURLRC="$JUNONIA_CONFIGDIR/curlrc"
 
   readonly hostname="$1"
@@ -45,11 +46,11 @@ tfh_junonia_filter () {
   echov "vvverbose:         $vvverbose"
 
   if [ -z "$hostname" ]; then
-    echoerr "A hostname is required"
-    return 64 # filter function error code
+    #echoerr "A hostname is required"
+    #return 64 # filter function error code
+    hostname=app.terraform.io
   fi
 
-  JW_ADDL_PARAMS="HOSTNAME=$hostname"
   JW_CONTENT_TYPE=application/vnd.api+json
 
   curl_auth_src=
@@ -120,6 +121,10 @@ tfh_junonia_filter () {
   return 6
 }
 
+#tfh_web_callback () {
+#  echo "foo"
+#}
+
 # This is a compact version of junonia_bootstrap for easy copyhing into user
 # scripts. For a fully commented, documented version of this script see
 # https://github.com/fprimex/junonia/blob/master/junonia.sh
@@ -184,13 +189,13 @@ fi
 
 junonia_bootstrap
 
-JUNONIA_WRAP=150
-JUNONIA_COL1=50
-JUNONIA_COL2=100
+JUNONIA_WRAP=100
+JUNONIA_COL1=30
+JUNONIA_COL2=70
 
 . "$JUNONIA_PATH"/lib/tfh/junonia
 
-echodebug "$PWD"
-echodebug "$0 $*"
+echodebug "PWD: $PWD"
+echodebug "CLI: $0 $*"
 
 junonia_run "$@"

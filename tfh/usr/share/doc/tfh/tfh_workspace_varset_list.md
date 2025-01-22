@@ -12,7 +12,7 @@ workspaces/{WORKSPACE_ID}/varsets
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/variable-sets
+https://developer.hashicorp.com/terraform/enterprise/api-docs/variable-sets
 
 ### Positional parameters
 

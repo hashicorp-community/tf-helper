@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/notification-configurations
+https://developer.hashicorp.com/terraform/enterprise/api-docs/notification-configurations
 
 ### Positional parameters
 

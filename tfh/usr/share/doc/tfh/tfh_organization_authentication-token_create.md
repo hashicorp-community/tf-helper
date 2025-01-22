@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/organization-tokens
+https://developer.hashicorp.com/terraform/enterprise/api-docs/organization-tokens
 
 ### Positional parameters
 

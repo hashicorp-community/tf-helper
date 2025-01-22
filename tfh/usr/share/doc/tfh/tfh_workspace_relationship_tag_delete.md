@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/workspaces
+https://developer.hashicorp.com/terraform/enterprise/api-docs/workspaces
 
 ### Positional parameters
 

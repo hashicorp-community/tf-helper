@@ -1,12 +1,16 @@
 ## `tfh account password`
 
-Run account password subcommands
+/account/password
 
 ### Synopsis
 
-    tfh account password COMMAND[ ... ]
+    tfh account password [ ... ]
+
+### REST endpoint
+
+    PATCH https://{HOSTNAME}/api/v2/account/password
 
 ### Description
 
-Run account password subcommands
+https://developer.hashicorp.com/terraform/enterprise/api-docs/account
 

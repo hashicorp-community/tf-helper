@@ -985,7 +985,7 @@ _junonia_md2spec () {
 
     positional && /\[default: `.*`\]$/ {
       match($0, /\[default: `.*`\]$/)
-      def = substr($0, RSTART+11, length($0)-2)
+      def = substr($0, RSTART+12, RLENGTH-12-2)
       params[n_params] = params[n_params] "=" def
     }
 
@@ -1176,9 +1176,14 @@ _junonia_md2help () {
     BEGIN {
       echodebug("cmd: " cmd)
 
+      subcmd_re = "^" cmd " [-_A-Za-z0-9]+$"
+      echodebug("  subcmd regex: " subcmd_re)
+
       # Split the supplied command into an array of parts
-      n = split(cmd, cmda)
-      i = 1
+      n_cmd_parts = split(cmd, cmda)
+      echodebug("n_cmd_parts: " n_cmd_parts)
+
+      subcmd_level = 1
 
       col1_indent = sprintf("%" col1 "s", "")
       txt = "NAME\n"
@@ -1187,6 +1192,7 @@ _junonia_md2help () {
 
     # When encountering a header, leave any header we were in.
     /^#/ {
+      echodebug("entering new header, leaving any old header (" $0 ")")
       if(positional_no_desc) {
         txt = txt twocol(param_col1, "", col1 - 3, col2, " ", "  ") "\n"
       }
@@ -1197,7 +1203,6 @@ _junonia_md2help () {
       if(cmd_doc_start && added_txt) {
         txt = txt "\n"
       }
-
 
       title = 0
       synopsis = 0
@@ -1226,8 +1231,8 @@ _junonia_md2help () {
       }
 
       # Smush the aliases together to make them grouped when split on spaces
-      sub(/, +/, ",")
-      sub(/ +,/, ",")
+      gsub(/, +/, ",")
+      gsub(/ +,/, ",")
 
       # Extract the commands, subcommands, and aliases in this header
       split("", subcmds, ":")
@@ -1244,23 +1249,19 @@ _junonia_md2help () {
     }
 
     # Find the topmost level command title to bootstrap subcommand location.
-    title && i == 1 && $0 == cmda[1] {
+    title && subcmd_level == 1 && $0 == cmda[1] {
+      echodebug("in topmost level command title")
       # The top level command; the name of the program.
       cmd_part = cmda[1]
 
       echodebug("top level command: " cmd_part)
 
-      # Bootstrap an expression to find subcommands of this command.
-      subcmd_re = "^" cmd_part " [-_A-Za-z0-9]+(,|$)"
-      echodebug("  subcmd regex: " subcmd_re)
-
       # Increment the level of subcommand we are interested in.
-      i = 2
+      subcmd_level = 2
 
       # This is the only command given; help for the program itself. So
       # actually we are done searching for the command to do help for.
-      if(n == 1) {
-        txt = txt "  " cmd_part "\n"
+      if(n_cmd_parts == 1) {
         cmd_doc_start = 1
         added_txt = 1
         echodebug("start command documentation")
@@ -1270,43 +1271,48 @@ _junonia_md2help () {
     }
 
     # Keep moving until the top level command is located
-    i == 1 {
+    subcmd_level == 1 {
+      echodebug("still searching for top level command")
       next
     }
 
-    # At this point i > 1
+    # At this point subcmd_level > 1
+
+    # Debugging block
+    #subcmd_level > 1 && n_cmd_parts == hn {
+    #  echodebug("    " subcmd_level "<=" n_cmd_parts " " title " " cmda[subcmd_level] " == " subcmds[subcmd_level] " (" $0 ")")
+    #  #for(j=1; j<=hn; j++) {
+    #  #  echodebug("      " j " " subcmds[j])
+    #  #}
+    #}
 
     # Keep looking at titles until the whole command is located
-    i > 1 && n == hn {
-      echodebug("    " i "<" n " " title " " cmda[i] " == " subcmds[i])
-      for(j=1; j<=hn; j++) {
-        echodebug("      " j " " subcmds[j])
-      }
-    }
-
-    title && i < n && n == hn && cmda[i] == subcmds[i] {
-      for(j=1; j<i; j++) {
+    title && subcmd_level <= n_cmd_parts && n_cmd_parts == hn && cmda[subcmd_level] == subcmds[subcmd_level] {
+      echodebug("searching for whole command")
+      for(j=1; j<=n_cmd_parts; j++) {
+        echodebug("if " cmda[j] " != " subcmds[j])
         if(cmda[j] != subcmds[j]) {
+          echodebug("subcommand mismatch (" cmda[j] " != " subcmds[j] ")")
           next
         }
       }
-      i++
+      subcmd_level = n_cmd_parts + 1
+      cmd_part = $0
+      echodebug("subcommand match, subcmd level to " subcmd_level " and cmd_part to " cmd_part)
       next
     }
 
     # The whole command has been found, so document it and get set up to
     # identify and document the subcommand summary
     #title && i == n && cmda[n] in subcmds {
-    title && i == n && n == hn && cmda[n] in aliases {
+    title && subcmd_level == n_cmd_parts + 1 && n_cmd_parts == hn && cmda[n_cmd_parts] in aliases {
+      echodebug("beginning whole command documentation")
       # Everything up to this point has to match up also
-      for(j=1; j<i; j++) {
+      for(j=1; j<subcmd_level; j++) {
         if(cmda[j] != subcmds[j]) {
           next
         }
       }
-
-      # This is the header line with all Markdown stripped
-      cmd_part = $0
 
       # Unsmush any aliases
       sub(/,/, ", ", cmd_part)
@@ -1314,25 +1320,19 @@ _junonia_md2help () {
       txt = txt "  " cmd_part "\n"
       added_txt = 1
 
-      # Get the last primary subcommand (not the aliases) and build a regex to
-      # find this commands subcommands to document.
-      split($0, subcmda, ",")
-      subcmd_re = "^" subcmda[1] " [-_A-Za-z0-9]+$"
-      echodebug("  subcmd regex: " subcmd_re)
-
       cmd_doc_start = 1
       echodebug("start command documentation")
-      i++
+      subcmd_level++
       next
     }
 
     # Keep moving until the whole command is located.
-    i <= n {
+    subcmd_level <= n_cmd_parts {
       next
     }
 
     # In the command description, so add it to the name line.
-    title && ! cmd_doc_end && ! /^$/ {
+    title && cmd_doc_start && ! cmd_doc_end && ! /^$/ {
       txt = substr(txt, 1, length(txt) - 1) " -- " $0 "\n"
       added_txt = 1
       next
@@ -2181,6 +2181,8 @@ _junonia_plugin_docs () {
 
 # Try to find and source a given function name
 _junonia_load_func () {
+  echodebug "begin load func"
+  echodebug "func: $1"
   if ! command -v "$1" >/dev/null 2>&1; then
     if ! _junonia_func_search "$JUNONIA_PATH" "$1"; then
       for plugin in $(_junonia_plugin_list); do
@@ -2191,46 +2193,78 @@ _junonia_load_func () {
   fi
 
   if ! command -v "$1" >/dev/null 2>&1; then
-    echodebug "command not found: $1"
+    echodebug "command not found for loading: $1"
     return 1
   fi
 }
 
 _junonia_func_search () {
-  echodebug "begin func search"
-
   searchpath="$1"
   func_name="$2"
   i=0
 
-  while ! command -v $func_name >/dev/null 2>&1; do
-    case $i in
-      0) p="$searchpath/$func_name.sh";;
-      1) p="$searchpath/cmd/$func_name.sh";;
-      2) p="$searchpath/cmds/$func_name.sh";;
-      3) p="$searchpath/lib/$JUNONIA_NAME/$func_name.sh";;
-      4) p="$searchpath/lib/$JUNONIA_NAME/cmd/$func_name.sh";;
-      5) p="$searchpath/lib/$JUNONIA_NAME/cmds/$func_name.sh";;
-      6) p="$searchpath/lib/$JUNONIA_NAME/command/$func_name.sh";;
-      7) p="$searchpath/lib/$JUNONIA_NAME/commands/$func_name.sh";;
-      *) return 1
-    esac
+  echodebug "begin func search"
+  echodebug "searchpath: $searchpath"
+  echodebug "func_name:  $func_name"
 
-    i=$(( $i + 1 ))
+  #while ! command -v $func_name >/dev/null 2>&1; do
+    for ext in sh py; do
+      i=0
+      while [ $i -lt 8 ]; do
+        case $i in
+          0) p="$searchpath/$func_name.$ext";;
+          1) p="$searchpath/cmd/$func_name.$ext";;
+          2) p="$searchpath/cmds/$func_name.$ext";;
+          3) p="$searchpath/lib/$JUNONIA_NAME/$func_name.$ext";;
+          4) p="$searchpath/lib/$JUNONIA_NAME/cmd/$func_name.$ext";;
+          5) p="$searchpath/lib/$JUNONIA_NAME/cmds/$func_name.$ext";;
+          6) p="$searchpath/lib/$JUNONIA_NAME/command/$func_name.$ext";;
+          7) p="$searchpath/lib/$JUNONIA_NAME/commands/$func_name.$ext";;
+        esac
 
-    # Found the function file, source it.
-    if [ -f "$p" ]; then
-      . "$p"
+        i=$(( $i + 1 ))
 
-      # Only stop the search if the sourced file actually contained the
-      # function.
-      if command -v $func_name >/dev/null 2>&1; then
-        return 0
-      fi
-    fi
-  done
+        # Note that if the JUNONIA_INTERP_* variable is set manually it will be
+        # used unconditionally for the interpreter.
 
-  # Function was not found
+        echodebug "searching for $p"
+        if [ ! -f "$p" ]; then
+          continue
+        fi
+
+        echodebug "found $p"
+        case "$ext" in
+          sh)
+            . "$p"
+
+            # Only stop the search if the sourced file actually contained the
+            # function.
+            if command -v $func_name >/dev/null 2>&1; then
+              JUNONIA_INTERP=${JUNONIA_INTERP_SH:-sh}
+              return 0
+            fi
+            ;;
+          py)
+            for py in python python3 pypy3 pypy; do
+              if command -v $py >/dev/null 2>&1; then
+                JUNONIA_INTERP=${JUNONIA_INTERP_PY:-$py}
+                JUNONIA_FUNCPATH="$p"
+                return 0
+              fi
+            done
+            echoerr "no suitable Python interpreter found"
+            return 1
+            ;;
+          *)
+            echoerr "unsupported extension: $ext"
+            return 1
+            ;;
+        esac
+      done
+    done
+  #done
+
+  echodebug "command not found in search: $func_name"
   return 1
 }
 
@@ -2296,9 +2330,9 @@ junonia_init () {
     return
   fi
 
-  readonly JUNONIA_VERSION="1.1.2"
+  readonly JUNONIA_VERSION="1.5.0"
 
-  # Communication control characters (TC1 - TC4
+  # Communication control characters (TC1 - TC4)
   readonly JSOH="" # Start of heading    (SOH / TC1 / dec 1)
   readonly JSTX="" # Start of text       (STX / TC2 / dec 2)
   readonly JETX="" # End of text         (ETX / TC3 / dec 3)
@@ -2415,7 +2449,7 @@ junonia_init () {
 
 # Use junonia_envvars to examine the current environment using env and extract
 # the names of variables of interest. Options are to list all variables (a),
-# readonly variables (r), or variables that are writable / can be set (2) as
+# readonly variables (r), or variables that are writable / can be set (w) as
 # the first argument. A prefix can also be supplied as the second argument,
 # which junonia itself sets to SCRIPT_ mostly typically.
 #
@@ -3051,7 +3085,7 @@ _junonia_set_args () {
         # Add any extra options to the query string
         for(opt in opts) {
           value = substr(opt, 2, length(opt)) "=" opts[opt]
-          args = args value
+          args = args "&" value
         }
       } else {
         # There are leftover parameters so something was invalid.
@@ -3083,7 +3117,7 @@ _junonia_set_args () {
         args = j_output JRS args
       } else {
         if(junonia_web) {
-          args = JRS args
+          args = "" JRS args
         }
       }
 
@@ -3100,6 +3134,7 @@ _junonia_set_args () {
   printf "%s\n" "$spec" | awk -v "JGS=$JGS" \
                      -v "JRS=$JRS" \
                      -v "JUS=$JUS" \
+                     -v "JEOT=$JEOT" \
                      "$JUNONIA_AWKS $awk_prog" - "$JUNONIA_NAME" "$@"
 }
 
@@ -3143,6 +3178,7 @@ junonia_run () {
 
   # A directory containing markdown docs was found. Run with it.
   if [ -n "$JUNONIA_DOCDIR" ]; then
+    echodebug "docdir: $JUNONIA_DOCDIR"
     junonia_runmd_filtered "$filter_func" "$JUNONIA_DOCDIR" "$@"
     return $?
   fi
@@ -3391,8 +3427,6 @@ _junonia_run_final () {
 # then execute the specified function with the values.
 _junonia_exec () {
   echodebug "begin exec"
-  echodebug "exec args:"
-  echodebug_raw "$@"
 
   # Each value from the parsed args are now their own word, so the IFS can go
   # back to normal.
@@ -3412,6 +3446,13 @@ _junonia_exec () {
 
   func="$1"
   shift
+
+  echodebug "filter_func: $filter_func"
+  echodebug "md:          $md"
+  echodebug "spec_type:   $spec_type"
+  echodebug "func:        $func"
+  echodebug "remaining exec args:"
+  echodebug_raw "$@"
 
   if [ "$func" = "junonia_web" ]; then
     # Need to pop these off and put them back so the filter function,
@@ -3446,6 +3487,7 @@ _junonia_exec () {
     # If the user filter is getting skipped then a meta parameter is being run.
     # So the script's top level positional parameters and options need to be
     # filtered out. Does not apply to config and help.
+    JUNONIA_INTERP=sh
     if [ "$func" = _junonia_help ] || [ "$func" = _junonia_config ]; then
       shift_n=0
     else
@@ -3510,8 +3552,11 @@ _junonia_exec () {
   readonly JUNONIA_SPEC_TYPE="$spec_type"
   readonly JUNONIA_SPEC="$spec"
 
-  echodebug "JUNONIA_CMD      : $JUNONIA_CMD"
-  echodebug "JUNONIA_FUNC     : $JUNONIA_FUNC"
+  #echodebug "spec:"
+  #echodebug_raw "$spec"
+
+  echodebug "JUNONIA_CMD:       $JUNONIA_CMD"
+  echodebug "JUNONIA_FUNC:      $JUNONIA_FUNC"
   echodebug "JUNONIA_SPEC_TYPE: $JUNONIA_SPEC_TYPE"
   echodebug "args:"
   echodebug_raw "$@"
@@ -3544,12 +3589,32 @@ _junonia_exec () {
     return 1
   fi
 
-  # A function file was found and sourced, and the function was found. Execute
-  # the function.
   if [ "$func" = "junonia_web" ]; then
+    # The function actually being run is junonia_web
     $JUNONIA_FUNC "$jw_func" "$jw_method" "$jw_content_t" "$jw_url" "$jw_output" "$@"
   else
-    $JUNONIA_FUNC "$@"
+    # A function file was found and sourced, and the function was found. Execute
+    # the function.
+    echodebug "JUNONIA_INTERP: $JUNONIA_INTERP"
+    case "$JUNONIA_INTERP" in
+      sh)
+        $JUNONIA_FUNC "$@"
+        ;;
+      python|python3|pypy3|pypy)
+        echodebug "executing python command"
+        echodebug "PYTHONPATH=\"$JUNONIA_PATH/lib/python\" \"$JUNONIA_INTERP\" \"$JUNONIA_FUNCPATH\" \"$@\""
+        PYTHONPATH="$JUNONIA_PATH/lib/python" "$JUNONIA_INTERP" "$JUNONIA_FUNCPATH" "$@"
+        ;;
+      *)
+        if command -v "$JUNONIA_INTERP"; then
+          echodebug "attempting execution with $JUNONIA_INTERP"
+          "$JUNONIA_INTERP" "$JUNONIA_FUNCPATH" "$@"
+        else
+          echoerr "Unable to execute $func with $JUNONIA_INTERP"
+          return 1
+        fi
+        ;;
+    esac
   fi
 }
 

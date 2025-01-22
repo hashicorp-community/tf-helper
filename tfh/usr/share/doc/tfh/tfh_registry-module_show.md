@@ -1,12 +1,24 @@
 ## `tfh registry-module show`
 
-Run registry-module show subcommands
+/registry-modules/show/{ORGANIZATION_NAME}/{NAME}/{PROVIDER}
 
 ### Synopsis
 
-    tfh registry-module show COMMAND[ ... ]
+    tfh registry-module show [ ... ]
+
+### REST endpoint
+
+    GET https://{HOSTNAME}/api/v2/registry-modules/show/{ORGANIZATION_NAME}/{NAME}/{PROVIDER}
 
 ### Description
 
-Run registry-module show subcommands
+https://developer.hashicorp.com/terraform/enterprise/api-docs/private-registry_modules
+
+### Positional parameters
+
+* `ORGANIZATION_NAME`
+
+* `NAME`
+
+* `PROVIDER`
 

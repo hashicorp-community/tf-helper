@@ -208,7 +208,7 @@ $_junonia_web_cmds"
   junonia_auth_config
 
   readonly JW_DEFAULT_CURLRC="$JUNONIA_CONFIGDIR/curlrc"
-  readonly JW_CURLRC="${JW_CURLRC:-"$JW_DEFAULT_CURLRC"}"
+  JW_CURLRC="${JW_CURLRC:-"$JW_DEFAULT_CURLRC"}"
   # Indicate that init has happened
   readonly JW_INIT=1
 }
@@ -498,59 +498,99 @@ junonia_web () {
   output="$1"
   shift
 
-  echodebug "junonia_web $func_name $method $url"
+  echodebug "begin junonia_web"
+  echodebug "func_name: $func_name"
+  echodebug "method:    $method"
+  echodebug "content_t: $content_t"
+  echodebug "url:       $url"
+  echodebug "output:    $output"
+  echodebug "remaining arguments:"
+  echodebug_raw "$@"
 
   # Determine how many upper case parameters there are to replace in the url
+  echodebug "url: $url"
   n_opts="$(echo "$url" | awk '{print gsub(/{[-_\.A-Z]+}/,"")}')"
+  echodebug "url opts: $n_opts"
 
-  # See if there are additional parameters coming from elsewhere.
-  if [ -n "$JW_ADDL_PARAMS" ]; then
-    echodebug "addl params: $JW_ADDL_PARAMS"
-    url="$(echo "$url" | awk -v "JRS=$JRS" -v "params=$JW_ADDL_PARAMS" '{
-      split(params, addl_params, JRS)
-      for(p in addl_params) {
-        split(addl_params[p], a, "=")
-        did_sub = sub("{" a[1] "}", a[2])
+  # Get the upper case parameters in the url in order
+  urlparams="$(echo "$url" | awk '{
+    n = split($0, a, /{[-_\.A-Z]+}/)
+    for(i=1; i<=n; i++) {
+      sub(a[i], "", $0)
+    }
+    sub(/^{/,"",$0)
+    sub(/}$/,"",$0)
+    n = split($0, b, /}{/)
+    for(i=1; i<=n; i++) {
+      print b[i]
+    }
+  }')"
+
+  if [ -f "$JUNONIA_CONFIGDIR/urlparams" ]; then
+    echodebug "in urlparams"
+    url="$(awk -v "url=$url" '{
+        split($0, a, "=")
+        did_sub = sub("{" a[1] "}", a[2], url)
         subs = subs + did_sub
       }
-      print
-      exit subs
-    }')"
-    addl_subs=$?
-  else
-    addl_subs=0
+      END {
+        print url
+        exit subs
+      }' "$JUNONIA_CONFIGDIR/urlparams")"
   fi
 
-  # Remove the number of upper case parameters replaced by addl parameters
-  n_opts=$(( $n_opts - $addl_subs ))
-  echodebug "n_opts:$n_opts addl_subs:$addl_subs #args:$#"
+  # Determine how many upper case parameters there are to replace in the url
+  echodebug "url: $url"
 
-  # For that many options, shift off values and substitute the parameter.
-  # Parameters are of the form FOO=bar, where FOO is always uppercase.
+  # Get the remaining upper case parameters in order
+  urlparams="$(echo "$url" | awk '{
+    n = split($0, a, /{[-_\.A-Z]+}/)
+    for(i=1; i<=n; i++) {
+      sub(a[i], "", $0)
+    }
+    sub(/^{/,"",$0)
+    sub(/}$/,"",$0)
+    n = split($0, b, /}{/)
+    for(i=1; i<=n; i++) {
+      print b[i]
+    }
+  }')"
+
+  # What's left should be assigned in order
+  url="$(echo "$urlparams" | awk -v "url=$url" 'BEGIN{
+    j = 1
+    for(i=1; i<=ARGC; i++) {
+      split(ARGV[i], p, "=")
+      if(p[2] != "") {
+        params[j] = p[2]
+        j++
+      }
+      ARGV[i] = ""
+    }
+    ARGC = 1
+  }
+  {
+    if(params[NR] != "") {
+      did_sub = sub("{" $0 "}", params[NR], url)
+      subs = subs + did_sub
+    }
+  }
+  END {
+    print url
+    exit subs
+  }' "$@")"
+
+  echodebug "final url: $url"
+
+  # For the number of options-1, shift off those arguments, leaving json output bool
   i=0
-  n_subs=0
-  while [ $i -lt $# ] && [ $i -lt $n_opts ]; do
-    echodebug "substituting $1"
-    url="$(echo "$url" | awk -v "param=$1" '{
-      split(param, a, "=")
-      did_sub = sub("{" a[1] "}", a[2])
-      print
-      exit did_sub
-    }')"
-    n_subs=$(( $n_subs + $? ))
-    i=$(( $i+1 ))
-    echodebug "n_subs:$n_subs"
+  while [ $i -lt $(( $# - 1 )) ] && [ $i -lt $n_opts ]; do
     shift
   done
 
-  echodebug "n_subs:$n_subs n_opts:$n_opts"
-  if [ "$n_subs" -lt "$n_opts" ]; then
-    echoerr "Mismatch on number of parameters and url"
-    echoerr "Cannot continue with $url"
-    return 1
-  fi
-
-  echodebug "final url: $url"
+  json="$1"
+  shift
+  echodebug "  json: $json"
 
   echodebug "remaining arguments ($#):"
   echodebug_raw $@
@@ -574,6 +614,7 @@ junonia_web () {
 
   echodebug "final query: $query"
 
+  echodebug "searching for callback"
   if _junonia_load_func $func_name; then
     echodebug "located callback $func_name"
     cb=$func_name
@@ -624,16 +665,16 @@ junonia_web () {
             tpl_arg=
             output_tpl=1
             get_tpl="cmd"
-            echodebug "SOH"
-            echodebug "cmd: $tpl_cmd"
-            echodebug "arg: $tpl_arg"
+            #echodebug "SOH"
+            #echodebug "cmd: $tpl_cmd"
+            #echodebug "arg: $tpl_arg"
             ;;
           $JEOT)
-            echodebug "EOT"
-            echodebug "cmd: $tpl_cmd"
-            echodebug "arg: $tpl_arg"
+            #echodebug "EOT"
+            #echodebug "cmd: $tpl_cmd"
+            #echodebug "arg: $tpl_arg"
 
-            echodebug "tpl_cmd: $tpl_cmd $@"
+            #echodebug "tpl_cmd: $tpl_cmd $@"
             $tpl_cmd "$@"
 
             output_tpl=
@@ -641,17 +682,17 @@ junonia_web () {
             ;;
           $JSTX)
             get_tpl="newarg"
-            echodebug "STX"
-            echodebug "cmd: $tpl_cmd"
-            echodebug "arg: $tpl_arg"
+            #echodebug "STX"
+            #echodebug "cmd: $tpl_cmd"
+            #echodebug "arg: $tpl_arg"
             ;;
           $JETX)
             set "$@" "$tpl_arg"
             tpl_arg=
             get_tpl=
-            echodebug "ETX"
-            echodebug "cmd: $tpl_cmd"
-            echodebug "arg: $tpl_arg"
+            #echodebug "ETX"
+            #echodebug "cmd: $tpl_cmd"
+            #echodebug "arg: $tpl_arg"
             ;;
           *)
             if [ $output_tpl ]; then
@@ -659,36 +700,36 @@ junonia_web () {
                 cmd)
                   tpl_cmd="$line"
                   get_tpl=
-                  echodebug "* cmd"
-                  echodebug "cmd: $tpl_cmd"
-                  echodebug "arg: $tpl_arg"
+                  #echodebug "* cmd"
+                  #echodebug "cmd: $tpl_cmd"
+                  #echodebug "arg: $tpl_arg"
                   ;;
                 newarg)
                   if [ "$line" != "" ]; then
                     tpl_arg="$tpl_arg$line"
-                    echodebug "* arg1"
-                    echodebug "cmd: $tpl_cmd"
-                    echodebug "arg: $tpl_arg"
+                    #echodebug "* arg1"
+                    #echodebug "cmd: $tpl_cmd"
+                    #echodebug "arg: $tpl_arg"
                     get_tpl=arg
                   fi
                   ;;
                 arg)
                   tpl_arg="$(printf "%s\n%s" "$tpl_arg" "$line")"
-                  echodebug "* arg2"
-                  echodebug "cmd: $tpl_cmd"
-                  echodebug "arg: $tpl_arg"
+                  #echodebug "* arg2"
+                  #echodebug "cmd: $tpl_cmd"
+                  #echodebug "arg: $tpl_arg"
                   ;;
                 *)
                   tpl_cmd="$tpl_cmd\n$line"
                   get_tpl=""
-                  echodebug "* cmd2"
-                  echodebug "cmd: $tpl_cmd"
-                  echodebug "arg: $tpl_arg"
+                  #echodebug "* cmd2"
+                  #echodebug "cmd: $tpl_cmd"
+                  #echodebug "arg: $tpl_arg"
                   ;;
                 esac
             else
               printf "%s\n" "$line"
-              echodebug "*"
+              #echodebug "*"
             fi
             ;;
         esac
@@ -788,6 +829,10 @@ junonia_request () {
       fi
     fi
 
+    if [ -n "$JW_CONTENT_TYPE" ]; then
+      _content_t="$JW_CONTENT_TYPE"
+    fi
+
     if [ -z "$_content_t" ]; then
       if [ "$_method" = POST ]; then
         echodebug "set default content type to application/json"
@@ -825,7 +870,7 @@ junonia_request () {
       _callback="$1"
       shift
     else
-      echodebug "no callback command found"
+      echodebug "no explicit callback command provided"
     fi
   fi
 
@@ -841,7 +886,7 @@ junonia_request () {
 
   case -$_npages:$_selector:$_callback- in
   -::-)
-    echodebug "no page limit, no selector, no callback"
+    echodebug "no page limit, no selector, no explicit callback"
     echodebug "will make the single request"
     ;;
   -?*::-)
@@ -880,7 +925,7 @@ junonia_request () {
   fi
 
   case "$JW_AUTH_SRC" in
-    curl)
+    curlrc)
       _autharg="$JW_AUTH"
       _autharg_debug='$JW_AUTH_REDACTED (curl)'
       ;;
@@ -911,7 +956,7 @@ junonia_request () {
     _resp="$(curl $JW_CURL_SILENT -w '\nhttp_code: %{http_code}\n' \
                   $_autharg \
                   "$_url" \
-                  -H "Content-Type: $_content_t\"" \
+                  -H "Content-Type: $_content_t" \
                   $@)"
   else
     _resp="$(curl $JW_CURL_SILENT "$_url" -w '\nhttp_code: %{http_code}\n' \
@@ -961,12 +1006,13 @@ junonia_request () {
     4*|5*)
       echoerr "API request failed."
       echoerr_raw "HTTP status code: $_resp_code"
-      if _json_err="$(junonia_jtree "$_resp_body" "$JW_ERR_SELECTOR")"; then
-        echoerr_raw "Details:"
-        echoerr_raw "$_json_err"
+      if [ -n "$_resp_body" ]; then
+        if _json_err="$(junonia_jtree "$_resp_body" "$JW_ERR_SELECTOR")"; then
+          echoerr_raw "Details:"
+          echoerr_raw "$_json_err"
+        fi
       else
-        echoerr "Response:"
-        echoerr_raw "$_resp_body"
+        echoerr "Empty response body"
       fi
 
       return 1

@@ -1,6 +1,6 @@
 ## `tfh workspace relationship remote-state-consumer create`
 
-/workspaces/{WORKSPACE_ID}/relationships/remote_state_consumers
+/workspaces/{WORKSPACE_ID}/relationships/remote-state-consumers
 
 ### Synopsis
 
@@ -8,11 +8,11 @@
 
 ### REST endpoint
 
-    POST https://{HOSTNAME}/api/v2/workspaces/{WORKSPACE_ID}/relationships/remote_state_consumers
+    POST https://{HOSTNAME}/api/v2/workspaces/{WORKSPACE_ID}/relationships/remote-state-consumers
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/workspaces
+https://developer.hashicorp.com/terraform/enterprise/api-docs/workspaces
 
 ### Positional parameters
 

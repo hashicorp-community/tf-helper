@@ -1,12 +1,16 @@
 ## `tfh account detail`
 
-Run account detail subcommands
+/account/details
 
 ### Synopsis
 
-    tfh account detail COMMAND[ ... ]
+    tfh account detail [ ... ]
+
+### REST endpoint
+
+    GET https://{HOSTNAME}/api/v2/account/details
 
 ### Description
 
-Run account detail subcommands
+https://developer.hashicorp.com/terraform/enterprise/api-docs/account
 

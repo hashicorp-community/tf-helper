@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/vcs-events
+https://developer.hashicorp.com/terraform/enterprise/api-docs/vcs-events
 
 ### Positional parameters
 

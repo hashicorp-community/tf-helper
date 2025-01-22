@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/organization-tags
+https://developer.hashicorp.com/terraform/enterprise/api-docs/organization-tags
 
 ### Positional parameters
 

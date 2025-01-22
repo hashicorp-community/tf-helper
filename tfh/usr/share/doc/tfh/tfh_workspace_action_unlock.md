@@ -1,12 +1,20 @@
 ## `tfh workspace action unlock`
 
-Run workspace action unlock subcommands
+/workspaces/{WORKSPACE_ID}/actions/unlock
 
 ### Synopsis
 
-    tfh workspace action unlock COMMAND[ ... ]
+    tfh workspace action unlock [ ... ]
+
+### REST endpoint
+
+    POST https://{HOSTNAME}/api/v2/workspaces/{WORKSPACE_ID}/actions/unlock
 
 ### Description
 
-Run workspace action unlock subcommands
+https://developer.hashicorp.com/terraform/enterprise/api-docs/workspaces
+
+### Positional parameters
+
+* `WORKSPACE_ID`
 

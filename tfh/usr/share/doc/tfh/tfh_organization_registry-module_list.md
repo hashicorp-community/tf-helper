@@ -12,7 +12,7 @@
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/private-registry_modules
+https://developer.hashicorp.com/terraform/enterprise/api-docs/private-registry_modules
 
 ### Positional parameters
 

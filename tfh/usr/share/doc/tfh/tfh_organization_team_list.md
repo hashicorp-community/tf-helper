@@ -12,7 +12,7 @@ organizations/{ORGANIZATION_NAME}/teams
 
 ### Description
 
-https://www.terraform.io/enterprise/api-docs/teams
+https://developer.hashicorp.com/terraform/enterprise/api-docs/teams
 
 ### Positional parameters
 
