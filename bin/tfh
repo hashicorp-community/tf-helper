@@ -121,10 +121,6 @@ tfh_junonia_filter () {
   return 6
 }
 
-#tfh_web_callback () {
-#  echo "foo"
-#}
-
 # This is a compact version of junonia_bootstrap for easy copyhing into user
 # scripts. For a fully commented, documented version of this script see
 # https://github.com/fprimex/junonia/blob/master/junonia.sh
@@ -193,7 +189,7 @@ JUNONIA_WRAP=100
 JUNONIA_COL1=30
 JUNONIA_COL2=70
 
-. "$JUNONIA_PATH"/lib/tfh/junonia
+. "$JUNONIA_PATH"/lib/junonia
 
 echodebug "PWD: $PWD"
 echodebug "CLI: $0 $*"
